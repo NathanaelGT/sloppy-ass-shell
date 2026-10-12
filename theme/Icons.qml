@@ -76,6 +76,8 @@ Singleton {
     "grip-vertical": "\uec01",
     "lock": "\ueae2",
     "lock-open": "\ueae1",
+    "eye": "\uea9a",
+    "eye-off": "\uecf3",
     "moon": "\ueaf8",
     "suspend": "\ueaf8",
     "reload": "\uf3ae",

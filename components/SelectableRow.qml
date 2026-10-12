@@ -22,6 +22,15 @@ Rectangle {
   color: active || mouse.containsMouse ? Theme.surfaceHigh : Theme.surface
   antialiasing: true
 
+  MouseArea {
+    id: mouse
+
+    anchors.fill: parent
+    hoverEnabled: true
+    cursorShape: Qt.PointingHandCursor
+    onClicked: root.clicked()
+  }
+
   Item {
     id: leadingHost
 
@@ -55,14 +64,6 @@ Rectangle {
     anchors.rightMargin: root.actionMargin
     anchors.verticalCenter: parent.verticalCenter
     spacing: root.actionSpacing
-  }
-
-  MouseArea {
-    id: mouse
-
-    anchors.fill: parent
-    hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
-    onClicked: root.clicked()
+    z: 1
   }
 }
