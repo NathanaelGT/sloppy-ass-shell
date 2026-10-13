@@ -877,6 +877,108 @@ ShellRoot {
       return panel.testSetSection(section, state)
     }
 
+    function bluetoothState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testBluetoothState()
+      state.enabled = true
+      state.open = true
+      return JSON.stringify(state)
+    }
+
+    function bluetoothSectionToggle(section: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleSection(section)
+    }
+
+    function bluetoothSectionSet(section: string, state: bool): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testSetSection(section, state)
+    }
+
+    function bluetoothExpand(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleExpanded(address)
+    }
+
+    function bluetoothRemoveAsk(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testAskRemove(address)
+    }
+
+    function bluetoothRemoveConfirm(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testConfirmRemove()
+    }
+
+    function bluetoothRemoveCancel(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testCancelRemove()
+    }
+
+    function bluetoothTrusted(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleTrusted(address)
+    }
+
+    function bluetoothConnected(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleConnected(address)
+    }
+
     function panelRect(name: string, screen: string): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"

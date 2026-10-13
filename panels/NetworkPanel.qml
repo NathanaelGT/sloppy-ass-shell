@@ -94,7 +94,8 @@ PanelBase {
       out.push({
         kind: "connected",
         section: "connected",
-        net: connectedNetwork
+        itemKey: connectedNetwork.name,
+        active: !!connectedNetwork.connected
       })
     }
     if (savedNetworks.length > 0) {
@@ -107,7 +108,8 @@ PanelBase {
         out.push({
           kind: "net",
           section: "saved",
-          net: savedNetworks[i]
+          itemKey: savedNetworks[i].name,
+          active: !!savedNetworks[i].connected
         })
       }
     }
@@ -121,99 +123,13 @@ PanelBase {
         out.push({
           kind: "net",
           section: "available",
-          net: availableNetworks[i]
+          itemKey: availableNetworks[i].name,
+          active: !!availableNetworks[i].connected
         })
       }
     }
     return out
   }
-
-  function rowKey(entry) {
-    if (entry.kind === "label") {
-      return "label:" + entry.section
-    }
-    return "net:" + entry.net.name
-  }
-
-  ListModel {
-    id: wifiModel
-  }
-
-  function syncRows() {
-    const rows = root.rows
-    const wanted = {}
-    for (let j = 0; j < rows.length; j++) {
-      const entry = rows[j]
-      let key = root.rowKey(entry)
-      if (entry.kind !== "label") {
-        let n = 0
-        while (wanted[key] !== undefined) {
-          n += 1
-          key = root.rowKey(entry) + "#" + n
-        }
-      }
-      wanted[key] = j
-    }
-    for (let i = wifiModel.count - 1; i >= 0; i--) {
-      if (wanted[wifiModel.get(i).key] === undefined) {
-        wifiModel.remove(i)
-      }
-    }
-    for (let j = 0; j < rows.length; j++) {
-      const entry = rows[j]
-      const isLabel = entry.kind === "label"
-      const label = isLabel ? entry.text : ""
-      const netName = isLabel ? "" : entry.net.name
-      const connected = isLabel ? false : !!entry.net.connected
-      let key = root.rowKey(entry)
-      if (!isLabel) {
-        let n = 0
-        while (wanted[key] !== undefined && wanted[key] !== j) {
-          n += 1
-          key = root.rowKey(entry) + "#" + n
-        }
-      }
-      wanted[key] = j
-      let at = -1
-      for (let i = 0; i < wifiModel.count; i++) {
-        if (wifiModel.get(i).key === key) {
-          at = i
-          break
-        }
-      }
-      if (at < 0) {
-        wifiModel.insert(j, {
-          key: key,
-          kind: entry.kind,
-          section: entry.section,
-          label: label,
-          netName: netName,
-          connected: connected
-        })
-      } else {
-        if (at !== j) {
-          wifiModel.move(at, j, 1)
-        }
-        if (wifiModel.get(j).kind !== entry.kind) {
-          wifiModel.setProperty(j, "kind", entry.kind)
-        }
-        if (wifiModel.get(j).section !== entry.section) {
-          wifiModel.setProperty(j, "section", entry.section)
-        }
-        if (wifiModel.get(j).label !== label) {
-          wifiModel.setProperty(j, "label", label)
-        }
-        if (wifiModel.get(j).netName !== netName) {
-          wifiModel.setProperty(j, "netName", netName)
-        }
-        if (wifiModel.get(j).connected !== connected) {
-          wifiModel.setProperty(j, "connected", connected)
-        }
-      }
-    }
-  }
-
-  onRowsChanged: root.syncRows()
 
   onEnabledChanged: {
     if (!root.enabled) {
@@ -226,16 +142,6 @@ PanelBase {
     if (cardHovered) {
       root.maybeRescan()
     }
-  }
-
-  function sectionExpanded(section) {
-    if (section === "connected") {
-      return root.connectedExpanded
-    }
-    if (section === "saved") {
-      return root.savedExpanded
-    }
-    return root.availableExpanded
   }
 
   function toggleSection(section) {
@@ -523,7 +429,7 @@ PanelBase {
     }
     const rows = root.rowDelegates()
     for (let i = 0; i < rows.length; i++) {
-      if (rows[i].netName === name) {
+      if (rows[i].itemKey === name) {
         return rows[i].passwordEditor
       }
     }
@@ -759,18 +665,18 @@ PanelBase {
     rolling: root.enabled && root.rows.length === 0
   }
 
-  ListView {
+  SectionList {
     id: list
 
-    visible: root.enabled && wifiModel.count > 0
-    width: parent.width
+    visible: root.enabled && count > 0
     height: visible ? contentHeight : 0
-    implicitHeight: height
-    interactive: false
-    focus: false
-    clip: true
-    spacing: Theme.gap
-    model: wifiModel
+    entries: root.rows
+    sections: ({
+        connected: root.connectedExpanded,
+        saved: root.savedExpanded,
+        available: root.availableExpanded
+      })
+    onSectionToggled: root.toggleSection(section)
 
     delegate: Item {
       id: entry
@@ -781,30 +687,30 @@ PanelBase {
       required property string kind
       required property string section
       required property string label
-      required property string netName
-      required property bool connected
+      required property string itemKey
+      required property bool active
 
-      readonly property var net: entry.isLabel ? null : root.findNetwork(entry.netName)
+      readonly property var net: entry.isLabel ? null : root.findNetwork(entry.itemKey)
       readonly property bool isLabel: entry.kind === "label"
-      readonly property bool isConnected: entry.net ? entry.net.connected : entry.connected
-      readonly property bool pwOpen: !entry.isLabel && root.pending !== "" && root.pending === entry.netName
-      readonly property bool confirmOpen: !entry.isLabel && root.confirmForget !== "" && root.confirmForget === entry.netName
-      readonly property bool actionsOpen: !entry.isLabel && root.expanded !== "" && root.expanded === entry.netName && !entry.pwOpen && !entry.confirmOpen
+      readonly property bool isConnected: entry.net ? entry.net.connected : entry.active
+      readonly property bool pwOpen: !entry.isLabel && root.pending !== "" && root.pending === entry.itemKey
+      readonly property bool confirmOpen: !entry.isLabel && root.confirmForget !== "" && root.confirmForget === entry.itemKey
+      readonly property bool actionsOpen: !entry.isLabel && root.expanded !== "" && root.expanded === entry.itemKey && !entry.pwOpen && !entry.confirmOpen
       readonly property bool changing: entry.net ? entry.net.stateChanging : false
-      readonly property bool busy: entry.changing || (!entry.isLabel && root.activating !== "" && root.activating === entry.netName)
-      onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.netName) {
+      readonly property bool busy: entry.changing || (!entry.isLabel && root.activating !== "" && root.activating === entry.itemKey)
+      onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.itemKey) {
         root.activating = ""
       }
       readonly property var passwordEditor: pwField
       readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || pwHover.containsMouse || eyeBtn.hovered || passCheckBtn.hovered || forgetCancelBtn.hovered || forgetCheckBtn.hovered || trashActionBtn.hovered || qrActionBtn.hovered || toggleActionBtn.hovered || speedActionBtn.hovered || badgeHover.containsMouse
-      readonly property bool shown: entry.isLabel ? true : root.sectionExpanded(entry.section)
+      readonly property bool shown: entry.isLabel ? true : list.isExpanded(entry.section)
       readonly property int qrSize: Math.round(entry.width * 0.5)
-      readonly property bool qrOpen: !entry.isLabel && entry.actionsOpen && root.sharing === entry.netName
-      readonly property string qrPayload: entry.isLabel ? "" : root.qrPayload(entry.netName)
-      readonly property bool qrLoading: entry.qrOpen && entry.net ? (root.qrHasPassword(entry.net) && !root.pskLoaded(entry.netName)) : false
+      readonly property bool qrOpen: !entry.isLabel && entry.actionsOpen && root.sharing === entry.itemKey
+      readonly property string qrPayload: entry.isLabel ? "" : root.qrPayload(entry.itemKey)
+      readonly property bool qrLoading: entry.qrOpen && entry.net ? (root.qrHasPassword(entry.net) && !root.pskLoaded(entry.itemKey)) : false
       readonly property bool qrMissing: entry.qrOpen && !entry.qrLoading && entry.qrPayload === ""
-      readonly property bool speedActive: Speedtest.running && Speedtest.target === entry.netName
-      readonly property bool speedFailed: Speedtest.error !== "" && Speedtest.target === entry.netName
+      readonly property bool speedActive: Speedtest.running && Speedtest.target === entry.itemKey
+      readonly property bool speedFailed: Speedtest.error !== "" && Speedtest.target === entry.itemKey
       readonly property int qrFadeMs: 220
       property bool qrExpanded: false
       onQrOpenChanged: {
@@ -852,19 +758,15 @@ PanelBase {
         onTriggered: entry.qrExpanded = false
       }
 
-      SectionHeader {
+      SectionHeaderRow {
         visible: entry.isLabel
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         label: entry.label
-
-        IconButton {
-          size: Math.round(20 * Theme.scale)
-          name: root.sectionExpanded(entry.section) ? "chevron-up" : "chevron-down"
-          iconColor: Theme.overlay
-          onClicked: root.toggleSection(entry.section)
-        }
+        section: entry.section
+        expanded: list.isExpanded(entry.section)
+        onToggleRequested: list.toggleSection(entry.section)
       }
 
       Rectangle {
@@ -941,7 +843,7 @@ PanelBase {
             anchors.right: actionsRow.left
             anchors.rightMargin: Math.round(8 * Theme.scale)
             anchors.verticalCenter: parent.verticalCenter
-            text: entry.net ? entry.net.name : entry.netName
+            text: entry.net ? entry.net.name : entry.itemKey
             color: entry.strongText
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
@@ -1109,7 +1011,7 @@ PanelBase {
             Text {
               width: parent.width - Math.round(48 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
-              text: "Forget " + entry.netName + "?"
+              text: "Forget " + entry.itemKey + "?"
               color: Theme.text
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSize
@@ -1196,7 +1098,7 @@ PanelBase {
             y: Math.round(4 * Theme.scale)
 
             Row {
-              visible: entry.isConnected && Speedtest.visibleFor(entry.netName)
+              visible: entry.isConnected && Speedtest.visibleFor(entry.itemKey)
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               spacing: Math.round(4 * Theme.scale)
@@ -1218,14 +1120,14 @@ PanelBase {
               }
 
               Item {
-                visible: Speedtest.up >= 0 && Speedtest.target === entry.netName
+                visible: Speedtest.up >= 0 && Speedtest.target === entry.itemKey
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.round(8 * Theme.scale)
                 height: Math.round(8 * Theme.scale)
               }
 
               Icon {
-                visible: Speedtest.up >= 0 && Speedtest.target === entry.netName
+                visible: Speedtest.up >= 0 && Speedtest.target === entry.itemKey
                 anchors.verticalCenter: parent.verticalCenter
                 name: "upload"
                 color: entry.mutedText
@@ -1233,7 +1135,7 @@ PanelBase {
               }
 
               Text {
-                visible: Speedtest.up >= 0 && Speedtest.target === entry.netName
+                visible: Speedtest.up >= 0 && Speedtest.target === entry.itemKey
                 anchors.verticalCenter: parent.verticalCenter
                 text: Speedtest.text(Speedtest.up)
                 color: entry.strongText
@@ -1333,10 +1235,10 @@ PanelBase {
               Text {
                 anchors.centerIn: parent
                 text: "AUTO"
-                color: root.autoEnabled(entry.netName) ? entry.accentText : Theme.overlay
+                color: root.autoEnabled(entry.itemKey) ? entry.accentText : Theme.overlay
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
-                font.bold: root.autoEnabled(entry.netName)
+                font.bold: root.autoEnabled(entry.itemKey)
 
                 Behavior on color {
                   ColorAnimation {
@@ -1353,7 +1255,7 @@ PanelBase {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: if (entry.net) {
-                  root.setAutoConnect(entry.netName, !root.autoEnabled(entry.netName))
+                  root.setAutoConnect(entry.itemKey, !root.autoEnabled(entry.itemKey))
                 }
               }
             }

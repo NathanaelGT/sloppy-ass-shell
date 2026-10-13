@@ -96,6 +96,7 @@ PanelWindow {
   }
   readonly property int cardX: align === "center" ? Math.round((width - cardWidth) / 2) : align === "left" ? edge : width - cardWidth - edge
   readonly property int restingY: vertical === "center" ? Math.round(((modelData ? modelData.height : 0) - cardHeight) / 2) : topMargin
+  readonly property int contentWidth: cardWidth - contentPad * 2
   readonly property real contentHeight: bodyColumn.implicitHeight
   readonly property real viewportHeight: scroller.height
 
