@@ -498,6 +498,24 @@ PanelBase {
     return root.toggleSharing(network);
   }
 
+  function wifiIface() {
+    return root.device ? root.device.name : "";
+  }
+
+  function testToggleSpeedtest() {
+    if (!root.connectedNetwork) return false;
+    return Speedtest.toggle(root.connectedNetwork.name, root.wifiIface());
+  }
+
+  function testPreloadSpeedtest() {
+    return Speedtest.preload();
+  }
+
+  function testMockSpeedtest(phase, down, up) {
+    if (!root.connectedNetwork) return false;
+    return Speedtest.mock(root.connectedNetwork.name, phase, down, up);
+  }
+
   function testWifiState() {
     return {
       pending: root.pending,
@@ -515,7 +533,8 @@ PanelBase {
       availableExpanded: root.availableExpanded,
       connected: root.connectedNetwork ? root.connectedNetwork.name : "",
       saved: root.savedNetworks.map((n) => n.name),
-      available: root.availableNetworks.map((n) => n.name)
+      available: root.availableNetworks.map((n) => n.name),
+      speedtest: Speedtest.state()
     };
   }
 
@@ -592,13 +611,15 @@ PanelBase {
       readonly property bool busy: entry.changing || (!entry.isLabel && root.activating !== "" && root.activating === entry.netName)
       onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.netName) root.activating = ""
       readonly property var passwordEditor: pwField
-      readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || pwHover.containsMouse || eyeBtn.hovered || passCheckBtn.hovered || forgetCancelBtn.hovered || forgetCheckBtn.hovered || trashActionBtn.hovered || qrActionBtn.hovered || toggleActionBtn.hovered || badgeHover.containsMouse
+      readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || pwHover.containsMouse || eyeBtn.hovered || passCheckBtn.hovered || forgetCancelBtn.hovered || forgetCheckBtn.hovered || trashActionBtn.hovered || qrActionBtn.hovered || toggleActionBtn.hovered || speedActionBtn.hovered || badgeHover.containsMouse
       readonly property bool shown: entry.isLabel ? true : root.sectionExpanded(entry.section)
       readonly property int qrSize: Math.round(entry.width * 0.5)
       readonly property bool qrOpen: !entry.isLabel && entry.actionsOpen && root.sharing === entry.netName
       readonly property string qrPayload: entry.isLabel ? "" : root.qrPayload(entry.netName)
       readonly property bool qrLoading: entry.qrOpen && entry.net ? (root.qrHasPassword(entry.net) && !root.pskLoaded(entry.netName)) : false
       readonly property bool qrMissing: entry.qrOpen && !entry.qrLoading && entry.qrPayload === ""
+      readonly property bool speedActive: Speedtest.running && Speedtest.target === entry.netName
+      readonly property bool speedFailed: Speedtest.error !== "" && Speedtest.target === entry.netName
       readonly property int qrFadeMs: 220
       property bool qrExpanded: false
       onQrOpenChanged: {
@@ -942,6 +963,53 @@ PanelBase {
             height: Math.round(20 * Theme.scale)
             y: Math.round(4 * Theme.scale)
 
+            Row {
+              visible: entry.isConnected && Speedtest.visibleFor(entry.netName)
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Math.round(4 * Theme.scale)
+
+              Icon {
+                visible: Speedtest.down >= 0 || entry.speedFailed
+                anchors.verticalCenter: parent.verticalCenter
+                name: "download"
+                color: entry.mutedText
+                font.pixelSize: Theme.fontSizeSmall
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: entry.speedFailed ? Speedtest.error : (Speedtest.down >= 0 ? Speedtest.text(Speedtest.down) : (Speedtest.running ? Speedtest.statusText() : "--"))
+                color: entry.speedFailed ? Theme.red : entry.strongText
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall
+              }
+
+              Item {
+                visible: Speedtest.up >= 0 && Speedtest.target === entry.netName
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.round(8 * Theme.scale)
+                height: Math.round(8 * Theme.scale)
+              }
+
+              Icon {
+                visible: Speedtest.up >= 0 && Speedtest.target === entry.netName
+                anchors.verticalCenter: parent.verticalCenter
+                name: "upload"
+                color: entry.mutedText
+                font.pixelSize: Theme.fontSizeSmall
+              }
+
+              Text {
+                visible: Speedtest.up >= 0 && Speedtest.target === entry.netName
+                anchors.verticalCenter: parent.verticalCenter
+                text: Speedtest.text(Speedtest.up)
+                color: entry.strongText
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall
+              }
+            }
+
             IconButton {
               id: toggleActionBtn
 
@@ -1035,6 +1103,23 @@ PanelBase {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: if (entry.net) root.setAutoConnect(entry.netName, !root.autoEnabled(entry.netName))
               }
+            }
+
+            IconButton {
+              id: speedActionBtn
+
+              visible: entry.isConnected
+              anchors.right: autoToggleBtn.left
+              anchors.rightMargin: Math.round(4 * Theme.scale)
+              anchors.verticalCenter: parent.verticalCenter
+              size: Math.round(20 * Theme.scale)
+              glyphSize: Math.round(13 * Theme.scale)
+              name: "gauge"
+              spinning: entry.speedActive
+              iconColor: speedActionBtn.hovered ? entry.hoverText : Theme.overlay
+              hoverColor: entry.hoverSurface
+              onClicked: if (entry.net) Speedtest.toggle(entry.net.name, root.wifiIface())
+              onHoveredChanged: if (speedActionBtn.hovered) Speedtest.preload()
             }
           }
         }

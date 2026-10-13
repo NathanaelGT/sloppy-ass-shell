@@ -583,6 +583,27 @@ ShellRoot {
       return panel.testToggleSharing(name);
     }
 
+    function wifiSpeedtest(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testToggleSpeedtest();
+    }
+
+    function wifiSpeedtestMock(phase: string, down: real, up: real): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testMockSpeedtest(phase, down, up);
+    }
+
+    function wifiSpeedtestPreload(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testPreloadSpeedtest();
+    }
+
     function wifiSectionToggle(section: string): bool {
       if (!TestDriver.active) return false;
       const panel = TestDriver.panel("network");

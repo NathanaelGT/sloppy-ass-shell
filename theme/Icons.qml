@@ -108,7 +108,8 @@ Singleton {
     "devices": "\ueb87",
     "wallpaper": "\uef56",
     "download": "\uea96",
-    "upload": "\ueb47"
+    "upload": "\ueb47",
+    "gauge": "\ueab1"
   })
 
   readonly property string fallback: "\uea6b"
