@@ -10,6 +10,7 @@ Singleton {
     "wifi-2": "\ueba5",
     "world": "\ueb54",
     "world-off": "\uf1ca",
+    "qrcode": "\ueb11",
     "bluetooth": "\uea37",
     "bluetooth-off": "\ueceb",
     "bluetooth-connected": "\uecea",

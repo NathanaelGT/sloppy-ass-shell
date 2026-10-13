@@ -15,10 +15,13 @@ PanelBase {
   property string confirmForget: ""
   property string expanded: ""
   property string activating: ""
+  property string sharing: ""
   property bool scanning: false
   property double lastRefresh: 0
   property var autoConnect: ({})
   property var modifyQueue: null
+  property var pskCache: ({})
+  property var pskQueue: []
   property bool connectedExpanded: true
   property bool savedExpanded: true
   property bool availableExpanded: true
@@ -160,6 +163,7 @@ PanelBase {
     if (section === "connected") root.connectedExpanded = !root.connectedExpanded;
     else if (section === "saved") root.savedExpanded = !root.savedExpanded;
     else if (section === "available") root.availableExpanded = !root.availableExpanded;
+    root.sharing = "";
   }
 
   function signalPct(network) {
@@ -204,16 +208,19 @@ PanelBase {
       }
       root.confirmForget = "";
       root.expanded = "";
+      root.sharing = "";
       return;
     }
     root.pending = "";
     root.confirmForget = "";
+    root.sharing = "";
     root.expanded = root.expanded === network.name ? "" : network.name;
   }
 
   function requestForget(network) {
     if (!network) return;
     root.pending = "";
+    root.sharing = "";
     root.confirmForget = root.confirmForget === network.name ? "" : network.name;
   }
 
@@ -221,6 +228,7 @@ PanelBase {
     if (!network) return false;
     root.pending = "";
     root.confirmForget = "";
+    root.sharing = "";
     root.expanded = root.expanded === network.name ? "" : network.name;
     return true;
   }
@@ -250,6 +258,65 @@ PanelBase {
     root.modifyQueue = null;
     modifyProc.command = ["nmcli", "connection", "modify", job[0], "connection.autoconnect", job[1]];
     modifyProc.running = true;
+  }
+
+  function qrHasPassword(network) {
+    if (!network) return false;
+    return network.security !== WifiSecurityType.Open && network.security !== WifiSecurityType.Owe;
+  }
+
+  function qrKind(network) {
+    const s = network.security;
+    if (s === WifiSecurityType.StaticWep || s === WifiSecurityType.DynamicWep || s === WifiSecurityType.Leap) return "WEP";
+    return "WPA";
+  }
+
+  function qrEscape(value) {
+    return String(value).replace(/([\\;,":])/g, "\\$1");
+  }
+
+  function pskLoaded(name) {
+    return root.pskCache[name] !== undefined;
+  }
+
+  function qrPayload(name) {
+    const network = root.findNetwork(name);
+    if (!network || !network.known) return "";
+    const ssid = root.qrEscape(network.name);
+    if (!root.qrHasPassword(network)) return "WIFI:T:nopass;S:" + ssid + ";;";
+    const psk = root.pskCache[name];
+    if (psk === undefined || psk === "") return "";
+    return "WIFI:T:" + root.qrKind(network) + ";S:" + ssid + ";P:" + root.qrEscape(psk) + ";;";
+  }
+
+  function requestPsk(name) {
+    if (!name || root.pskLoaded(name)) return;
+    if (root.pskQueue.indexOf(name) < 0 && pskProc.target !== name) root.pskQueue.push(name);
+    root.pumpPsk();
+  }
+
+  function pumpPsk() {
+    if (pskProc.running || root.pskQueue.length === 0) return;
+    const name = root.pskQueue.shift();
+    pskProc.target = name;
+    pskProc.output = "";
+    pskProc.command = ["nmcli", "-s", "-g", "802-11-wireless-security.psk", "connection", "show", name];
+    pskProc.running = true;
+  }
+
+  function storePsk(name, output) {
+    const next = {};
+    for (const k in root.pskCache) next[k] = root.pskCache[k];
+    next[name] = output.replace(/\n+$/, "");
+    root.pskCache = next;
+  }
+
+  function toggleSharing(network) {
+    if (!network) return false;
+    const next = root.sharing === network.name ? "" : network.name;
+    root.sharing = next;
+    if (next !== "" && root.qrHasPassword(network)) root.requestPsk(network.name);
+    return true;
   }
 
   Process {
@@ -289,6 +356,21 @@ PanelBase {
     }
   }
 
+  Process {
+    id: pskProc
+
+    running: false
+    property string target: ""
+    property string output: ""
+    stdout: StdioCollector {
+      onStreamFinished: pskProc.output = text
+    }
+    onExited: {
+      root.storePsk(pskProc.target, pskProc.output);
+      root.pumpPsk();
+    }
+  }
+
   Timer {
     id: activatingTimer
 
@@ -322,6 +404,7 @@ PanelBase {
     root.showPassword = false;
     root.confirmForget = "";
     root.expanded = "";
+    root.sharing = "";
     return true;
   }
 
@@ -405,7 +488,14 @@ PanelBase {
     else if (section === "saved") root.savedExpanded = value;
     else if (section === "available") root.availableExpanded = value;
     else return false;
+    root.sharing = "";
     return true;
+  }
+
+  function testToggleSharing(name) {
+    const network = root.findNetwork(name);
+    if (!network || !network.known) return false;
+    return root.toggleSharing(network);
   }
 
   function testWifiState() {
@@ -414,6 +504,8 @@ PanelBase {
       showPassword: root.showPassword,
       confirm: root.confirmForget,
       expanded: root.expanded,
+      sharing: root.sharing,
+      sharePayload: root.sharing !== "" ? root.qrPayload(root.sharing) : "",
       activating: root.activating,
       scanning: root.scanning,
       lastRefresh: root.lastRefresh,
@@ -432,6 +524,7 @@ PanelBase {
     pending = "";
     confirmForget = "";
     expanded = "";
+    sharing = "";
     activating = "";
     showPassword = false;
     queryAutoConnect();
@@ -499,9 +592,32 @@ PanelBase {
       readonly property bool busy: entry.changing || (!entry.isLabel && root.activating !== "" && root.activating === entry.netName)
       onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.netName) root.activating = ""
       readonly property var passwordEditor: pwField
-      readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || pwHover.containsMouse || eyeBtn.hovered || passCheckBtn.hovered || forgetCancelBtn.hovered || forgetCheckBtn.hovered || trashActionBtn.hovered || toggleActionBtn.hovered || badgeHover.containsMouse
+      readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || pwHover.containsMouse || eyeBtn.hovered || passCheckBtn.hovered || forgetCancelBtn.hovered || forgetCheckBtn.hovered || trashActionBtn.hovered || qrActionBtn.hovered || toggleActionBtn.hovered || badgeHover.containsMouse
       readonly property bool shown: entry.isLabel ? true : root.sectionExpanded(entry.section)
-      readonly property int extraHeight: (entry.pwOpen || entry.confirmOpen || entry.actionsOpen) ? Math.round(34 * Theme.scale) : 0
+      readonly property int qrSize: Math.round(entry.width * 0.5)
+      readonly property bool qrOpen: !entry.isLabel && entry.actionsOpen && root.sharing === entry.netName
+      readonly property string qrPayload: entry.isLabel ? "" : root.qrPayload(entry.netName)
+      readonly property bool qrLoading: entry.qrOpen && entry.net ? (root.qrHasPassword(entry.net) && !root.pskLoaded(entry.netName)) : false
+      readonly property bool qrMissing: entry.qrOpen && !entry.qrLoading && entry.qrPayload === ""
+      readonly property int qrFadeMs: 220
+      property bool qrExpanded: false
+      onQrOpenChanged: {
+        if (entry.qrOpen) {
+          qrCollapseTimer.stop();
+          entry.qrExpanded = true;
+        } else {
+          qrCollapseTimer.restart();
+        }
+      }
+      Component.onCompleted: if (entry.qrOpen) entry.qrExpanded = true
+      readonly property int actionsHeight: entry.qrExpanded ? entry.qrSize + Math.round(24 * Theme.scale) : Math.round(34 * Theme.scale)
+      readonly property int extraHeight: (entry.pwOpen || entry.confirmOpen) ? Math.round(34 * Theme.scale) : (entry.actionsOpen ? entry.actionsHeight : 0)
+      readonly property color cardColor: entry.qrOpen ? Theme.qrSurface : (entry.highlighted ? Theme.surfaceHigh : Theme.surface)
+      readonly property color hoverSurface: entry.qrOpen ? Theme.qrHover : Theme.surfaceHigher
+      readonly property color strongText: entry.qrOpen ? Theme.crust : (entry.isConnected ? Theme.primary : Theme.text)
+      readonly property color mutedText: entry.qrOpen ? Theme.overlay : Theme.subtext
+      readonly property color accentText: entry.qrOpen ? Theme.crust : Theme.primary
+      readonly property color hoverText: entry.qrOpen ? Theme.crust : Theme.text
 
       width: list.width
       height: entry.shown ? (entry.isLabel ? Math.round(20 * Theme.scale) : Math.round(44 * Theme.scale) + entry.extraHeight) : 0
@@ -510,6 +626,13 @@ PanelBase {
 
       Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
       Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
+      Timer {
+        id: qrCollapseTimer
+
+        interval: entry.qrFadeMs
+        onTriggered: entry.qrExpanded = false
+      }
 
       SectionHeader {
         visible: entry.isLabel
@@ -531,9 +654,11 @@ PanelBase {
         width: parent.width
         height: parent.height
         radius: Theme.rowRadius
-        color: entry.highlighted ? Theme.surfaceHigh : Theme.surface
+        color: entry.cardColor
         antialiasing: true
         clip: true
+
+        Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
         MouseArea {
           id: cardHover
@@ -573,8 +698,10 @@ PanelBase {
             Icon {
               anchors.verticalCenter: parent.verticalCenter
               name: entry.net ? root.glyphFor(entry.net) : "wifi"
-              color: entry.isConnected ? Theme.primary : Theme.text
+              color: entry.strongText
               font.pixelSize: Theme.iconSizeLarge
+
+              Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
             }
           }
 
@@ -585,11 +712,13 @@ PanelBase {
             anchors.rightMargin: Math.round(8 * Theme.scale)
             anchors.verticalCenter: parent.verticalCenter
             text: entry.net ? entry.net.name : entry.netName
-            color: entry.isConnected ? Theme.primary : Theme.text
+            color: entry.strongText
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize
             font.bold: entry.isConnected
             elide: Text.ElideRight
+
+            Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
           }
 
           Row {
@@ -612,16 +741,18 @@ PanelBase {
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: entry.net ? root.signalPct(entry.net) + "%" : ""
-              color: Theme.subtext
+              color: entry.mutedText
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSizeSmall
+
+              Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
             }
 
             Spinner {
               anchors.verticalCenter: parent.verticalCenter
               visible: entry.busy && !entry.actionsOpen
               running: visible
-              color: Theme.primary
+              color: entry.accentText
             }
           }
         }
@@ -774,17 +905,42 @@ PanelBase {
           width: parent.width
           anchors.top: parent.top
           anchors.topMargin: Math.round(44 * Theme.scale)
-          height: visible ? Math.round(34 * Theme.scale) : 0
+          height: visible ? entry.actionsHeight : 0
           clip: true
 
-          Item {
+          QrCode {
+            id: qrView
+
+            x: Math.round(12 * Theme.scale)
+            y: Math.round(12 * Theme.scale)
+            width: entry.qrSize
+            height: entry.qrSize
+            text: entry.qrPayload
+            opacity: entry.qrOpen && entry.qrPayload !== "" ? 1 : 0
+
+            Behavior on opacity { NumberAnimation { duration: entry.qrFadeMs; easing.type: Easing.OutCubic } }
+          }
+
+          Text {
+            visible: entry.qrMissing
             anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.topMargin: Math.round(4 * Theme.scale)
             anchors.leftMargin: Math.round(12 * Theme.scale)
-            anchors.rightMargin: Math.round(6 * Theme.scale)
+            anchors.top: parent.top
+            anchors.topMargin: Math.round(12 * Theme.scale)
+            width: entry.qrSize
+            text: "No key"
+            color: Theme.overlay
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+          }
+
+          Item {
+            x: Math.round(12 * Theme.scale)
+            width: parent.width - Math.round(12 * Theme.scale) - Math.round(6 * Theme.scale)
             height: Math.round(20 * Theme.scale)
+            y: Math.round(4 * Theme.scale)
 
             IconButton {
               id: toggleActionBtn
@@ -795,8 +951,8 @@ PanelBase {
               size: Math.round(20 * Theme.scale)
               glyphSize: Math.round(13 * Theme.scale)
               name: entry.isConnected ? "plug" : "plug-connected"
-              iconColor: toggleActionBtn.hovered ? Theme.text : Theme.overlay
-              hoverColor: Theme.surfaceHigher
+              iconColor: toggleActionBtn.hovered ? entry.hoverText : Theme.overlay
+              hoverColor: entry.hoverSurface
               onClicked: {
                 if (!entry.net) return;
                 root.activating = entry.net.name;
@@ -812,7 +968,7 @@ PanelBase {
               anchors.verticalCenter: parent.verticalCenter
               visible: entry.busy
               running: visible
-              color: Theme.primary
+              color: entry.accentText
             }
 
             IconButton {
@@ -825,31 +981,50 @@ PanelBase {
               size: Math.round(20 * Theme.scale)
               glyphSize: Math.round(13 * Theme.scale)
               name: "trash"
-              iconColor: trashActionBtn.hovered ? Theme.text : Theme.overlay
-              hoverColor: Theme.surfaceHigher
+              iconColor: trashActionBtn.hovered ? entry.hoverText : Theme.overlay
+              hoverColor: entry.hoverSurface
               onClicked: if (entry.net) root.requestForget(entry.net)
+            }
+
+            IconButton {
+              id: qrActionBtn
+
+              visible: entry.net ? entry.net.known : false
+              anchors.right: trashActionBtn.left
+              anchors.rightMargin: Math.round(4 * Theme.scale)
+              anchors.verticalCenter: parent.verticalCenter
+              size: Math.round(20 * Theme.scale)
+              glyphSize: Math.round(13 * Theme.scale)
+              name: "qrcode"
+              iconColor: entry.qrOpen ? entry.accentText : (qrActionBtn.hovered ? entry.hoverText : Theme.overlay)
+              hoverColor: entry.hoverSurface
+              onClicked: if (entry.net) root.toggleSharing(entry.net)
+
+              Behavior on iconColor { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
             }
 
             Rectangle {
               id: autoToggleBtn
 
               visible: entry.net ? entry.net.known : false
-              anchors.right: trashActionBtn.left
+              anchors.right: qrActionBtn.left
               anchors.rightMargin: Math.round(4 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
               width: Math.round(44 * Theme.scale)
               height: Math.round(20 * Theme.scale)
               radius: height / 2
-              color: badgeHover.containsMouse ? Theme.surfaceHigher : "transparent"
+              color: badgeHover.containsMouse ? entry.hoverSurface : "transparent"
               antialiasing: true
 
               Text {
                 anchors.centerIn: parent
                 text: "AUTO"
-                color: root.autoEnabled(entry.netName) ? Theme.primary : Theme.overlay
+                color: root.autoEnabled(entry.netName) ? entry.accentText : Theme.overlay
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 font.bold: root.autoEnabled(entry.netName)
+
+                Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
               }
 
               MouseArea {
