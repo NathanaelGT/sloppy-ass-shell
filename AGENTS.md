@@ -21,6 +21,12 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `routeStream <app> <index> <target|Default>` routes audibly — announce first); mute has no
   seam — audible side effects. `test appRows <app>` dumps row keys/labels/pins for deterministic
   assertions without screenshots. It never moves the cursor or changes focus.
+  Wifi flows: `test wifiState` (pending/show/confirm/sections/networks, no cursor or focus
+  effects); `wifiBeginPass <name>`/`wifiSetPass`/`wifiPassEcho`/`wifiShowToggle`/`wifiPassRect`
+  drive the inline password without typing; `wifiSectionToggle`/`wifiSectionSet` mirror the
+  chevrons; `wifiForgetAsk`/`wifiForgetCancel` stage and drop the confirm strip. Live ammo:
+  `wifiPassSubmit` attempts a real join, `wifiForgetConfirm` really forgets (reconnect by hand
+  afterwards) — announce first, like `routeStream`.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no
@@ -35,8 +41,11 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   sleep 2, since the user is active on HDMI-A-1. `test beginWork` / `test endWork` already toast
   session start/end the same way, so a separate done notice is only needed for sessions that
   never armed test mode: `dunstify -a opencode -u low "opencode" "testing done — all yours". Run `ydotoold` once for `ydotool`, or pipe commands
-  straight to `dotool` (`echo "mousemove 100 0" | dotool`). Synthetic clicks do NOT grant Hyprland
-  keyboard focus to `OnDemand` layer surfaces, so injected typing lands in the focused window,
+  straight to `dotool` (`echo "mousemove 100 0" | dotool`). `ydotoold`'s virtual device is broken
+  here (`unable to find device pointer`), so prefer `dotool`. Re-capture geometry immediately
+  before aiming: live lists such as wifi signal resorting invalidate coordinates within seconds
+  (a stale aim once disconnected the active network; recovered with
+  `nmcli connection up <name>`). Synthetic clicks do NOT grant Hyprland keyboard focus to `OnDemand` layer surfaces, so injected typing lands in the focused window,
   never in a panel `TextInput`. Confirm every result with a `grim` capture and state plainly what
   stayed unverified.
 - Menus open on `Hypr.focusedScreenName`. Pin the monitor with
@@ -88,7 +97,7 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   icon resolves from the toplevel appId/`class` through `services/AppIcons.qml` (desktop entry icon).
 - `PwNode.properties` is invalid unless the node is bound with `PwObjectTracker`.
 - Reuse before rewriting: `BarSurface`, `Slider`, `EditablePercent`, `EditableLabel`, `MuteButton`,
-  `VolumeIcon`, `SectionHeader`, `Pins`, `Aliases`, `Audio`.
+  `VolumeIcon`, `SectionHeader`, `PlaceholderCard`, `Pins`, `Aliases`, `Audio`.
 
 ## Style
 

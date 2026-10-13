@@ -484,6 +484,141 @@ ShellRoot {
       return panel.testPinApp(app);
     }
 
+    function wifiState(): string {
+      if (!TestDriver.active) return "{\"enabled\":false}";
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return "{\"enabled\":true,\"open\":false}";
+      const state = panel.testWifiState();
+      state.enabled = true;
+      state.open = true;
+      return JSON.stringify(state);
+    }
+
+    function wifiBeginPass(name: string): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testBeginPassword(name);
+    }
+
+    function wifiSetPass(text: string): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testSetPassword(text);
+    }
+
+    function wifiPassEcho(): string {
+      if (!TestDriver.active) return "";
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return "";
+      return panel.testPasswordEcho();
+    }
+
+    function wifiShowToggle(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testToggleShowPassword();
+    }
+
+    function wifiPassRect(): string {
+      if (!TestDriver.active) return "{\"enabled\":false}";
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return "{\"enabled\":true,\"open\":false}";
+      const rect = panel.testPasswordRect();
+      if (!rect) return "{\"enabled\":true,\"open\":true,\"found\":false}";
+      rect.enabled = true;
+      rect.open = true;
+      rect.found = true;
+      return JSON.stringify(rect);
+    }
+
+    function wifiPassSubmit(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testSubmitPassword();
+    }
+
+    function wifiForgetAsk(name: string): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testAskForget(name);
+    }
+
+    function wifiForgetConfirm(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testConfirmForget();
+    }
+
+    function wifiForgetCancel(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testCancelForget();
+    }
+
+    function wifiExpand(name: string): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testToggleExpanded(name);
+    }
+
+    function wifiAutoToggle(name: string): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testToggleAutoConnect(name);
+    }
+
+    function wifiQrToggle(name: string): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testToggleSharing(name);
+    }
+
+    function wifiSpeedtest(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testToggleSpeedtest();
+    }
+
+    function wifiSpeedtestMock(phase: string, down: real, up: real): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testMockSpeedtest(phase, down, up);
+    }
+
+    function wifiSpeedtestPreload(): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testPreloadSpeedtest();
+    }
+
+    function wifiSectionToggle(section: string): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      panel.toggleSection(section);
+      return true;
+    }
+
+    function wifiSectionSet(section: string, state: bool): bool {
+      if (!TestDriver.active) return false;
+      const panel = TestDriver.panel("network");
+      if (!panel || !panel.open) return false;
+      return panel.testSetSection(section, state);
+    }
+
     function panelRect(name: string, screen: string): string {
       if (!TestDriver.active) return "{\"enabled\":false}";
       const rect = TestDriver.panelRect(name, screen);

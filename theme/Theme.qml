@@ -44,6 +44,8 @@ Singleton {
   readonly property color surface: "#313244"
   readonly property color surfaceHigh: "#45475a"
   readonly property color surfaceHigher: "#585b70"
+  readonly property color qrSurface: "#fafafa"
+  readonly property color qrHover: "#ccd0da"
   readonly property color overlay: "#6c7086"
   readonly property color text: "#cdd6f4"
   readonly property color subtext: "#a6adc8"
