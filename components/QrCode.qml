@@ -12,18 +12,22 @@ Item {
 
   function paint(context) {
     context.clearRect(0, 0, canvas.width, canvas.height)
-    const grid = root.matrix;
-    if (!grid) return;
-    const cell = Math.min(canvas.width, canvas.height) / grid.size;
-    context.fillStyle = String(root.moduleColor);
+    const grid = root.matrix
+    if (!grid) {
+      return
+    }
+    const cell = Math.min(canvas.width, canvas.height) / grid.size
+    context.fillStyle = String(root.moduleColor)
     for (let y = 0; y < grid.size; y++) {
-      const top = Math.round(y * cell);
-      const bottom = Math.round((y + 1) * cell);
+      const top = Math.round(y * cell)
+      const bottom = Math.round((y + 1) * cell)
       for (let x = 0; x < grid.size; x++) {
-        if (!grid.modules[y][x]) continue;
-        const left = Math.round(x * cell);
-        const right = Math.round((x + 1) * cell);
-        context.fillRect(left, top, right - left, bottom - top);
+        if (!grid.modules[y][x]) {
+          continue
+        }
+        const left = Math.round(x * cell)
+        const right = Math.round((x + 1) * cell)
+        context.fillRect(left, top, right - left, bottom - top)
       }
     }
   }

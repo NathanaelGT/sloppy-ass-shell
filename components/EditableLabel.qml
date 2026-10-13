@@ -15,40 +15,40 @@ Item {
   readonly property int testCursorPosition: input.cursorPosition
 
   function testSetText(value) {
-    input.text = value;
+    input.text = value
   }
 
   function testPressAt(lx, ly) {
-    input.deselect();
-    input.cursorPosition = input.positionAt(lx, ly);
+    input.deselect()
+    input.cursorPosition = input.positionAt(lx, ly)
   }
 
   function testCommit() {
-    root.commit();
+    root.commit()
   }
 
   function testCancel() {
-    root.cancel();
+    root.cancel()
   }
 
   implicitHeight: Math.round(20 * Theme.scale)
 
   function begin() {
-    input.text = root.text;
-    root.editing = true;
-    input.forceActiveFocus();
-    input.selectAll();
+    input.text = root.text
+    root.editing = true
+    input.forceActiveFocus()
+    input.selectAll()
   }
 
   function commit() {
-    root.edited(input.text.trim());
-    root.editing = false;
-    input.focus = false;
+    root.edited(input.text.trim())
+    root.editing = false
+    input.focus = false
   }
 
   function cancel() {
-    root.editing = false;
-    input.focus = false;
+    root.editing = false
+    input.focus = false
   }
 
   Text {
@@ -74,7 +74,9 @@ Item {
     antialiasing: true
 
     Behavior on opacity {
-      NumberAnimation { duration: 100 }
+      NumberAnimation {
+        duration: 100
+      }
     }
   }
 
@@ -92,7 +94,9 @@ Item {
     clip: true
     onAccepted: root.commit()
     onActiveFocusChanged: {
-      if (!activeFocus && root.editing) root.cancel();
+      if (!activeFocus && root.editing) {
+        root.cancel()
+      }
     }
     Keys.onEscapePressed: root.cancel()
   }

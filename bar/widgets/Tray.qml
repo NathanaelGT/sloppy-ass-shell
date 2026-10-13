@@ -40,7 +40,9 @@ BarButton {
           sourceSize: Qt.size(width, height)
           source: trayItem.modelData.icon
           onStatusChanged: {
-            if (status === Image.Error) source = Quickshell.iconPath("application-x-executable", "");
+            if (status === Image.Error) {
+              source = Quickshell.iconPath("application-x-executable", "")
+            }
           }
         }
 
@@ -49,19 +51,22 @@ BarButton {
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
           acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-          onClicked: (event) => {
+          onClicked: event => {
             if (event.button === Qt.RightButton) {
-              if (trayItem.modelData.hasMenu) trayItem.modelData.display(Window.window, trayItem.width / 2, trayItem.height);
-              else trayItem.modelData.secondaryActivate();
+              if (trayItem.modelData.hasMenu) {
+                trayItem.modelData.display(Window.window, trayItem.width / 2, trayItem.height)
+              } else {
+                trayItem.modelData.secondaryActivate()
+              }
             } else if (event.button === Qt.MiddleButton) {
-              trayItem.modelData.secondaryActivate();
+              trayItem.modelData.secondaryActivate()
             } else if (trayItem.modelData.onlyMenu && trayItem.modelData.hasMenu) {
-              trayItem.modelData.display(Window.window, trayItem.width / 2, trayItem.height);
+              trayItem.modelData.display(Window.window, trayItem.width / 2, trayItem.height)
             } else {
-              trayItem.modelData.activate();
+              trayItem.modelData.activate()
             }
           }
-          onWheel: (event) => trayItem.modelData.scroll(event.angleDelta.y, false)
+          onWheel: event => trayItem.modelData.scroll(event.angleDelta.y, false)
         }
       }
     }

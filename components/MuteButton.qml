@@ -10,7 +10,7 @@ Rectangle {
   property real maxLevel: 1.5
   property string kind: "output"
 
-  signal clicked()
+  signal clicked
   signal wheeled(real angleDelta)
 
   implicitWidth: Math.round(20 * Theme.scale)
@@ -52,9 +52,9 @@ Rectangle {
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
     onClicked: root.clicked()
-    onWheel: (e) => {
-      root.wheeled(e.angleDelta.y);
-      e.accepted = true;
+    onWheel: e => {
+      root.wheeled(e.angleDelta.y)
+      e.accepted = true
     }
   }
 }

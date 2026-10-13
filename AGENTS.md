@@ -104,5 +104,12 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
 - 2-space indent, no comments, `id: root`, functions before the markup.
 - `panels/` screens, `components/` reusable items, `services/` singletons, `theme/` tokens.
 - Prefer `Column`/`Flickable` over `ListView`; Quickshell 0.3.1 models are `ObjectModel` — read `.values`.
+- Format as the last step of the task, after the behavior checks: `find . -name '*.qml' | sort >
+  /tmp/opencode/qmlformat-files.txt` then the `qmlformat` binary under `/nix/store/*qtdeclarative-6*/bin`
+  with `-F /tmp/opencode/qmlformat-files.txt` (in-place, whole tree, idempotent; the root
+  `.qmlformat.ini` pins 2-space indent and essential semicolons). It lands after verification, so the
+  formatted file is never the version that was behavior-checked and only goes live on the next reload.
+- Always brace control-flow bodies (`if`/`else`/`for`/`while`), even when the body is a single statement;
+  `else if` chains stay chained. The whole tree is converted already, so this is about new code.
 - Report every finding with severity and a `file:line` proof; ask before assuming; keep edits
   surgical; propose extra features instead of adding them; never commit.

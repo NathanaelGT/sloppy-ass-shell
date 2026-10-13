@@ -20,10 +20,16 @@ BarButton {
   readonly property int connectivity: Networking.connectivity
 
   readonly property string glyph: {
-    if (!enabled) return "wifi-off";
-    if (connectivity === NetworkConnectivity.Full) return "wifi-2";
-    if (connectivity === NetworkConnectivity.Portal) return "wifi-1";
-    return "wifi-0";
+    if (!enabled) {
+      return "wifi-off"
+    }
+    if (connectivity === NetworkConnectivity.Full) {
+      return "wifi-2"
+    }
+    if (connectivity === NetworkConnectivity.Portal) {
+      return "wifi-1"
+    }
+    return "wifi-0"
   }
 
   Icon {

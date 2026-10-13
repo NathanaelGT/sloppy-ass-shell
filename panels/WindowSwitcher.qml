@@ -14,25 +14,33 @@ PanelBase {
   exclusiveFocus: true
 
   readonly property var items: {
-    const monitor = Hypr.monitor;
-    if (!monitor) return [];
-    const workspace = monitor.activeWorkspace;
-    if (!workspace || !workspace.toplevels) return [];
-    const list = workspace.toplevels;
-    return list.values ? list.values : list;
+    const monitor = Hypr.monitor
+    if (!monitor) {
+      return []
+    }
+    const workspace = monitor.activeWorkspace
+    if (!workspace || !workspace.toplevels) {
+      return []
+    }
+    const list = workspace.toplevels
+    return list.values ? list.values : list
   }
 
   readonly property int selected: 0
 
   function activate(index) {
-    const item = items[index];
-    if (!item) return;
-    Panels.close();
-    Hypr.focusToplevel(item.address);
+    const item = items[index]
+    if (!item) {
+      return
+    }
+    Panels.close()
+    Hypr.focusToplevel(item.address)
   }
 
-  onKeyPressed: (event) => {
-    if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) root.activate(event.key - Qt.Key_1);
+  onKeyPressed: event => {
+    if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
+      root.activate(event.key - Qt.Key_1)
+    }
   }
 
   Column {

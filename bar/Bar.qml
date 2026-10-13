@@ -50,13 +50,12 @@ PanelWindow {
     stdout: StdioCollector {
       onStreamFinished: {
         try {
-          const pos = JSON.parse(text);
-          const nearTop = pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y - Math.round(2 * Theme.scale) && pos.y < screen.y + Math.round(3 * Theme.scale);
-          const overBar = root.shown && pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y && pos.y < screen.y + Theme.barThickness;
-          root.revealed = nearTop || overBar;
-          Panels.barHoverScreen = overBar ? screen.name : (Panels.barHoverScreen === screen.name ? "" : Panels.barHoverScreen);
-        } catch (e) {
-        }
+          const pos = JSON.parse(text)
+          const nearTop = pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y - Math.round(2 * Theme.scale) && pos.y < screen.y + Math.round(3 * Theme.scale)
+          const overBar = root.shown && pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y && pos.y < screen.y + Theme.barThickness
+          root.revealed = nearTop || overBar
+          Panels.barHoverScreen = overBar ? screen.name : (Panels.barHoverScreen === screen.name ? "" : Panels.barHoverScreen)
+        } catch (e) {}
       }
     }
   }
@@ -122,12 +121,24 @@ PanelWindow {
         anchors.verticalCenter: parent.verticalCenter
         spacing: Math.round(4 * Theme.scale)
 
-        Tray { screen: root.screen }
-        Notifications { screen: root.screen }
-        Network { screen: root.screen }
-        Bluetooth { screen: root.screen }
-        Volume { screen: root.screen }
-        Battery { screen: root.screen }
+        Tray {
+          screen: root.screen
+        }
+        Notifications {
+          screen: root.screen
+        }
+        Network {
+          screen: root.screen
+        }
+        Bluetooth {
+          screen: root.screen
+        }
+        Volume {
+          screen: root.screen
+        }
+        Battery {
+          screen: root.screen
+        }
       }
     }
   }

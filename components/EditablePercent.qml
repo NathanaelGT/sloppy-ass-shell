@@ -17,42 +17,44 @@ Item {
   readonly property int testCursorPosition: input.cursorPosition
 
   function testSetText(value) {
-    input.text = value;
+    input.text = value
   }
 
   function testPressAt(lx, ly) {
-    input.deselect();
-    input.cursorPosition = input.positionAt(lx - input.x, ly - input.y);
+    input.deselect()
+    input.cursorPosition = input.positionAt(lx - input.x, ly - input.y)
   }
 
   function testCommit() {
-    root.commit();
+    root.commit()
   }
 
   function testCancel() {
-    root.cancel();
+    root.cancel()
   }
 
   implicitWidth: Math.round(32 * Theme.scale)
   implicitHeight: Math.round(16 * Theme.scale)
 
   function begin() {
-    input.text = String(Math.round(root.percent));
-    root.editing = true;
-    input.forceActiveFocus();
-    input.selectAll();
+    input.text = String(Math.round(root.percent))
+    root.editing = true
+    input.forceActiveFocus()
+    input.selectAll()
   }
 
   function commit() {
-    const value = parseFloat(input.text);
-    if (!isNaN(value)) root.edited(Math.max(0, Math.min(root.maximum, value)));
-    root.editing = false;
-    input.focus = false;
+    const value = parseFloat(input.text)
+    if (!isNaN(value)) {
+      root.edited(Math.max(0, Math.min(root.maximum, value)))
+    }
+    root.editing = false
+    input.focus = false
   }
 
   function cancel() {
-    root.editing = false;
-    input.focus = false;
+    root.editing = false
+    input.focus = false
   }
 
   Text {
@@ -92,7 +94,9 @@ Item {
     antialiasing: true
 
     Behavior on opacity {
-      NumberAnimation { duration: 100 }
+      NumberAnimation {
+        duration: 100
+      }
     }
   }
 
@@ -113,7 +117,9 @@ Item {
     inputMethodHints: Qt.ImhDigitsOnly
     onAccepted: root.commit()
     onActiveFocusChanged: {
-      if (!activeFocus && root.editing) root.cancel();
+      if (!activeFocus && root.editing) {
+        root.cancel()
+      }
     }
     Keys.onEscapePressed: root.cancel()
   }
@@ -123,9 +129,9 @@ Item {
     enabled: !root.editing
     cursorShape: Qt.PointingHandCursor
     onClicked: root.begin()
-    onWheel: (e) => {
-      root.wheeled(e.angleDelta.y);
-      e.accepted = true;
+    onWheel: e => {
+      root.wheeled(e.angleDelta.y)
+      e.accepted = true
     }
   }
 }

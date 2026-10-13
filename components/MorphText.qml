@@ -23,43 +23,52 @@ Item {
   implicitHeight: lineH
 
   function finishInstant() {
-    finishTimer.stop();
+    finishTimer.stop()
     if (root.morphing) {
-      root.shownText = root.pending;
-      root.morphing = false;
+      root.shownText = root.pending
+      root.morphing = false
     }
   }
 
   function setInstant(s) {
-    root.text = s;
-    root.finishInstant();
-    root.shownText = s;
-    root.slots = [];
+    root.text = s
+    root.finishInstant()
+    root.shownText = s
+    root.slots = []
   }
 
   function morphTo(s) {
-    root.text = s;
-    root.finishInstant();
-    if (s === root.shownText) return;
-    root.pending = s;
-    const from = root.shownText;
-    const count = Math.max(from.length, s.length);
-    const next = [];
-    for (let i = 0; i < count; i++) next.push({ o: from[i] || "", n: s[i] || "" });
-    root.morphing = true;
-    root.slots = next;
-    finishTimer.interval = root.rollMs + count * root.staggerMs + 60;
-    finishTimer.restart();
+    root.text = s
+    root.finishInstant()
+    if (s === root.shownText) {
+      return
+    }
+    root.pending = s
+    const from = root.shownText
+    const count = Math.max(from.length, s.length)
+    const next = []
+    for (let i = 0; i < count; i++) {
+      next.push({
+        o: from[i] || "",
+        n: s[i] || ""
+      })
+    }
+    root.morphing = true
+    root.slots = next
+    finishTimer.interval = root.rollMs + count * root.staggerMs + 60
+    finishTimer.restart()
   }
 
   Timer {
     id: finishTimer
 
     onTriggered: {
-      const target = root.text;
-      root.shownText = root.pending;
-      root.morphing = false;
-      if (target !== root.pending) root.morphTo(target);
+      const target = root.text
+      root.shownText = root.pending
+      root.morphing = false
+      if (target !== root.pending) {
+        root.morphTo(target)
+      }
     }
   }
 
@@ -103,13 +112,23 @@ Item {
         height: root.lineH
         clip: true
 
-        Component.onCompleted: if (root.morphing) seq.restart()
+        Component.onCompleted: if (root.morphing) {
+          seq.restart()
+        }
 
         SequentialAnimation {
           id: seq
 
-          PauseAnimation { duration: index * root.staggerMs }
-          NumberAnimation { target: pairBox; property: "y"; to: -root.lineH; duration: root.rollMs; easing.type: Easing.OutCubic }
+          PauseAnimation {
+            duration: index * root.staggerMs
+          }
+          NumberAnimation {
+            target: pairBox
+            property: "y"
+            to: -root.lineH
+            duration: root.rollMs
+            easing.type: Easing.OutCubic
+          }
         }
 
         Item {

@@ -11,7 +11,7 @@ Rectangle {
   property int actionSpacing: Math.round(6 * Theme.scale)
   property int actionMargin: Math.round(8 * Theme.scale)
 
-  signal clicked()
+  signal clicked
 
   default property alias actions: actionsRow.data
   property alias leading: leadingHost.data

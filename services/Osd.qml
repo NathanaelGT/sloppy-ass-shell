@@ -11,11 +11,11 @@ Singleton {
   property real value: -1
 
   function show(iconName, text, amount) {
-    icon = iconName;
-    label = text;
-    value = amount;
-    visible = true;
-    timer.restart();
+    icon = iconName
+    label = text
+    value = amount
+    visible = true
+    timer.restart()
   }
 
   Timer {

@@ -22,21 +22,31 @@ BarButton {
   visible: device !== null && device.isPresent && !(full && hideWhenFull)
 
   readonly property string glyph: {
-    if (charging) return "battery-charging";
-    if (pct > 0.85) return "battery-4";
-    if (pct > 0.6) return "battery-3";
-    if (pct > 0.35) return "battery-2";
-    return "battery-1";
+    if (charging) {
+      return "battery-charging"
+    }
+    if (pct > 0.85) {
+      return "battery-4"
+    }
+    if (pct > 0.6) {
+      return "battery-3"
+    }
+    if (pct > 0.35) {
+      return "battery-2"
+    }
+    return "battery-1"
   }
 
   readonly property color tint: charging ? Theme.green : pct <= 0.15 ? Theme.red : pct <= 0.3 ? Theme.yellow : Theme.text
 
   function formatTime(seconds) {
-    if (!seconds || seconds <= 0) return "";
-    const total = Math.round(seconds / 60);
-    const h = Math.floor(total / 60);
-    const m = total % 60;
-    return h > 0 ? h + "h " + m + "m" : m + "m";
+    if (!seconds || seconds <= 0) {
+      return ""
+    }
+    const total = Math.round(seconds / 60)
+    const h = Math.floor(total / 60)
+    const m = total % 60
+    return h > 0 ? h + "h " + m + "m" : m + "m"
   }
 
   Icon {

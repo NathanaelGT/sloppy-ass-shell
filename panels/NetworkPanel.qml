@@ -29,64 +29,110 @@ PanelBase {
   readonly property bool enabled: Networking.wifiEnabled
 
   readonly property var device: {
-    const list = Networking.devices ? Networking.devices.values : [];
-    for (let i = 0; i < list.length; i++) if (list[i].type === DeviceType.Wifi) return list[i];
-    return null;
+    const list = Networking.devices ? Networking.devices.values : []
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].type === DeviceType.Wifi) {
+        return list[i]
+      }
+    }
+    return null
   }
 
   readonly property var allNetworks: {
-    if (!device || !device.networks) return [];
-    const list = device.networks.values ? device.networks.values : device.networks;
-    const out = [];
-    for (let i = 0; i < list.length; i++) out.push(list[i]);
-    return out;
+    if (!device || !device.networks) {
+      return []
+    }
+    const list = device.networks.values ? device.networks.values : device.networks
+    const out = []
+    for (let i = 0; i < list.length; i++) {
+      out.push(list[i])
+    }
+    return out
   }
 
   readonly property var connectedNetwork: {
-    for (let i = 0; i < allNetworks.length; i++) if (allNetworks[i].connected) return allNetworks[i];
-    return null;
+    for (let i = 0; i < allNetworks.length; i++) {
+      if (allNetworks[i].connected) {
+        return allNetworks[i]
+      }
+    }
+    return null
   }
 
   readonly property var savedNetworks: {
-    const out = [];
+    const out = []
     for (let i = 0; i < allNetworks.length; i++) {
-      const n = allNetworks[i];
-      if (n.known && !n.connected) out.push(n);
+      const n = allNetworks[i]
+      if (n.known && !n.connected) {
+        out.push(n)
+      }
     }
-    out.sort((a, b) => (b.signalStrength || 0) - (a.signalStrength || 0));
-    return out;
+    out.sort((a, b) => (b.signalStrength || 0) - (a.signalStrength || 0))
+    return out
   }
 
   readonly property var availableNetworks: {
-    const out = [];
+    const out = []
     for (let i = 0; i < allNetworks.length; i++) {
-      const n = allNetworks[i];
-      if (!n.known && !n.connected) out.push(n);
+      const n = allNetworks[i]
+      if (!n.known && !n.connected) {
+        out.push(n)
+      }
     }
-    out.sort((a, b) => (b.signalStrength || 0) - (a.signalStrength || 0));
-    return out;
+    out.sort((a, b) => (b.signalStrength || 0) - (a.signalStrength || 0))
+    return out
   }
 
   readonly property var rows: {
-    const out = [];
+    const out = []
     if (connectedNetwork) {
-      out.push({ kind: "label", section: "connected", text: "Connected" });
-      out.push({ kind: "connected", section: "connected", net: connectedNetwork });
+      out.push({
+        kind: "label",
+        section: "connected",
+        text: "Connected"
+      })
+      out.push({
+        kind: "connected",
+        section: "connected",
+        net: connectedNetwork
+      })
     }
     if (savedNetworks.length > 0) {
-      out.push({ kind: "label", section: "saved", text: "Saved" });
-      for (let i = 0; i < savedNetworks.length; i++) out.push({ kind: "net", section: "saved", net: savedNetworks[i] });
+      out.push({
+        kind: "label",
+        section: "saved",
+        text: "Saved"
+      })
+      for (let i = 0; i < savedNetworks.length; i++) {
+        out.push({
+          kind: "net",
+          section: "saved",
+          net: savedNetworks[i]
+        })
+      }
     }
     if (availableNetworks.length > 0) {
-      out.push({ kind: "label", section: "available", text: "Available" });
-      for (let i = 0; i < availableNetworks.length; i++) out.push({ kind: "net", section: "available", net: availableNetworks[i] });
+      out.push({
+        kind: "label",
+        section: "available",
+        text: "Available"
+      })
+      for (let i = 0; i < availableNetworks.length; i++) {
+        out.push({
+          kind: "net",
+          section: "available",
+          net: availableNetworks[i]
+        })
+      }
     }
-    return out;
+    return out
   }
 
   function rowKey(entry) {
-    if (entry.kind === "label") return "label:" + entry.section;
-    return "net:" + entry.net.name;
+    if (entry.kind === "label") {
+      return "label:" + entry.section
+    }
+    return "net:" + entry.net.name
   }
 
   ListModel {
@@ -94,50 +140,75 @@ PanelBase {
   }
 
   function syncRows() {
-    const rows = root.rows;
-    const wanted = {};
+    const rows = root.rows
+    const wanted = {}
     for (let j = 0; j < rows.length; j++) {
-      const entry = rows[j];
-      let key = root.rowKey(entry);
+      const entry = rows[j]
+      let key = root.rowKey(entry)
       if (entry.kind !== "label") {
-        let n = 0;
+        let n = 0
         while (wanted[key] !== undefined) {
-          n += 1;
-          key = root.rowKey(entry) + "#" + n;
+          n += 1
+          key = root.rowKey(entry) + "#" + n
         }
       }
-      wanted[key] = j;
+      wanted[key] = j
     }
-    for (let i = wifiModel.count - 1; i >= 0; i--) if (wanted[wifiModel.get(i).key] === undefined) wifiModel.remove(i);
+    for (let i = wifiModel.count - 1; i >= 0; i--) {
+      if (wanted[wifiModel.get(i).key] === undefined) {
+        wifiModel.remove(i)
+      }
+    }
     for (let j = 0; j < rows.length; j++) {
-      const entry = rows[j];
-      const isLabel = entry.kind === "label";
-      const label = isLabel ? entry.text : "";
-      const netName = isLabel ? "" : entry.net.name;
-      const connected = isLabel ? false : !!entry.net.connected;
-      let key = root.rowKey(entry);
+      const entry = rows[j]
+      const isLabel = entry.kind === "label"
+      const label = isLabel ? entry.text : ""
+      const netName = isLabel ? "" : entry.net.name
+      const connected = isLabel ? false : !!entry.net.connected
+      let key = root.rowKey(entry)
       if (!isLabel) {
-        let n = 0;
+        let n = 0
         while (wanted[key] !== undefined && wanted[key] !== j) {
-          n += 1;
-          key = root.rowKey(entry) + "#" + n;
+          n += 1
+          key = root.rowKey(entry) + "#" + n
         }
       }
-      wanted[key] = j;
-      let at = -1;
-      for (let i = 0; i < wifiModel.count; i++) if (wifiModel.get(i).key === key) {
-        at = i;
-        break;
+      wanted[key] = j
+      let at = -1
+      for (let i = 0; i < wifiModel.count; i++) {
+        if (wifiModel.get(i).key === key) {
+          at = i
+          break
+        }
       }
       if (at < 0) {
-        wifiModel.insert(j, { key: key, kind: entry.kind, section: entry.section, label: label, netName: netName, connected: connected });
+        wifiModel.insert(j, {
+          key: key,
+          kind: entry.kind,
+          section: entry.section,
+          label: label,
+          netName: netName,
+          connected: connected
+        })
       } else {
-        if (at !== j) wifiModel.move(at, j, 1);
-        if (wifiModel.get(j).kind !== entry.kind) wifiModel.setProperty(j, "kind", entry.kind);
-        if (wifiModel.get(j).section !== entry.section) wifiModel.setProperty(j, "section", entry.section);
-        if (wifiModel.get(j).label !== label) wifiModel.setProperty(j, "label", label);
-        if (wifiModel.get(j).netName !== netName) wifiModel.setProperty(j, "netName", netName);
-        if (wifiModel.get(j).connected !== connected) wifiModel.setProperty(j, "connected", connected);
+        if (at !== j) {
+          wifiModel.move(at, j, 1)
+        }
+        if (wifiModel.get(j).kind !== entry.kind) {
+          wifiModel.setProperty(j, "kind", entry.kind)
+        }
+        if (wifiModel.get(j).section !== entry.section) {
+          wifiModel.setProperty(j, "section", entry.section)
+        }
+        if (wifiModel.get(j).label !== label) {
+          wifiModel.setProperty(j, "label", label)
+        }
+        if (wifiModel.get(j).netName !== netName) {
+          wifiModel.setProperty(j, "netName", netName)
+        }
+        if (wifiModel.get(j).connected !== connected) {
+          wifiModel.setProperty(j, "connected", connected)
+        }
       }
     }
   }
@@ -145,178 +216,233 @@ PanelBase {
   onRowsChanged: root.syncRows()
 
   onEnabledChanged: {
-    if (!root.enabled) return;
-    root.maybeRescan();
+    if (!root.enabled) {
+      return
+    }
+    root.maybeRescan()
   }
 
   onCardHoveredChanged: {
-    if (cardHovered) root.maybeRescan();
+    if (cardHovered) {
+      root.maybeRescan()
+    }
   }
 
   function sectionExpanded(section) {
-    if (section === "connected") return root.connectedExpanded;
-    if (section === "saved") return root.savedExpanded;
-    return root.availableExpanded;
+    if (section === "connected") {
+      return root.connectedExpanded
+    }
+    if (section === "saved") {
+      return root.savedExpanded
+    }
+    return root.availableExpanded
   }
 
   function toggleSection(section) {
-    if (section === "connected") root.connectedExpanded = !root.connectedExpanded;
-    else if (section === "saved") root.savedExpanded = !root.savedExpanded;
-    else if (section === "available") root.availableExpanded = !root.availableExpanded;
-    root.sharing = "";
+    if (section === "connected") {
+      root.connectedExpanded = !root.connectedExpanded
+    } else if (section === "saved") {
+      root.savedExpanded = !root.savedExpanded
+    } else if (section === "available") {
+      root.availableExpanded = !root.availableExpanded
+    }
+    root.sharing = ""
   }
 
   function signalPct(network) {
-    const s = network && network.signalStrength ? network.signalStrength : 0;
-    return Math.round(s > 1 ? s : s * 100);
+    const s = network && network.signalStrength ? network.signalStrength : 0
+    return Math.round(s > 1 ? s : s * 100)
   }
 
   function glyphFor(network) {
-    const pct = signalPct(network);
-    if (pct > 66) return "wifi-2";
-    if (pct > 33) return "wifi-1";
-    return "wifi-0";
+    const pct = signalPct(network)
+    if (pct > 66) {
+      return "wifi-2"
+    }
+    if (pct > 33) {
+      return "wifi-1"
+    }
+    return "wifi-0"
   }
 
   function secured(network) {
-    return network.security !== WifiSecurityType.Open;
+    return network.security !== WifiSecurityType.Open
   }
 
   function rescan() {
-    if (!device || scanProc.running) return;
-    root.scanning = true;
-    scanProc.command = ["nmcli", "device", "wifi", "list", "ifname", device.name, "--rescan", "yes"];
-    scanProc.running = true;
+    if (!device || scanProc.running) {
+      return
+    }
+    root.scanning = true
+    scanProc.command = ["nmcli", "device", "wifi", "list", "ifname", device.name, "--rescan", "yes"]
+    scanProc.running = true
   }
 
   function lastRefreshAge() {
-    return Date.now() - root.lastRefresh;
+    return Date.now() - root.lastRefresh
   }
 
   function maybeRescan() {
-    if (root.scanning || root.lastRefreshAge() <= 5000) return;
-    root.rescan();
+    if (root.scanning || root.lastRefreshAge() <= 5000) {
+      return
+    }
+    root.rescan()
   }
 
   function activate(network) {
-    if (!network) return;
-    if (secured(network) && !network.known) {
-      if (root.pending === network.name) root.pending = "";
-      else {
-        root.pending = network.name;
-        root.showPassword = false;
-      }
-      root.confirmForget = "";
-      root.expanded = "";
-      root.sharing = "";
-      return;
+    if (!network) {
+      return
     }
-    root.pending = "";
-    root.confirmForget = "";
-    root.sharing = "";
-    root.expanded = root.expanded === network.name ? "" : network.name;
+    if (secured(network) && !network.known) {
+      if (root.pending === network.name) {
+        root.pending = ""
+      } else {
+        root.pending = network.name
+        root.showPassword = false
+      }
+      root.confirmForget = ""
+      root.expanded = ""
+      root.sharing = ""
+      return
+    }
+    root.pending = ""
+    root.confirmForget = ""
+    root.sharing = ""
+    root.expanded = root.expanded === network.name ? "" : network.name
   }
 
   function requestForget(network) {
-    if (!network) return;
-    root.pending = "";
-    root.sharing = "";
-    root.confirmForget = root.confirmForget === network.name ? "" : network.name;
+    if (!network) {
+      return
+    }
+    root.pending = ""
+    root.sharing = ""
+    root.confirmForget = root.confirmForget === network.name ? "" : network.name
   }
 
   function toggleExpanded(network) {
-    if (!network) return false;
-    root.pending = "";
-    root.confirmForget = "";
-    root.sharing = "";
-    root.expanded = root.expanded === network.name ? "" : network.name;
-    return true;
+    if (!network) {
+      return false
+    }
+    root.pending = ""
+    root.confirmForget = ""
+    root.sharing = ""
+    root.expanded = root.expanded === network.name ? "" : network.name
+    return true
   }
 
   function autoEnabled(name) {
-    return root.autoConnect[name] !== false;
+    return root.autoConnect[name] !== false
   }
 
   function queryAutoConnect() {
-    if (queryProc.running) return;
-    queryProc.command = ["nmcli", "-t", "-f", "NAME,AUTOCONNECT", "connection", "show"];
-    queryProc.running = true;
+    if (queryProc.running) {
+      return
+    }
+    queryProc.command = ["nmcli", "-t", "-f", "NAME,AUTOCONNECT", "connection", "show"]
+    queryProc.running = true
   }
 
   function setAutoConnect(name, value) {
-    const next = {};
-    for (const k in root.autoConnect) next[k] = root.autoConnect[k];
-    next[name] = value;
-    root.autoConnect = next;
-    root.modifyQueue = [name, value ? "yes" : "no"];
-    root.pumpModify();
+    const next = {}
+    for (const k in root.autoConnect) {
+      next[k] = root.autoConnect[k]
+    }
+    next[name] = value
+    root.autoConnect = next
+    root.modifyQueue = [name, value ? "yes" : "no"]
+    root.pumpModify()
   }
 
   function pumpModify() {
-    if (modifyProc.running || !root.modifyQueue) return;
-    const job = root.modifyQueue;
-    root.modifyQueue = null;
-    modifyProc.command = ["nmcli", "connection", "modify", job[0], "connection.autoconnect", job[1]];
-    modifyProc.running = true;
+    if (modifyProc.running || !root.modifyQueue) {
+      return
+    }
+    const job = root.modifyQueue
+    root.modifyQueue = null
+    modifyProc.command = ["nmcli", "connection", "modify", job[0], "connection.autoconnect", job[1]]
+    modifyProc.running = true
   }
 
   function qrHasPassword(network) {
-    if (!network) return false;
-    return network.security !== WifiSecurityType.Open && network.security !== WifiSecurityType.Owe;
+    if (!network) {
+      return false
+    }
+    return network.security !== WifiSecurityType.Open && network.security !== WifiSecurityType.Owe
   }
 
   function qrKind(network) {
-    const s = network.security;
-    if (s === WifiSecurityType.StaticWep || s === WifiSecurityType.DynamicWep || s === WifiSecurityType.Leap) return "WEP";
-    return "WPA";
+    const s = network.security
+    if (s === WifiSecurityType.StaticWep || s === WifiSecurityType.DynamicWep || s === WifiSecurityType.Leap) {
+      return "WEP"
+    }
+    return "WPA"
   }
 
   function qrEscape(value) {
-    return String(value).replace(/([\\;,":])/g, "\\$1");
+    return String(value).replace(/([\\;,":])/g, "\\$1")
   }
 
   function pskLoaded(name) {
-    return root.pskCache[name] !== undefined;
+    return root.pskCache[name] !== undefined
   }
 
   function qrPayload(name) {
-    const network = root.findNetwork(name);
-    if (!network || !network.known) return "";
-    const ssid = root.qrEscape(network.name);
-    if (!root.qrHasPassword(network)) return "WIFI:T:nopass;S:" + ssid + ";;";
-    const psk = root.pskCache[name];
-    if (psk === undefined || psk === "") return "";
-    return "WIFI:T:" + root.qrKind(network) + ";S:" + ssid + ";P:" + root.qrEscape(psk) + ";;";
+    const network = root.findNetwork(name)
+    if (!network || !network.known) {
+      return ""
+    }
+    const ssid = root.qrEscape(network.name)
+    if (!root.qrHasPassword(network)) {
+      return "WIFI:T:nopass;S:" + ssid + ";;"
+    }
+    const psk = root.pskCache[name]
+    if (psk === undefined || psk === "") {
+      return ""
+    }
+    return "WIFI:T:" + root.qrKind(network) + ";S:" + ssid + ";P:" + root.qrEscape(psk) + ";;"
   }
 
   function requestPsk(name) {
-    if (!name || root.pskLoaded(name)) return;
-    if (root.pskQueue.indexOf(name) < 0 && pskProc.target !== name) root.pskQueue.push(name);
-    root.pumpPsk();
+    if (!name || root.pskLoaded(name)) {
+      return
+    }
+    if (root.pskQueue.indexOf(name) < 0 && pskProc.target !== name) {
+      root.pskQueue.push(name)
+    }
+    root.pumpPsk()
   }
 
   function pumpPsk() {
-    if (pskProc.running || root.pskQueue.length === 0) return;
-    const name = root.pskQueue.shift();
-    pskProc.target = name;
-    pskProc.output = "";
-    pskProc.command = ["nmcli", "-s", "-g", "802-11-wireless-security.psk", "connection", "show", name];
-    pskProc.running = true;
+    if (pskProc.running || root.pskQueue.length === 0) {
+      return
+    }
+    const name = root.pskQueue.shift()
+    pskProc.target = name
+    pskProc.output = ""
+    pskProc.command = ["nmcli", "-s", "-g", "802-11-wireless-security.psk", "connection", "show", name]
+    pskProc.running = true
   }
 
   function storePsk(name, output) {
-    const next = {};
-    for (const k in root.pskCache) next[k] = root.pskCache[k];
-    next[name] = output.replace(/\n+$/, "");
-    root.pskCache = next;
+    const next = {}
+    for (const k in root.pskCache) {
+      next[k] = root.pskCache[k]
+    }
+    next[name] = output.replace(/\n+$/, "")
+    root.pskCache = next
   }
 
   function toggleSharing(network) {
-    if (!network) return false;
-    const next = root.sharing === network.name ? "" : network.name;
-    root.sharing = next;
-    if (next !== "" && root.qrHasPassword(network)) root.requestPsk(network.name);
-    return true;
+    if (!network) {
+      return false
+    }
+    const next = root.sharing === network.name ? "" : network.name
+    root.sharing = next
+    if (next !== "" && root.qrHasPassword(network)) {
+      root.requestPsk(network.name)
+    }
+    return true
   }
 
   Process {
@@ -324,8 +450,8 @@ PanelBase {
 
     running: false
     onExited: {
-      root.scanning = false;
-      root.lastRefresh = Date.now();
+      root.scanning = false
+      root.lastRefresh = Date.now()
     }
   }
 
@@ -335,13 +461,15 @@ PanelBase {
     running: false
     stdout: StdioCollector {
       onStreamFinished: {
-        const next = {};
-        const lines = text.split("\n");
+        const next = {}
+        const lines = text.split("\n")
         for (let i = 0; i < lines.length; i++) {
-          const m = lines[i].match(/^(.*):(yes|no)$/);
-          if (m) next[m[1].replace(/\\:/g, ":")] = m[2] === "yes";
+          const m = lines[i].match(/^(.*):(yes|no)$/)
+          if (m) {
+            next[m[1].replace(/\\:/g, ":")] = m[2] === "yes"
+          }
         }
-        root.autoConnect = next;
+        root.autoConnect = next
       }
     }
   }
@@ -351,8 +479,8 @@ PanelBase {
 
     running: false
     onExited: {
-      root.pumpModify();
-      root.queryAutoConnect();
+      root.pumpModify()
+      root.queryAutoConnect()
     }
   }
 
@@ -366,8 +494,8 @@ PanelBase {
       onStreamFinished: pskProc.output = text
     }
     onExited: {
-      root.storePsk(pskProc.target, pskProc.output);
-      root.pumpPsk();
+      root.storePsk(pskProc.target, pskProc.output)
+      root.pumpPsk()
     }
   }
 
@@ -379,141 +507,196 @@ PanelBase {
   }
 
   function rowDelegates() {
-    const out = [];
-    const kids = list.contentItem.children;
-    for (let i = 0; i < kids.length; i++) if (kids[i] && kids[i].objectName === "wifiRow") out.push(kids[i]);
-    return out;
+    const out = []
+    const kids = list.contentItem.children
+    for (let i = 0; i < kids.length; i++) {
+      if (kids[i] && kids[i].objectName === "wifiRow") {
+        out.push(kids[i])
+      }
+    }
+    return out
   }
 
   function editorForName(name) {
-    if (!name) return null;
-    const rows = root.rowDelegates();
-    for (let i = 0; i < rows.length; i++) if (rows[i].netName === name) return rows[i].passwordEditor;
-    return null;
+    if (!name) {
+      return null
+    }
+    const rows = root.rowDelegates()
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].netName === name) {
+        return rows[i].passwordEditor
+      }
+    }
+    return null
   }
 
   function findNetwork(name) {
-    for (let i = 0; i < allNetworks.length; i++) if (allNetworks[i].name === name) return allNetworks[i];
-    return null;
+    for (let i = 0; i < allNetworks.length; i++) {
+      if (allNetworks[i].name === name) {
+        return allNetworks[i]
+      }
+    }
+    return null
   }
 
   function testBeginPassword(name) {
-    const network = root.findNetwork(name);
-    if (!network || !root.secured(network) || network.known) return false;
-    root.pending = name;
-    root.showPassword = false;
-    root.confirmForget = "";
-    root.expanded = "";
-    root.sharing = "";
-    return true;
+    const network = root.findNetwork(name)
+    if (!network || !root.secured(network) || network.known) {
+      return false
+    }
+    root.pending = name
+    root.showPassword = false
+    root.confirmForget = ""
+    root.expanded = ""
+    root.sharing = ""
+    return true
   }
 
   function testSetPassword(text) {
-    const editor = root.editorForName(root.pending);
-    if (!editor) return false;
-    editor.text = text;
-    return true;
+    const editor = root.editorForName(root.pending)
+    if (!editor) {
+      return false
+    }
+    editor.text = text
+    return true
   }
 
   function testPasswordEcho() {
-    const editor = root.editorForName(root.pending);
-    if (!editor) return "";
-    return editor.echoMode === TextInput.Password ? "hidden" : "shown";
+    const editor = root.editorForName(root.pending)
+    if (!editor) {
+      return ""
+    }
+    return editor.echoMode === TextInput.Password ? "hidden" : "shown"
   }
 
   function testToggleShowPassword() {
-    root.showPassword = !root.showPassword;
-    return root.showPassword;
+    root.showPassword = !root.showPassword
+    return root.showPassword
   }
 
   function testPasswordRect() {
-    const editor = root.editorForName(root.pending);
-    if (!editor) return null;
-    const point = editor.mapToItem(null, 0, 0);
-    if (!point) return null;
-    return { x: point.x, y: point.y, width: editor.width, height: editor.height, echo: root.testPasswordEcho() };
+    const editor = root.editorForName(root.pending)
+    if (!editor) {
+      return null
+    }
+    const point = editor.mapToItem(null, 0, 0)
+    if (!point) {
+      return null
+    }
+    return {
+      x: point.x,
+      y: point.y,
+      width: editor.width,
+      height: editor.height,
+      echo: root.testPasswordEcho()
+    }
   }
 
   function testSubmitPassword() {
-    const editor = root.editorForName(root.pending);
-    if (!editor || !root.pending) return false;
-    const network = root.findNetwork(root.pending);
-    if (!network) return false;
-    network.connectWithPsk(editor.text);
-    root.pending = "";
-    return true;
+    const editor = root.editorForName(root.pending)
+    if (!editor || !root.pending) {
+      return false
+    }
+    const network = root.findNetwork(root.pending)
+    if (!network) {
+      return false
+    }
+    network.connectWithPsk(editor.text)
+    root.pending = ""
+    return true
   }
 
   function testAskForget(name) {
-    const network = root.findNetwork(name);
-    if (!network) return false;
-    root.requestForget(network);
-    return true;
+    const network = root.findNetwork(name)
+    if (!network) {
+      return false
+    }
+    root.requestForget(network)
+    return true
   }
 
   function testConfirmForget() {
-    if (!root.confirmForget) return false;
-    const network = root.findNetwork(root.confirmForget);
-    if (!network) {
-      root.confirmForget = "";
-      return false;
+    if (!root.confirmForget) {
+      return false
     }
-    network.forget();
-    root.confirmForget = "";
-    return true;
+    const network = root.findNetwork(root.confirmForget)
+    if (!network) {
+      root.confirmForget = ""
+      return false
+    }
+    network.forget()
+    root.confirmForget = ""
+    return true
   }
 
   function testCancelForget() {
-    if (!root.confirmForget) return false;
-    root.confirmForget = "";
-    return true;
+    if (!root.confirmForget) {
+      return false
+    }
+    root.confirmForget = ""
+    return true
   }
 
   function testToggleExpanded(name) {
-    const network = root.findNetwork(name);
-    if (!network) return false;
-    return root.toggleExpanded(network);
+    const network = root.findNetwork(name)
+    if (!network) {
+      return false
+    }
+    return root.toggleExpanded(network)
   }
 
   function testToggleAutoConnect(name) {
-    const network = root.findNetwork(name);
-    if (!network || !network.known) return false;
-    root.setAutoConnect(name, !root.autoEnabled(name));
-    return true;
+    const network = root.findNetwork(name)
+    if (!network || !network.known) {
+      return false
+    }
+    root.setAutoConnect(name, !root.autoEnabled(name))
+    return true
   }
 
   function testSetSection(section, state) {
-    const value = state === true;
-    if (section === "connected") root.connectedExpanded = value;
-    else if (section === "saved") root.savedExpanded = value;
-    else if (section === "available") root.availableExpanded = value;
-    else return false;
-    root.sharing = "";
-    return true;
+    const value = state === true
+    if (section === "connected") {
+      root.connectedExpanded = value
+    } else if (section === "saved") {
+      root.savedExpanded = value
+    } else if (section === "available") {
+      root.availableExpanded = value
+    } else {
+      return false
+    }
+    root.sharing = ""
+    return true
   }
 
   function testToggleSharing(name) {
-    const network = root.findNetwork(name);
-    if (!network || !network.known) return false;
-    return root.toggleSharing(network);
+    const network = root.findNetwork(name)
+    if (!network || !network.known) {
+      return false
+    }
+    return root.toggleSharing(network)
   }
 
   function wifiIface() {
-    return root.device ? root.device.name : "";
+    return root.device ? root.device.name : ""
   }
 
   function testToggleSpeedtest() {
-    if (!root.connectedNetwork) return false;
-    return Speedtest.toggle(root.connectedNetwork.name, root.wifiIface());
+    if (!root.connectedNetwork) {
+      return false
+    }
+    return Speedtest.toggle(root.connectedNetwork.name, root.wifiIface())
   }
 
   function testPreloadSpeedtest() {
-    return Speedtest.preload();
+    return Speedtest.preload()
   }
 
   function testMockSpeedtest(phase, down, up) {
-    if (!root.connectedNetwork) return false;
-    return Speedtest.mock(root.connectedNetwork.name, phase, down, up);
+    if (!root.connectedNetwork) {
+      return false
+    }
+    return Speedtest.mock(root.connectedNetwork.name, phase, down, up)
   }
 
   function testWifiState() {
@@ -532,21 +715,21 @@ PanelBase {
       savedExpanded: root.savedExpanded,
       availableExpanded: root.availableExpanded,
       connected: root.connectedNetwork ? root.connectedNetwork.name : "",
-      saved: root.savedNetworks.map((n) => n.name),
-      available: root.availableNetworks.map((n) => n.name),
+      saved: root.savedNetworks.map(n => n.name),
+      available: root.availableNetworks.map(n => n.name),
       speedtest: Speedtest.state()
-    };
+    }
   }
 
   onOpened: {
-    root.maybeRescan();
-    pending = "";
-    confirmForget = "";
-    expanded = "";
-    sharing = "";
-    activating = "";
-    showPassword = false;
-    queryAutoConnect();
+    root.maybeRescan()
+    pending = ""
+    confirmForget = ""
+    expanded = ""
+    sharing = ""
+    activating = ""
+    showPassword = false
+    queryAutoConnect()
   }
 
   PanelHeader {
@@ -609,7 +792,9 @@ PanelBase {
       readonly property bool actionsOpen: !entry.isLabel && root.expanded !== "" && root.expanded === entry.netName && !entry.pwOpen && !entry.confirmOpen
       readonly property bool changing: entry.net ? entry.net.stateChanging : false
       readonly property bool busy: entry.changing || (!entry.isLabel && root.activating !== "" && root.activating === entry.netName)
-      onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.netName) root.activating = ""
+      onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.netName) {
+        root.activating = ""
+      }
       readonly property var passwordEditor: pwField
       readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || pwHover.containsMouse || eyeBtn.hovered || passCheckBtn.hovered || forgetCancelBtn.hovered || forgetCheckBtn.hovered || trashActionBtn.hovered || qrActionBtn.hovered || toggleActionBtn.hovered || speedActionBtn.hovered || badgeHover.containsMouse
       readonly property bool shown: entry.isLabel ? true : root.sectionExpanded(entry.section)
@@ -624,13 +809,15 @@ PanelBase {
       property bool qrExpanded: false
       onQrOpenChanged: {
         if (entry.qrOpen) {
-          qrCollapseTimer.stop();
-          entry.qrExpanded = true;
+          qrCollapseTimer.stop()
+          entry.qrExpanded = true
         } else {
-          qrCollapseTimer.restart();
+          qrCollapseTimer.restart()
         }
       }
-      Component.onCompleted: if (entry.qrOpen) entry.qrExpanded = true
+      Component.onCompleted: if (entry.qrOpen) {
+        entry.qrExpanded = true
+      }
       readonly property int actionsHeight: entry.qrExpanded ? entry.qrSize + Math.round(24 * Theme.scale) : Math.round(34 * Theme.scale)
       readonly property int extraHeight: (entry.pwOpen || entry.confirmOpen) ? Math.round(34 * Theme.scale) : (entry.actionsOpen ? entry.actionsHeight : 0)
       readonly property color cardColor: entry.qrOpen ? Theme.qrSurface : (entry.highlighted ? Theme.surfaceHigh : Theme.surface)
@@ -645,8 +832,18 @@ PanelBase {
       opacity: entry.shown ? 1 : 0
       clip: true
 
-      Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-      Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+      Behavior on height {
+        NumberAnimation {
+          duration: 220
+          easing.type: Easing.OutCubic
+        }
+      }
+      Behavior on opacity {
+        NumberAnimation {
+          duration: 160
+          easing.type: Easing.OutCubic
+        }
+      }
 
       Timer {
         id: qrCollapseTimer
@@ -679,7 +876,12 @@ PanelBase {
         antialiasing: true
         clip: true
 
-        Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on color {
+          ColorAnimation {
+            duration: 220
+            easing.type: Easing.OutCubic
+          }
+        }
 
         MouseArea {
           id: cardHover
@@ -698,7 +900,9 @@ PanelBase {
           height: Math.round(44 * Theme.scale)
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
-          onClicked: if (entry.net) root.activate(entry.net)
+          onClicked: if (entry.net) {
+            root.activate(entry.net)
+          }
         }
 
         Item {
@@ -722,7 +926,12 @@ PanelBase {
               color: entry.strongText
               font.pixelSize: Theme.iconSizeLarge
 
-              Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+              Behavior on color {
+                ColorAnimation {
+                  duration: 220
+                  easing.type: Easing.OutCubic
+                }
+              }
             }
           }
 
@@ -739,7 +948,12 @@ PanelBase {
             font.bold: entry.isConnected
             elide: Text.ElideRight
 
-            Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on color {
+              ColorAnimation {
+                duration: 220
+                easing.type: Easing.OutCubic
+              }
+            }
           }
 
           Row {
@@ -766,7 +980,12 @@ PanelBase {
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSizeSmall
 
-              Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+              Behavior on color {
+                ColorAnimation {
+                  duration: 220
+                  easing.type: Easing.OutCubic
+                }
+              }
             }
 
             Spinner {
@@ -786,7 +1005,9 @@ PanelBase {
           height: visible ? Math.round(34 * Theme.scale) : 0
           clip: true
 
-          onVisibleChanged: if (visible) pwField.forceActiveFocus()
+          onVisibleChanged: if (visible) {
+            pwField.forceActiveFocus()
+          }
 
           Row {
             anchors.left: parent.left
@@ -809,9 +1030,11 @@ PanelBase {
               font.pixelSize: Theme.fontSize
               clip: true
               onAccepted: {
-                const network = root.findNetwork(root.pending);
-                if (network) network.connectWithPsk(pwField.text);
-                root.pending = "";
+                const network = root.findNetwork(root.pending)
+                if (network) {
+                  network.connectWithPsk(pwField.text)
+                }
+                root.pending = ""
               }
 
               MouseArea {
@@ -855,9 +1078,11 @@ PanelBase {
               iconColor: Theme.primary
               hoverColor: Theme.surfaceHigher
               onClicked: {
-                const network = root.findNetwork(root.pending);
-                if (network) network.connectWithPsk(pwField.text);
-                root.pending = "";
+                const network = root.findNetwork(root.pending)
+                if (network) {
+                  network.connectWithPsk(pwField.text)
+                }
+                root.pending = ""
               }
             }
           }
@@ -913,9 +1138,11 @@ PanelBase {
               iconColor: Theme.red
               hoverColor: Theme.surfaceHigher
               onClicked: {
-                const network = root.findNetwork(root.confirmForget);
-                if (network) network.forget();
-                root.confirmForget = "";
+                const network = root.findNetwork(root.confirmForget)
+                if (network) {
+                  network.forget()
+                }
+                root.confirmForget = ""
               }
             }
           }
@@ -939,7 +1166,12 @@ PanelBase {
             text: entry.qrPayload
             opacity: entry.qrOpen && entry.qrPayload !== "" ? 1 : 0
 
-            Behavior on opacity { NumberAnimation { duration: entry.qrFadeMs; easing.type: Easing.OutCubic } }
+            Behavior on opacity {
+              NumberAnimation {
+                duration: entry.qrFadeMs
+                easing.type: Easing.OutCubic
+              }
+            }
           }
 
           Text {
@@ -1022,11 +1254,16 @@ PanelBase {
               iconColor: toggleActionBtn.hovered ? entry.hoverText : Theme.overlay
               hoverColor: entry.hoverSurface
               onClicked: {
-                if (!entry.net) return;
-                root.activating = entry.net.name;
-                activatingTimer.restart();
-                if (entry.isConnected) entry.net.disconnect();
-                else entry.net.connect();
+                if (!entry.net) {
+                  return
+                }
+                root.activating = entry.net.name
+                activatingTimer.restart()
+                if (entry.isConnected) {
+                  entry.net.disconnect()
+                } else {
+                  entry.net.connect()
+                }
               }
             }
 
@@ -1051,7 +1288,9 @@ PanelBase {
               name: "trash"
               iconColor: trashActionBtn.hovered ? entry.hoverText : Theme.overlay
               hoverColor: entry.hoverSurface
-              onClicked: if (entry.net) root.requestForget(entry.net)
+              onClicked: if (entry.net) {
+                root.requestForget(entry.net)
+              }
             }
 
             IconButton {
@@ -1066,9 +1305,16 @@ PanelBase {
               name: "qrcode"
               iconColor: entry.qrOpen ? entry.accentText : (qrActionBtn.hovered ? entry.hoverText : Theme.overlay)
               hoverColor: entry.hoverSurface
-              onClicked: if (entry.net) root.toggleSharing(entry.net)
+              onClicked: if (entry.net) {
+                root.toggleSharing(entry.net)
+              }
 
-              Behavior on iconColor { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+              Behavior on iconColor {
+                ColorAnimation {
+                  duration: 220
+                  easing.type: Easing.OutCubic
+                }
+              }
             }
 
             Rectangle {
@@ -1092,7 +1338,12 @@ PanelBase {
                 font.pixelSize: Theme.fontSizeSmall
                 font.bold: root.autoEnabled(entry.netName)
 
-                Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                Behavior on color {
+                  ColorAnimation {
+                    duration: 220
+                    easing.type: Easing.OutCubic
+                  }
+                }
               }
 
               MouseArea {
@@ -1101,7 +1352,9 @@ PanelBase {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: if (entry.net) root.setAutoConnect(entry.netName, !root.autoEnabled(entry.netName))
+                onClicked: if (entry.net) {
+                  root.setAutoConnect(entry.netName, !root.autoEnabled(entry.netName))
+                }
               }
             }
 
@@ -1118,12 +1371,15 @@ PanelBase {
               spinning: entry.speedActive
               iconColor: speedActionBtn.hovered ? entry.hoverText : Theme.overlay
               hoverColor: entry.hoverSurface
-              onClicked: if (entry.net) Speedtest.toggle(entry.net.name, root.wifiIface())
-              onHoveredChanged: if (speedActionBtn.hovered) Speedtest.preload()
+              onClicked: if (entry.net) {
+                Speedtest.toggle(entry.net.name, root.wifiIface())
+              }
+              onHoveredChanged: if (speedActionBtn.hovered) {
+                Speedtest.preload()
+              }
             }
           }
         }
-
       }
     }
   }

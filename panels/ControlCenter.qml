@@ -60,7 +60,9 @@ PanelBase {
       label: "Bluetooth"
       active: Bluetooth.defaultAdapter ? Bluetooth.defaultAdapter.enabled : false
       onClicked: {
-        if (Bluetooth.defaultAdapter) Bluetooth.defaultAdapter.enabled = !Bluetooth.defaultAdapter.enabled;
+        if (Bluetooth.defaultAdapter) {
+          Bluetooth.defaultAdapter.enabled = !Bluetooth.defaultAdapter.enabled
+        }
       }
     }
 
@@ -97,7 +99,7 @@ PanelBase {
       node: Audio.sink
       value: Audio.volume / Audio.maxVolume
       fullMark: 1 / Audio.maxVolume
-      onMoved: (v) => Audio.setVolume(v * Audio.maxVolume)
+      onMoved: v => Audio.setVolume(v * Audio.maxVolume)
     }
 
     Text {
@@ -164,7 +166,9 @@ PanelBase {
         BarButton {
           implicitWidth: Math.round(28 * Theme.scale)
           implicitHeight: Math.round(28 * Theme.scale)
-          onClicked: if (Media.active) Media.active.previous()
+          onClicked: if (Media.active) {
+            Media.active.previous()
+          }
           Icon {
             anchors.centerIn: parent
             name: "player-skip-back"
@@ -175,7 +179,9 @@ PanelBase {
         BarButton {
           implicitWidth: Math.round(28 * Theme.scale)
           implicitHeight: Math.round(28 * Theme.scale)
-          onClicked: if (Media.active) Media.active.togglePlaying()
+          onClicked: if (Media.active) {
+            Media.active.togglePlaying()
+          }
           Icon {
             anchors.centerIn: parent
             name: Media.active && Media.active.isPlaying ? "player-pause" : "player-play"
@@ -186,7 +192,9 @@ PanelBase {
         BarButton {
           implicitWidth: Math.round(28 * Theme.scale)
           implicitHeight: Math.round(28 * Theme.scale)
-          onClicked: if (Media.active) Media.active.next()
+          onClicked: if (Media.active) {
+            Media.active.next()
+          }
           Icon {
             anchors.centerIn: parent
             name: "player-skip-forward"
@@ -204,8 +212,8 @@ PanelBase {
 
   Text {
     visible: {
-      const list = Notifs.active;
-      return list !== null && list !== undefined && typeof list.length === "number" && list.length > 0;
+      const list = Notifs.active
+      return list !== null && list !== undefined && typeof list.length === "number" && list.length > 0
     }
     text: "Notifications"
     color: Theme.subtext

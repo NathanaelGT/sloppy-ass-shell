@@ -7,7 +7,7 @@ Rectangle {
   property bool checked: false
   property color accent: Theme.primary
 
-  signal toggled()
+  signal toggled
 
   implicitWidth: Math.round(40 * Theme.scale)
   implicitHeight: Math.round(22 * Theme.scale)
@@ -18,7 +18,9 @@ Rectangle {
   antialiasing: true
 
   Behavior on color {
-    ColorAnimation { duration: 140 }
+    ColorAnimation {
+      duration: 140
+    }
   }
 
   Rectangle {

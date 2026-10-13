@@ -31,20 +31,26 @@ PanelWindow {
   property var recent: []
 
   function push(notification) {
-    if (Notifs.dnd) return;
-    const next = [notification];
-    for (let i = 0; i < recent.length; i++) if (recent[i] !== notification && next.length < 4) next.push(recent[i]);
-    recent = next;
+    if (Notifs.dnd) {
+      return
+    }
+    const next = [notification]
+    for (let i = 0; i < recent.length; i++) {
+      if (recent[i] !== notification && next.length < 4) {
+        next.push(recent[i])
+      }
+    }
+    recent = next
   }
 
   function remove(notification) {
-    recent = recent.filter((n) => n !== notification);
+    recent = recent.filter(n => n !== notification)
   }
 
   Connections {
     target: Notifs.server
     function onNotification(notification) {
-      root.push(notification);
+      root.push(notification)
     }
   }
 
@@ -77,7 +83,7 @@ PanelWindow {
         Connections {
           target: toast.modelData
           function onClosed(reason) {
-            root.remove(toast.modelData);
+            root.remove(toast.modelData)
           }
         }
 
@@ -85,8 +91,8 @@ PanelWindow {
           anchors.fill: parent
           acceptedButtons: Qt.LeftButton
           onClicked: {
-            toast.modelData.dismiss();
-            root.remove(toast.modelData);
+            toast.modelData.dismiss()
+            root.remove(toast.modelData)
           }
         }
 
@@ -144,8 +150,8 @@ PanelWindow {
             implicitWidth: Math.round(26 * Theme.scale)
             implicitHeight: Math.round(26 * Theme.scale)
             onClicked: {
-              toast.modelData.dismiss();
-              root.remove(toast.modelData);
+              toast.modelData.dismiss()
+              root.remove(toast.modelData)
             }
             Icon {
               anchors.centerIn: parent

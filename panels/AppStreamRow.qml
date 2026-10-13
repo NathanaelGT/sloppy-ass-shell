@@ -15,7 +15,7 @@ Column {
   property bool active: true
   property real maxVolume: 1.5
 
-  signal pinToggled()
+  signal pinToggled
   signal routePressed(var anchor)
   signal wheeled(real angleDelta)
   signal percentEditing(var editor)
@@ -65,7 +65,12 @@ Column {
         enabled: root.pinVisible
         onClicked: root.pinToggled()
 
-        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+          NumberAnimation {
+            duration: 160
+            easing.type: Easing.OutCubic
+          }
+        }
       }
 
       Rectangle {
@@ -133,10 +138,12 @@ Column {
       node: root.node
       value: root.audio ? root.audio.volume / root.maxVolume : 0
       fullMark: 1 / root.maxVolume
-      onMoved: (v) => {
-        if (root.audio) root.audio.volume = v * root.maxVolume;
+      onMoved: v => {
+        if (root.audio) {
+          root.audio.volume = v * root.maxVolume
+        }
       }
-      onWheeled: (angleDelta) => root.wheeled(angleDelta)
+      onWheeled: angleDelta => root.wheeled(angleDelta)
     }
 
     EditablePercent {
@@ -145,10 +152,12 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       percent: root.audio ? root.audio.volume * 100 : 0
       maximum: root.maxVolume * 100
-      onEdited: (value) => {
-        if (root.audio) root.audio.volume = value / 100;
+      onEdited: value => {
+        if (root.audio) {
+          root.audio.volume = value / 100
+        }
       }
-      onWheeled: (angleDelta) => root.wheeled(angleDelta)
+      onWheeled: angleDelta => root.wheeled(angleDelta)
       onEditingChanged: root.percentEditing(editing ? percentInput : null)
     }
 
@@ -159,9 +168,11 @@ Column {
       level: root.audio ? root.audio.volume : 0
       maxLevel: root.maxVolume
       onClicked: {
-        if (root.audio) root.audio.muted = !root.audio.muted;
+        if (root.audio) {
+          root.audio.muted = !root.audio.muted
+        }
       }
-      onWheeled: (angleDelta) => root.wheeled(angleDelta)
+      onWheeled: angleDelta => root.wheeled(angleDelta)
     }
   }
 }

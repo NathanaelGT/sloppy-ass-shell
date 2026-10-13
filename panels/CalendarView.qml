@@ -13,34 +13,38 @@ Column {
   readonly property int cellSize: Math.round(30 * Theme.scale)
 
   readonly property var dayNames: {
-    const names = [];
-    for (let i = 1; i <= 7; i++) names.push(Theme.locale.dayName(i, Locale.ShortFormat));
-    return names;
+    const names = []
+    for (let i = 1; i <= 7; i++) {
+      names.push(Theme.locale.dayName(i, Locale.ShortFormat))
+    }
+    return names
   }
 
   readonly property var weeks: {
-    const first = new Date(root.cursor.getFullYear(), root.cursor.getMonth(), 1);
-    const offset = (first.getDay() + 6) % 7;
-    const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset);
-    const result = [];
+    const first = new Date(root.cursor.getFullYear(), root.cursor.getMonth(), 1)
+    const offset = (first.getDay() + 6) % 7
+    const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset)
+    const result = []
     for (let w = 0; w < 6; w++) {
-      const row = [];
-      for (let i = 0; i < 7; i++) row.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7 + i));
-      result.push(row);
+      const row = []
+      for (let i = 0; i < 7; i++) {
+        row.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7 + i))
+      }
+      result.push(row)
     }
-    return result;
+    return result
   }
 
   function isoWeek(date) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const day = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - day);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+    const day = d.getUTCDay() || 7
+    d.setUTCDate(d.getUTCDate() + 4 - day)
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+    return Math.ceil(((d - yearStart) / 86400000 + 1) / 7)
   }
 
   function sameDay(a, b) {
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   }
 
   Row {

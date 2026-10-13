@@ -14,17 +14,25 @@ BarButton {
 
   onClicked: Panels.toggle("bluetooth", root.screen.name)
   onRightClicked: {
-    if (adapter) adapter.enabled = !adapter.enabled;
+    if (adapter) {
+      adapter.enabled = !adapter.enabled
+    }
   }
   onMiddleClicked: Quickshell.execDetached(["bash", "-lc", "bluetoothctl power off; sleep 0.5; bluetoothctl power on"])
 
   readonly property var adapter: Bluetooth.defaultAdapter
   readonly property bool on: adapter ? adapter.enabled : false
   readonly property bool connected: {
-    if (!adapter) return false;
-    const devices = adapter.devices.values ? adapter.devices.values : adapter.devices;
-    for (let i = 0; i < devices.length; i++) if (devices[i].connected) return true;
-    return false;
+    if (!adapter) {
+      return false
+    }
+    const devices = adapter.devices.values ? adapter.devices.values : adapter.devices
+    for (let i = 0; i < devices.length; i++) {
+      if (devices[i].connected) {
+        return true
+      }
+    }
+    return false
   }
 
   visible: on

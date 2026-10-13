@@ -9,8 +9,8 @@ Rectangle {
   property bool active: false
   property color accent: Theme.primary
 
-  signal clicked()
-  signal rightClicked()
+  signal clicked
+  signal rightClicked
 
   implicitHeight: Math.round(58 * Theme.scale)
   radius: Math.round(15 * Theme.scale)
@@ -18,7 +18,9 @@ Rectangle {
   antialiasing: true
 
   Behavior on color {
-    ColorAnimation { duration: 150 }
+    ColorAnimation {
+      duration: 150
+    }
   }
 
   Column {
@@ -44,6 +46,6 @@ Rectangle {
   MouseArea {
     anchors.fill: parent
     acceptedButtons: Qt.LeftButton | Qt.RightButton
-    onClicked: (e) => e.button === Qt.LeftButton ? root.clicked() : root.rightClicked()
+    onClicked: e => e.button === Qt.LeftButton ? root.clicked() : root.rightClicked()
   }
 }

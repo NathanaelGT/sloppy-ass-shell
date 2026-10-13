@@ -10,11 +10,15 @@ PanelBase {
   panelName: "notifications"
 
   readonly property var items: {
-    const list = Notifs.active;
-    if (!list) return [];
-    const out = [];
-    for (let i = 0; i < list.length; i++) out.push(list[i]);
-    return out;
+    const list = Notifs.active
+    if (!list) {
+      return []
+    }
+    const out = []
+    for (let i = 0; i < list.length; i++) {
+      out.push(list[i])
+    }
+    return out
   }
 
   PanelHeader {
@@ -27,8 +31,11 @@ PanelBase {
       visible: Notifs.dnd || root.items.length > 0
       hoverFill: Theme.surfaceHigh
       onClicked: {
-        if (root.items.length > 0) Notifs.dismissAll();
-        else Notifs.dnd = false;
+        if (root.items.length > 0) {
+          Notifs.dismissAll()
+        } else {
+          Notifs.dnd = false
+        }
       }
       Icon {
         anchors.centerIn: parent

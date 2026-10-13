@@ -12,23 +12,26 @@ Rectangle {
   property bool hovered: mouse.containsMouse
   property bool spinning: false
 
-  signal clicked()
+  signal clicked
 
   onSpinningChanged: {
-    if (root.spinning) finishAnim.stop();
-    else root.finishSpin();
+    if (root.spinning) {
+      finishAnim.stop()
+    } else {
+      root.finishSpin()
+    }
   }
 
   function finishSpin() {
-    const pos = ((icon.rotation % 360) + 360) % 360;
+    const pos = ((icon.rotation % 360) + 360) % 360
     if (pos < 0.5) {
-      icon.rotation = 0;
-      return;
+      icon.rotation = 0
+      return
     }
-    finishAnim.from = icon.rotation;
-    finishAnim.to = icon.rotation + (360 - pos);
-    finishAnim.duration = Math.round((360 - pos) / 360 * 1000);
-    finishAnim.restart();
+    finishAnim.from = icon.rotation
+    finishAnim.to = icon.rotation + (360 - pos)
+    finishAnim.duration = Math.round((360 - pos) / 360 * 1000)
+    finishAnim.restart()
   }
 
   implicitWidth: size
@@ -57,7 +60,9 @@ Rectangle {
       id: finishAnim
 
       easing.type: Easing.Linear
-      onStopped: if (!root.spinning) icon.rotation = 0
+      onStopped: if (!root.spinning) {
+        icon.rotation = 0
+      }
     }
   }
 

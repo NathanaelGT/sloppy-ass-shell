@@ -26,10 +26,10 @@ PanelWindow {
   property bool animateCardHeight: false
   default property alias cardData: bodyColumn.data
 
-  signal opened()
-  signal scrolled()
+  signal opened
+  signal scrolled
   signal keyPressed(var event)
-  signal cancelRequested()
+  signal cancelRequested
 
   screen: modelData
   readonly property string screenId: modelData ? modelData.name : ""
@@ -89,7 +89,10 @@ PanelWindow {
 
   Behavior on cardHeight {
     enabled: root.animateCardHeight
-    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+    NumberAnimation {
+      duration: 220
+      easing.type: Easing.OutCubic
+    }
   }
   readonly property int cardX: align === "center" ? Math.round((width - cardWidth) / 2) : align === "left" ? edge : width - cardWidth - edge
   readonly property int restingY: vertical === "center" ? Math.round(((modelData ? modelData.height : 0) - cardHeight) / 2) : topMargin
@@ -97,72 +100,96 @@ PanelWindow {
   readonly property real viewportHeight: scroller.height
 
   function scrollBy(delta) {
-    const limit = Math.max(0, scroller.contentHeight - scroller.height);
-    scroller.contentY = Math.max(0, Math.min(limit, scroller.contentY - delta / 2));
+    const limit = Math.max(0, scroller.contentHeight - scroller.height)
+    scroller.contentY = Math.max(0, Math.min(limit, scroller.contentY - delta / 2))
   }
 
   function hitCancelTarget(lx, ly) {
-    const target = root.cancelItem;
-    if (!target) return false;
-    const point = target.mapToItem(contentClip, 0, 0);
-    return point && lx >= point.x && lx <= point.x + target.width && ly >= point.y && ly <= point.y + target.height;
+    const target = root.cancelItem
+    if (!target) {
+      return false
+    }
+    const point = target.mapToItem(contentClip, 0, 0)
+    return point && lx >= point.x && lx <= point.x + target.width && ly >= point.y && ly <= point.y + target.height
   }
 
   function targetPressAt(lx, ly) {
-    const target = root.cancelItem;
-    if (!target) return;
-    const point = target.mapToItem(contentClip, 0, 0);
-    if (point) target.testPressAt(lx - point.x, ly - point.y);
+    const target = root.cancelItem
+    if (!target) {
+      return
+    }
+    const point = target.mapToItem(contentClip, 0, 0)
+    if (point) {
+      target.testPressAt(lx - point.x, ly - point.y)
+    }
   }
 
   function testDispatch(x, y) {
-    if (!root.cancelItem) return "idle";
-    const origin = contentClip.mapToItem(null, 0, 0);
-    if (root.hitCancelTarget(x - origin.x, y - origin.y)) {
-      root.targetPressAt(x - origin.x, y - origin.y);
-      return "passthrough";
+    if (!root.cancelItem) {
+      return "idle"
     }
-    root.cancelRequested();
-    return "cancelled";
+    const origin = contentClip.mapToItem(null, 0, 0)
+    if (root.hitCancelTarget(x - origin.x, y - origin.y)) {
+      root.targetPressAt(x - origin.x, y - origin.y)
+      return "passthrough"
+    }
+    root.cancelRequested()
+    return "cancelled"
   }
 
   function testRect() {
-    const point = visual.mapToItem(null, 0, 0);
-    if (!point) return null;
-    return { x: point.x, y: point.y, width: visual.width, height: visual.height };
+    const point = visual.mapToItem(null, 0, 0)
+    if (!point) {
+      return null
+    }
+    return {
+      x: point.x,
+      y: point.y,
+      width: visual.width,
+      height: visual.height
+    }
   }
 
   onRequestedChanged: {
     if (requested) {
-      closeDelay.stop();
-      open = true;
-      if (Panels.closingScreen === root.screenId) Panels.closingScreen = "";
+      closeDelay.stop()
+      open = true
+      if (Panels.closingScreen === root.screenId) {
+        Panels.closingScreen = ""
+      }
     } else {
-      open = false;
-      if (root.attached && root.panelName !== "") Panels.closingScreen = root.screenId;
-      closeDelay.restart();
+      open = false
+      if (root.attached && root.panelName !== "") {
+        Panels.closingScreen = root.screenId
+      }
+      closeDelay.restart()
     }
   }
 
   onOpenChanged: {
     if (root.panelName !== "") {
-      if (root.open) TestDriver.register(root.panelName, root.screenId, root);
-      else TestDriver.unregister(root.panelName, root.screenId);
+      if (root.open) {
+        TestDriver.register(root.panelName, root.screenId, root)
+      } else {
+        TestDriver.unregister(root.panelName, root.screenId)
+      }
     }
-    if (root.open) root.windowAtOpen = Hypr.activeWindowAddress;
+    if (root.open) {
+      root.windowAtOpen = Hypr.activeWindowAddress
+    }
     if (!root.open) {
-      root.exitCloseArmed = false;
-      root.cardHovered = false;
-      exitTimer.stop();
+      root.exitCloseArmed = false
+      root.cardHovered = false
+      exitTimer.stop()
     }
   }
 
   onKeepOpenChanged: {
     if (root.keepOpen) {
-      root.exitCloseArmed = true;
-      exitTimer.stop();
+      root.exitCloseArmed = true
+      exitTimer.stop()
     } else if (root.exitCloseArmed && root.exitCloseActive) {
-      exitTimer.restart();
+      exitTimer.restart()
     }
   }
 
@@ -170,9 +197,13 @@ PanelWindow {
     target: Hypr
 
     function onActiveWindowAddressChanged() {
-      if (!root.open || !root.dismissOnBackdrop) return;
-      if (Hypr.activeWindowAddress === root.windowAtOpen) return;
-      Panels.close();
+      if (!root.open || !root.dismissOnBackdrop) {
+        return
+      }
+      if (Hypr.activeWindowAddress === root.windowAtOpen) {
+        return
+      }
+      Panels.close()
     }
   }
 
@@ -181,13 +212,17 @@ PanelWindow {
 
     interval: 180
     running: false
-    onTriggered: if (root.exitCloseActive && !root.keepOpen) Panels.close()
+    onTriggered: if (root.exitCloseActive && !root.keepOpen) {
+      Panels.close()
+    }
   }
 
   onVisibleChanged: {
     if (visible) {
-      if (autoFocusKeyCatcher) keyCatcher.forceActiveFocus();
-      root.opened();
+      if (autoFocusKeyCatcher) {
+        keyCatcher.forceActiveFocus()
+      }
+      root.opened()
     }
   }
 
@@ -196,17 +231,21 @@ PanelWindow {
 
     interval: 260
     running: false
-    onTriggered: if (Panels.closingScreen === root.screenId) Panels.closingScreen = ""
+    onTriggered: if (Panels.closingScreen === root.screenId) {
+      Panels.closingScreen = ""
+    }
   }
 
   MouseArea {
     id: backdrop
 
     anchors.fill: parent
-    onClicked: if (root.dismissOnBackdrop && !root.popupOpen) Panels.close()
-    onWheel: (event) => {
-      root.scrollBy(event.angleDelta.y);
-      event.accepted = true;
+    onClicked: if (root.dismissOnBackdrop && !root.popupOpen) {
+      Panels.close()
+    }
+    onWheel: event => {
+      root.scrollBy(event.angleDelta.y)
+      event.accepted = true
     }
   }
 
@@ -229,7 +268,12 @@ PanelWindow {
       layer.enabled: true
       layer.samples: 4
 
-      Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+      Behavior on y {
+        NumberAnimation {
+          duration: 220
+          easing.type: Easing.OutCubic
+        }
+      }
 
       HoverHandler {
         onHoveredChanged: root.cardHovered = hovered
@@ -269,7 +313,9 @@ PanelWindow {
 
       MouseArea {
         anchors.fill: parent
-        onClicked: if (root.dismissOnBackdrop && !root.popupOpen) Panels.close()
+        onClicked: if (root.dismissOnBackdrop && !root.popupOpen) {
+          Panels.close()
+        }
       }
 
       Item {
@@ -283,9 +329,9 @@ PanelWindow {
 
         MouseArea {
           anchors.fill: parent
-          onWheel: (event) => {
-            root.scrollBy(event.angleDelta.y);
-            event.accepted = true;
+          onWheel: event => {
+            root.scrollBy(event.angleDelta.y)
+            event.accepted = true
           }
         }
 
@@ -339,15 +385,17 @@ PanelWindow {
           hoverEnabled: true
           propagateComposedEvents: true
           cursorShape: containsMouse && root.hitCancelTarget(mouseX, mouseY) ? Qt.IBeamCursor : Qt.ArrowCursor
-          onPressed: (mouse) => {
-            if (root.hitCancelTarget(mouse.x, mouse.y)) mouse.accepted = false;
-          }
-          onClicked: (mouse) => {
+          onPressed: mouse => {
             if (root.hitCancelTarget(mouse.x, mouse.y)) {
-              mouse.accepted = false;
-              return;
+              mouse.accepted = false
             }
-            root.cancelRequested();
+          }
+          onClicked: mouse => {
+            if (root.hitCancelTarget(mouse.x, mouse.y)) {
+              mouse.accepted = false
+              return
+            }
+            root.cancelRequested()
           }
         }
       }
@@ -359,12 +407,12 @@ PanelWindow {
 
     anchors.fill: parent
     focus: root.autoFocusKeyCatcher
-    Keys.onPressed: (event) => {
+    Keys.onPressed: event => {
       if (event.key === Qt.Key_Escape) {
-        Panels.close();
-        event.accepted = true;
+        Panels.close()
+        event.accepted = true
       } else {
-        root.keyPressed(event);
+        root.keyPressed(event)
       }
     }
   }

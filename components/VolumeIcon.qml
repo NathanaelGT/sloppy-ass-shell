@@ -20,8 +20,10 @@ Item {
   readonly property int redWaves: Math.round(level * 100) < 101 ? 0 : Math.min(3, 1 + Math.floor((level - 1) / overStep))
 
   function waveColor(index) {
-    if (index > waves) return "transparent";
-    return index <= redWaves ? overColor : color;
+    if (index > waves) {
+      return "transparent"
+    }
+    return index <= redWaves ? overColor : color
   }
 
   Shape {
@@ -38,16 +40,46 @@ Item {
       startX: 6 * root.u
       startY: 15 * root.u
 
-      PathLine { x: 4 * root.u; y: 15 * root.u }
-      PathLine { x: 3 * root.u; y: 14 * root.u }
-      PathLine { x: 3 * root.u; y: 10 * root.u }
-      PathLine { x: 4 * root.u; y: 9 * root.u }
-      PathLine { x: 6 * root.u; y: 9 * root.u }
-      PathLine { x: 9.5 * root.u; y: 4.5 * root.u }
-      PathLine { x: 11 * root.u; y: 5 * root.u }
-      PathLine { x: 11 * root.u; y: 19 * root.u }
-      PathLine { x: 9.5 * root.u; y: 19.5 * root.u }
-      PathLine { x: 6 * root.u; y: 15 * root.u }
+      PathLine {
+        x: 4 * root.u
+        y: 15 * root.u
+      }
+      PathLine {
+        x: 3 * root.u
+        y: 14 * root.u
+      }
+      PathLine {
+        x: 3 * root.u
+        y: 10 * root.u
+      }
+      PathLine {
+        x: 4 * root.u
+        y: 9 * root.u
+      }
+      PathLine {
+        x: 6 * root.u
+        y: 9 * root.u
+      }
+      PathLine {
+        x: 9.5 * root.u
+        y: 4.5 * root.u
+      }
+      PathLine {
+        x: 11 * root.u
+        y: 5 * root.u
+      }
+      PathLine {
+        x: 11 * root.u
+        y: 19 * root.u
+      }
+      PathLine {
+        x: 9.5 * root.u
+        y: 19.5 * root.u
+      }
+      PathLine {
+        x: 6 * root.u
+        y: 15 * root.u
+      }
     }
 
     ShapePath {

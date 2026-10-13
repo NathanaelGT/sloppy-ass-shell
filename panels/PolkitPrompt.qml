@@ -16,8 +16,8 @@ PanelBase {
   externalRequested: Polkit.active && Hypr.focusedScreenName === screenId
 
   onOpened: {
-    response.text = "";
-    response.forceActiveFocus();
+    response.text = ""
+    response.forceActiveFocus()
   }
 
   Column {
@@ -63,7 +63,9 @@ PanelBase {
         font.pixelSize: Theme.fontSize
         clip: true
         onAccepted: {
-          if (Polkit.flow) Polkit.flow.submit(text);
+          if (Polkit.flow) {
+            Polkit.flow.submit(text)
+          }
         }
       }
     }
@@ -87,7 +89,9 @@ PanelBase {
         icon: "x"
         label: "Cancel"
         onClicked: {
-          if (Polkit.flow) Polkit.flow.cancelAuthenticationRequest();
+          if (Polkit.flow) {
+            Polkit.flow.cancelAuthenticationRequest()
+          }
         }
       }
 
@@ -97,7 +101,9 @@ PanelBase {
         label: "Authenticate"
         active: true
         onClicked: {
-          if (Polkit.flow) Polkit.flow.submit(response.text);
+          if (Polkit.flow) {
+            Polkit.flow.submit(response.text)
+          }
         }
       }
     }

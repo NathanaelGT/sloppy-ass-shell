@@ -8,21 +8,24 @@ Singleton {
   property string closingScreen: ""
 
   function toggle(name, screen) {
-    if (openOn(name, screen)) close();
-    else open(name, screen);
+    if (openOn(name, screen)) {
+      close()
+    } else {
+      open(name, screen)
+    }
   }
 
   function open(name, screen) {
-    panel = name;
-    screenName = screen;
+    panel = name
+    screenName = screen
   }
 
   function close() {
-    panel = "";
-    screenName = "";
+    panel = ""
+    screenName = ""
   }
 
   function openOn(name, screen) {
-    return panel === name && screenName === screen;
+    return panel === name && screenName === screen
   }
 }

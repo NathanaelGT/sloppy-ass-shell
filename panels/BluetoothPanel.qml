@@ -15,28 +15,34 @@ PanelBase {
   readonly property var adapter: Bluetooth.defaultAdapter
 
   readonly property var devices: {
-    if (!adapter || !adapter.devices) return [];
-    const list = adapter.devices.values ? adapter.devices.values : adapter.devices;
-    const out = [];
-    for (let i = 0; i < list.length; i++) {
-      const d = list[i];
-      if (d.paired || d.bonded || d.connected) out.push(d);
+    if (!adapter || !adapter.devices) {
+      return []
     }
-    out.sort((a, b) => (b.connected ? 1 : 0) - (a.connected ? 1 : 0));
-    return out;
+    const list = adapter.devices.values ? adapter.devices.values : adapter.devices
+    const out = []
+    for (let i = 0; i < list.length; i++) {
+      const d = list[i]
+      if (d.paired || d.bonded || d.connected) {
+        out.push(d)
+      }
+    }
+    out.sort((a, b) => (b.connected ? 1 : 0) - (a.connected ? 1 : 0))
+    return out
   }
 
   function refresh() {
-    if (adapter) adapter.discovering = true;
+    if (adapter) {
+      adapter.discovering = true
+    }
   }
 
   function remove(device) {
-    Quickshell.execDetached(["bluetoothctl", "remove", device.address]);
+    Quickshell.execDetached(["bluetoothctl", "remove", device.address])
   }
 
   onOpened: {
-    refresh();
-    expandedAddress = "";
+    refresh()
+    expandedAddress = ""
   }
 
   PanelHeader {
@@ -49,7 +55,9 @@ PanelBase {
 
     Switch {
       checked: root.adapter ? root.adapter.enabled : false
-      onToggled: if (root.adapter) root.adapter.enabled = !root.adapter.enabled
+      onToggled: if (root.adapter) {
+        root.adapter.enabled = !root.adapter.enabled
+      }
     }
   }
 
@@ -80,7 +88,9 @@ PanelBase {
       anchors.rightMargin: Math.round(10 * Theme.scale)
       anchors.verticalCenter: parent.verticalCenter
       checked: root.adapter ? root.adapter.discoverable : false
-      onToggled: if (root.adapter) root.adapter.discoverable = !root.adapter.discoverable
+      onToggled: if (root.adapter) {
+        root.adapter.discoverable = !root.adapter.discoverable
+      }
     }
   }
 

@@ -24,26 +24,28 @@ Rectangle {
 
   readonly property string dragKey: root.group ? root.group.name : ""
 
-  signal toggleExpanded()
-  signal appPinToggled()
+  signal toggleExpanded
+  signal appPinToggled
   signal pinToggled(string key)
   signal routePressed(string key, var node, var anchor)
   signal wheeled(var node, real angleDelta)
   signal percentEditing(var editor)
   signal dragStarted(string key, real sceneY)
   signal dragMoved(real sceneY)
-  signal dragEnded()
-  signal dragCancelled()
+  signal dragEnded
+  signal dragCancelled
 
   property var activePercentEditor: null
 
   function liveNode(viewKey) {
-    const rows = root.group ? root.group.rows : [];
+    const rows = root.group ? root.group.rows : []
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (row.separator !== true && row.viewKey === viewKey) return row.node;
+      const row = rows[i]
+      if (row.separator !== true && row.viewKey === viewKey) {
+        return row.node
+      }
     }
-    return null;
+    return null
   }
 
   ListModel {
@@ -51,83 +53,121 @@ Rectangle {
   }
 
   function streamKids() {
-    const out = [];
-    const kids = rowList.contentItem.children;
-    for (let i = 0; i < kids.length; i++) if (kids[i] && kids[i].objectName === "streamRow") out.push(kids[i]);
-    return out;
+    const out = []
+    const kids = rowList.contentItem.children
+    for (let i = 0; i < kids.length; i++) {
+      if (kids[i] && kids[i].objectName === "streamRow") {
+        out.push(kids[i])
+      }
+    }
+    return out
   }
 
   function refreshPercentEditor() {
-    let found = null;
-    const kids = root.streamKids();
+    let found = null
+    const kids = root.streamKids()
     for (let i = 0; i < kids.length; i++) {
-      const editor = kids[i].streamEditor;
+      const editor = kids[i].streamEditor
       if (editor && editor.editing) {
-        found = editor;
-        break;
+        found = editor
+        break
       }
     }
-    root.activePercentEditor = found;
+    root.activePercentEditor = found
   }
 
   function cancelPercentEdits() {
-    const kids = root.streamKids();
+    const kids = root.streamKids()
     for (let i = 0; i < kids.length; i++) {
-      const editor = kids[i].streamEditor;
-      if (editor && editor.editing) editor.cancel();
+      const editor = kids[i].streamEditor
+      if (editor && editor.editing) {
+        editor.cancel()
+      }
     }
-    root.activePercentEditor = null;
+    root.activePercentEditor = null
   }
 
   function percentEditorAt(rowIndex) {
-    let seen = -1;
-    let target = "";
+    let seen = -1
+    let target = ""
     for (let i = 0; i < rowModel.count; i++) {
-      const row = rowModel.get(i);
-      if (row.separator) continue;
-      seen += 1;
+      const row = rowModel.get(i)
+      if (row.separator) {
+        continue
+      }
+      seen += 1
       if (seen === rowIndex) {
-        target = row.rowKey;
-        break;
+        target = row.rowKey
+        break
       }
     }
-    if (!target) return null;
-    const kids = root.streamKids();
-    for (let i = 0; i < kids.length; i++) if (kids[i].rowKey === target) return kids[i].streamEditor;
-    return null;
+    if (!target) {
+      return null
+    }
+    const kids = root.streamKids()
+    for (let i = 0; i < kids.length; i++) {
+      if (kids[i].rowKey === target) {
+        return kids[i].streamEditor
+      }
+    }
+    return null
   }
 
   function viewKeyAt(rows, viewKey) {
     for (let j = 0; j < rows.length; j++) {
-      const row = rows[j];
-      if ((row.separator === true ? "__separator__" : row.viewKey) === viewKey) return j;
+      const row = rows[j]
+      if ((row.separator === true ? "__separator__" : row.viewKey) === viewKey) {
+        return j
+      }
     }
-    return -1;
+    return -1
   }
 
   function syncRows() {
-    const rows = root.group ? root.group.rows : [];
-    for (let i = rowModel.count - 1; i >= 0; i--) if (root.viewKeyAt(rows, rowModel.get(i).viewKey) < 0) rowModel.remove(i);
+    const rows = root.group ? root.group.rows : []
+    for (let i = rowModel.count - 1; i >= 0; i--) {
+      if (root.viewKeyAt(rows, rowModel.get(i).viewKey) < 0) {
+        rowModel.remove(i)
+      }
+    }
     for (let j = 0; j < rows.length; j++) {
-      const row = rows[j];
-      const viewKey = row.separator === true ? "__separator__" : row.viewKey;
-      const rowKey = row.separator === true ? "__separator__" : row.key;
-      const kind = row.kind ? row.kind : "";
-      const label = row.name ? row.name : "";
-      const separator = row.separator === true;
-      let at = -1;
-      for (let i = 0; i < rowModel.count; i++) if (rowModel.get(i).viewKey === viewKey) {
-        at = i;
-        break;
+      const row = rows[j]
+      const viewKey = row.separator === true ? "__separator__" : row.viewKey
+      const rowKey = row.separator === true ? "__separator__" : row.key
+      const kind = row.kind ? row.kind : ""
+      const label = row.name ? row.name : ""
+      const separator = row.separator === true
+      let at = -1
+      for (let i = 0; i < rowModel.count; i++) {
+        if (rowModel.get(i).viewKey === viewKey) {
+          at = i
+          break
+        }
       }
       if (at < 0) {
-        rowModel.insert(j, { viewKey: viewKey, rowKey: rowKey, kind: kind, label: label, separator: separator });
+        rowModel.insert(j, {
+          viewKey: viewKey,
+          rowKey: rowKey,
+          kind: kind,
+          label: label,
+          separator: separator
+        })
       } else {
-        if (at !== j) rowModel.move(at, j, 1);
-        if (rowModel.get(j).rowKey !== rowKey) rowModel.setProperty(j, "rowKey", rowKey);
-        if (rowModel.get(j).kind !== kind) rowModel.setProperty(j, "kind", kind);
-        if (rowModel.get(j).label !== label) rowModel.setProperty(j, "label", label);
-        if (rowModel.get(j).separator !== separator) rowModel.setProperty(j, "separator", separator);
+        if (at !== j) {
+          rowModel.move(at, j, 1)
+        }
+        if (rowModel.get(j).rowKey !== rowKey) {
+          rowModel.setProperty(j, "rowKey", rowKey)
+        }
+        if (rowModel.get(j).kind !== kind) {
+          rowModel.setProperty(j, "kind", kind)
+        }
+        if (rowModel.get(j).label !== label) {
+          rowModel.setProperty(j, "label", label)
+        }
+        if (rowModel.get(j).separator !== separator) {
+          rowModel.setProperty(j, "separator", separator)
+        }
       }
     }
   }
@@ -135,66 +175,100 @@ Rectangle {
   onGroupChanged: root.syncRows()
 
   readonly property bool anyInputShown: {
-    if (!root.group) return false;
-    for (let i = 0; i < root.group.inputs.length; i++) {
-      if (root.streamRowShown(root.group.inputs[i].key, root.group.inputs[i].node)) return true;
+    if (!root.group) {
+      return false
     }
-    return false;
+    for (let i = 0; i < root.group.inputs.length; i++) {
+      if (root.streamRowShown(root.group.inputs[i].key, root.group.inputs[i].node)) {
+        return true
+      }
+    }
+    return false
   }
   readonly property bool anyOutputShown: {
-    if (!root.group) return false;
-    for (let i = 0; i < root.group.outputs.length; i++) {
-      if (root.streamRowShown(root.group.outputs[i].key, root.group.outputs[i].node)) return true;
+    if (!root.group) {
+      return false
     }
-    return false;
+    for (let i = 0; i < root.group.outputs.length; i++) {
+      if (root.streamRowShown(root.group.outputs[i].key, root.group.outputs[i].node)) {
+        return true
+      }
+    }
+    return false
   }
   readonly property bool hasStreams: root.group ? (root.group.inputs.length + root.group.outputs.length) > 0 : false
   readonly property bool hasContent: root.hasStreams
   readonly property bool hasPinned: {
-    if (root.group && Pins.isAppPinned(root.group.name)) return true;
-    if (!root.group || !root.group.rows) return false;
-    const rows = root.group.rows;
-    for (let i = 0; i < rows.length; i++) if (rows[i].separator !== true && Pins.isStreamPinned(rows[i].key)) return true;
-    return false;
+    if (root.group && Pins.isAppPinned(root.group.name)) {
+      return true
+    }
+    if (!root.group || !root.group.rows) {
+      return false
+    }
+    const rows = root.group.rows
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].separator !== true && Pins.isStreamPinned(rows[i].key)) {
+        return true
+      }
+    }
+    return false
   }
   readonly property bool liveActive: {
-    const rows = root.group ? root.group.rows : [];
+    const rows = root.group ? root.group.rows : []
     for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (row.separator === true) continue;
-      if (Audio.streamActive(row.node)) return true;
+      const row = rows[i]
+      if (row.separator === true) {
+        continue
+      }
+      if (Audio.streamActive(row.node)) {
+        return true
+      }
     }
-    return false;
+    return false
   }
 
   function streamRowShown(key, node) {
-    if (root.expanded) return true;
-    if (Pins.isStreamPinned(key)) return true;
-    return Audio.streamActive(node);
+    if (root.expanded) {
+      return true
+    }
+    if (Pins.isStreamPinned(key)) {
+      return true
+    }
+    return Audio.streamActive(node)
   }
 
   function rowShownAt(i) {
-    const rows = root.group ? root.group.rows : [];
-    if (i < 0 || i >= rows.length) return false;
-    const row = rows[i];
-    if (row.separator === true) return root.anyInputShown && root.anyOutputShown;
-    return root.streamRowShown(row.key, row.node);
+    const rows = root.group ? root.group.rows : []
+    if (i < 0 || i >= rows.length) {
+      return false
+    }
+    const row = rows[i]
+    if (row.separator === true) {
+      return root.anyInputShown && root.anyOutputShown
+    }
+    return root.streamRowShown(row.key, row.node)
   }
 
   function hasStreamAfter(key) {
-    const rows = root.group ? root.group.rows : [];
-    let seen = false;
+    const rows = root.group ? root.group.rows : []
+    let seen = false
     for (let j = 0; j < rows.length; j++) {
-      const row = rows[j];
+      const row = rows[j]
       if (!seen) {
-        if (row.separator !== true && row.key === key) seen = true;
-        continue;
+        if (row.separator !== true && row.key === key) {
+          seen = true
+        }
+        continue
       }
       if (row.separator === true) {
-        if (root.anyInputShown && root.anyOutputShown) return false;
-      } else if (root.rowShownAt(j)) return true;
+        if (root.anyInputShown && root.anyOutputShown) {
+          return false
+        }
+      } else if (root.rowShownAt(j)) {
+        return true
+      }
     }
-    return false;
+    return false
   }
 
   width: parent ? parent.width : 0
@@ -207,23 +281,34 @@ Rectangle {
   clip: true
 
   transform: [
-    Translate { y: root.settling ? root.dropShift : (root.dragging ? root.dragDelta : 0) },
+    Translate {
+      y: root.settling ? root.dropShift : (root.dragging ? root.dragDelta : 0)
+    },
     Translate {
       y: root.dragging ? 0 : root.previewShift
       Behavior on y {
         enabled: !root.snapPreview
-        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: 180
+          easing.type: Easing.OutCubic
+        }
       }
     }
   ]
 
   Behavior on height {
     enabled: root.animate
-    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+    NumberAnimation {
+      duration: 220
+      easing.type: Easing.OutCubic
+    }
   }
   Behavior on opacity {
     enabled: root.animate
-    NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+    NumberAnimation {
+      duration: 160
+      easing.type: Easing.OutCubic
+    }
   }
 
   Column {
@@ -300,7 +385,12 @@ Rectangle {
         antialiasing: true
         opacity: root.appPinned && root.sectionVisible ? 1 : 0
 
-        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+          NumberAnimation {
+            duration: 160
+            easing.type: Easing.OutCubic
+          }
+        }
 
         Icon {
           anchors.centerIn: parent
@@ -318,16 +408,18 @@ Rectangle {
           cursorShape: Qt.OpenHandCursor
           acceptedButtons: Qt.LeftButton | Qt.RightButton
           preventStealing: true
-          onPressed: (mouse) => {
+          onPressed: mouse => {
             if (mouse.button === Qt.RightButton) {
-              root.dragCancelled();
-              return;
+              root.dragCancelled()
+              return
             }
-            root.dragStarted(root.dragKey, gripMouse.mapToItem(null, mouse.x, mouse.y).y);
+            root.dragStarted(root.dragKey, gripMouse.mapToItem(null, mouse.x, mouse.y).y)
           }
-          onPositionChanged: (mouse) => root.dragMoved(gripMouse.mapToItem(null, mouse.x, mouse.y).y)
-          onReleased: (mouse) => {
-            if (mouse.button === Qt.LeftButton) root.dragEnded();
+          onPositionChanged: mouse => root.dragMoved(gripMouse.mapToItem(null, mouse.x, mouse.y).y)
+          onReleased: mouse => {
+            if (mouse.button === Qt.LeftButton) {
+              root.dragEnded()
+            }
           }
           onCanceled: root.dragCancelled()
         }
@@ -346,7 +438,12 @@ Rectangle {
         enabled: root.sectionVisible
         onClicked: root.appPinToggled()
 
-        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on opacity {
+          NumberAnimation {
+            duration: 160
+            easing.type: Easing.OutCubic
+          }
+        }
       }
 
       IconButton {
@@ -374,8 +471,22 @@ Rectangle {
         clip: true
         model: rowModel
         cacheBuffer: 100000
-        move: Transition { enabled: root.animate; NumberAnimation { property: "y"; duration: 220; easing.type: Easing.OutCubic } }
-        displaced: Transition { enabled: root.animate; NumberAnimation { property: "y"; duration: 220; easing.type: Easing.OutCubic } }
+        move: Transition {
+          enabled: root.animate
+          NumberAnimation {
+            property: "y"
+            duration: 220
+            easing.type: Easing.OutCubic
+          }
+        }
+        displaced: Transition {
+          enabled: root.animate
+          NumberAnimation {
+            property: "y"
+            duration: 220
+            easing.type: Easing.OutCubic
+          }
+        }
 
         delegate: Item {
           id: rowItem
@@ -402,58 +513,67 @@ Rectangle {
 
           Behavior on height {
             enabled: root.animate
-            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+            NumberAnimation {
+              duration: 220
+              easing.type: Easing.OutCubic
+            }
           }
           Behavior on opacity {
             enabled: root.animate
-            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+            NumberAnimation {
+              duration: 160
+              easing.type: Easing.OutCubic
+            }
           }
 
-        Rectangle {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          height: Math.round(1 * Theme.scale)
-          visible: rowItem.separator
-          color: Theme.surfaceHigh
-        }
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            height: Math.round(1 * Theme.scale)
+            visible: rowItem.separator
+            color: Theme.surfaceHigh
+          }
 
-        Rectangle {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.bottom: parent.bottom
-          anchors.bottomMargin: Math.round(2 * Theme.scale)
-          height: Math.round(1 * Theme.scale)
-          visible: rowItem.showDivider
-          color: Theme.surfaceHigh
-        }
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: Math.round(2 * Theme.scale)
+            height: Math.round(1 * Theme.scale)
+            visible: rowItem.showDivider
+            color: Theme.surfaceHigh
+          }
 
-        AppStreamRow {
-          id: streamRow
+          AppStreamRow {
+            id: streamRow
 
-          visible: !rowItem.separator
-          anchors.verticalCenter: parent.verticalCenter
-          width: parent.width
-          node: rowItem.node
-          kind: rowItem.kind
-          label: rowItem.label
-          target: root.targetFor ? root.targetFor(rowItem.node) : "Default"
-          pinned: rowItem.pinned
-          pinVisible: root.sectionVisible || root.expanded
-          open: root.routeStream === rowItem.node
-          active: Audio.streamActive(rowItem.node)
-          maxVolume: root.maxVolume
-          onPinToggled: root.pinToggled(rowItem.rowKey)
-          onRoutePressed: (anchor) => root.routePressed(rowItem.rowKey, rowItem.node, anchor)
-          onWheeled: (angleDelta) => root.wheeled(rowItem.node, angleDelta)
-          onPercentEditing: (editor) => {
-            if (editor) root.activePercentEditor = editor;
-            else root.refreshPercentEditor();
-            root.percentEditing(root.activePercentEditor);
+            visible: !rowItem.separator
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            node: rowItem.node
+            kind: rowItem.kind
+            label: rowItem.label
+            target: root.targetFor ? root.targetFor(rowItem.node) : "Default"
+            pinned: rowItem.pinned
+            pinVisible: root.sectionVisible || root.expanded
+            open: root.routeStream === rowItem.node
+            active: Audio.streamActive(rowItem.node)
+            maxVolume: root.maxVolume
+            onPinToggled: root.pinToggled(rowItem.rowKey)
+            onRoutePressed: anchor => root.routePressed(rowItem.rowKey, rowItem.node, anchor)
+            onWheeled: angleDelta => root.wheeled(rowItem.node, angleDelta)
+            onPercentEditing: editor => {
+              if (editor) {
+                root.activePercentEditor = editor
+              } else {
+                root.refreshPercentEditor()
+              }
+              root.percentEditing(root.activePercentEditor)
+            }
           }
         }
       }
     }
   }
-}
 }

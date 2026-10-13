@@ -15,8 +15,8 @@ BarButton {
   onMiddleClicked: Notifs.dismissAll()
 
   readonly property int count: {
-    const list = Notifs.active;
-    return list && typeof list.length === "number" ? list.length : 0;
+    const list = Notifs.active
+    return list && typeof list.length === "number" ? list.length : 0
   }
 
   Icon {

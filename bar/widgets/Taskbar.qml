@@ -15,33 +15,45 @@ Item {
   width: implicitWidth
 
   readonly property var spaces: {
-    const all = Hypr.workspaces;
-    const result = [];
-    if (!all) return result;
-    for (let i = 0; i < all.length; i++) {
-      const ws = all[i];
-      if (ws.monitor && ws.monitor.name === root.screen.name) result.push(ws);
+    const all = Hypr.workspaces
+    const result = []
+    if (!all) {
+      return result
     }
-    result.sort((a, b) => a.id - b.id);
-    return result;
+    for (let i = 0; i < all.length; i++) {
+      const ws = all[i]
+      if (ws.monitor && ws.monitor.name === root.screen.name) {
+        result.push(ws)
+      }
+    }
+    result.sort((a, b) => a.id - b.id)
+    return result
   }
 
   function appsOf(workspace) {
-    const list = workspace.toplevels;
-    if (!list) return [];
-    return list.values ? list.values : list;
+    const list = workspace.toplevels
+    if (!list) {
+      return []
+    }
+    return list.values ? list.values : list
   }
 
   function classOf(toplevel) {
-    if (!toplevel) return "";
-    if (toplevel.wayland && toplevel.wayland.appId) return toplevel.wayland.appId;
-    const ipc = toplevel.lastIpcObject;
-    if (!ipc) return "";
-    return ipc.class || ipc.initialClass || "";
+    if (!toplevel) {
+      return ""
+    }
+    if (toplevel.wayland && toplevel.wayland.appId) {
+      return toplevel.wayland.appId
+    }
+    const ipc = toplevel.lastIpcObject
+    if (!ipc) {
+      return ""
+    }
+    return ipc.class || ipc.initialClass || ""
   }
 
   function iconName(toplevel) {
-    return AppIcons.resolve(root.classOf(toplevel));
+    return AppIcons.resolve(root.classOf(toplevel))
   }
 
   Row {
@@ -95,9 +107,12 @@ Item {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
-                onClicked: (e) => {
-                  if (e.button === Qt.RightButton) Panels.toggle("window-switcher", root.screen.name);
-                  else Hypr.focusToplevel(appIcon.modelData.address);
+                onClicked: e => {
+                  if (e.button === Qt.RightButton) {
+                    Panels.toggle("window-switcher", root.screen.name)
+                  } else {
+                    Hypr.focusToplevel(appIcon.modelData.address)
+                  }
                 }
               }
             }

@@ -24,73 +24,93 @@ Rectangle {
   visible: displayed
   clip: true
 
-  Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+  Behavior on height {
+    NumberAnimation {
+      duration: 220
+      easing.type: Easing.OutCubic
+    }
+  }
 
   function advanceDots() {
-    dotCount += dotDir;
+    dotCount += dotDir
     if (dotCount >= 3) {
-      dotCount = 3;
-      dotDir = -1;
+      dotCount = 3
+      dotDir = -1
     } else if (dotCount <= 1) {
-      dotCount = 1;
-      dotDir = 1;
+      dotCount = 1
+      dotDir = 1
     }
   }
 
   function appear() {
-    if (!root.shown) return;
-    fadeInAnim.stop();
-    baseMorph.setInstant(root.text);
-    root.shownIcon = root.icon;
-    root.dotCount = 1;
-    root.dotDir = 1;
-    dotsMorph.setInstant(".");
-    root.opacity = root.instant ? 1 : 0;
-    root.displayed = true;
-    if (!root.instant) fadeInAnim.restart();
+    if (!root.shown) {
+      return
+    }
+    fadeInAnim.stop()
+    baseMorph.setInstant(root.text)
+    root.shownIcon = root.icon
+    root.dotCount = 1
+    root.dotDir = 1
+    dotsMorph.setInstant(".")
+    root.opacity = root.instant ? 1 : 0
+    root.displayed = true
+    if (!root.instant) {
+      fadeInAnim.restart()
+    }
   }
 
   function hideCard() {
-    fadeInAnim.stop();
-    settleTimer.stop();
-    baseMorph.setInstant(root.text);
-    root.shownIcon = root.icon;
-    root.opacity = 1;
-    root.displayed = false;
+    fadeInAnim.stop()
+    settleTimer.stop()
+    baseMorph.setInstant(root.text)
+    root.shownIcon = root.icon
+    root.opacity = 1
+    root.displayed = false
   }
 
   function settle() {
-    if (!root.displayed) return;
+    if (!root.displayed) {
+      return
+    }
     if (root.instant) {
-      settleTimer.stop();
-      baseMorph.setInstant(root.text);
-      root.shownIcon = root.icon;
-    } else settleTimer.restart();
+      settleTimer.stop()
+      baseMorph.setInstant(root.text)
+      root.shownIcon = root.icon
+    } else {
+      settleTimer.restart()
+    }
   }
 
   onTextChanged: Qt.callLater(root.settle)
 
   onShownChanged: {
-    if (shown) Qt.callLater(root.appear);
-    else root.hideCard();
+    if (shown) {
+      Qt.callLater(root.appear)
+    } else {
+      root.hideCard()
+    }
   }
 
   onRollingChanged: {
     if (rolling) {
-      root.dotCount = 1;
-      root.dotDir = 1;
-      dotsMorph.setInstant(".");
+      root.dotCount = 1
+      root.dotDir = 1
+      dotsMorph.setInstant(".")
     }
   }
 
   onMorphActiveChanged: {
-    if (!morphActive && root.displayed) root.shownIcon = root.icon;
+    if (!morphActive && root.displayed) {
+      root.shownIcon = root.icon
+    }
   }
 
   Component.onCompleted: {
-    baseMorph.setInstant(root.text);
-    root.shownIcon = root.icon;
-    if (root.shown) root.appear();
+    baseMorph.setInstant(root.text)
+    root.shownIcon = root.icon
+    if (root.shown) {
+      root.appear()
+    }
   }
 
   Timer {
@@ -118,8 +138,8 @@ Rectangle {
     repeat: true
     running: root.rolling && root.displayed && !root.morphActive
     onTriggered: {
-      root.advanceDots();
-      dotsMorph.morphTo("...".substring(0, root.dotCount));
+      root.advanceDots()
+      dotsMorph.morphTo("...".substring(0, root.dotCount))
     }
   }
 
@@ -142,7 +162,10 @@ Rectangle {
 
       Behavior on width {
         enabled: root.morphActive
-        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation {
+          duration: 300
+          easing.type: Easing.OutCubic
+        }
       }
 
       Item {

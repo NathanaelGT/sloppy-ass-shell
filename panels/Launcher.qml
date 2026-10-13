@@ -18,36 +18,49 @@ PanelBase {
   property string query: ""
 
   readonly property var matches: {
-    const model = DesktopEntries.applications;
-    const all = model ? model.values : [];
-    const q = root.query.trim().toLowerCase();
-    const out = [];
+    const model = DesktopEntries.applications
+    const all = model ? model.values : []
+    const q = root.query.trim().toLowerCase()
+    const out = []
     for (let i = 0; i < all.length; i++) {
-      const app = all[i];
-      if (app.noDisplay) continue;
-      const name = app.name ? app.name : "";
-      const rawKeywords = app.keywords;
-      let keywords = "";
-      if (typeof rawKeywords === "string") keywords = rawKeywords;
-      else if (rawKeywords && typeof rawKeywords.length === "number") {
-        for (let k = 0; k < rawKeywords.length; k++) keywords = keywords + " " + rawKeywords[k];
-      } else if (rawKeywords) keywords = String(rawKeywords);
-      if (q.length === 0 || name.toLowerCase().includes(q) || keywords.toLowerCase().includes(q)) out.push(app);
-      if (out.length >= 60) break;
+      const app = all[i]
+      if (app.noDisplay) {
+        continue
+      }
+      const name = app.name ? app.name : ""
+      const rawKeywords = app.keywords
+      let keywords = ""
+      if (typeof rawKeywords === "string") {
+        keywords = rawKeywords
+      } else if (rawKeywords && typeof rawKeywords.length === "number") {
+        for (let k = 0; k < rawKeywords.length; k++) {
+          keywords = keywords + " " + rawKeywords[k]
+        }
+      } else if (rawKeywords) {
+        keywords = String(rawKeywords)
+      }
+      if (q.length === 0 || name.toLowerCase().includes(q) || keywords.toLowerCase().includes(q)) {
+        out.push(app)
+      }
+      if (out.length >= 60) {
+        break
+      }
     }
-    out.sort((a, b) => (a.name ? a.name : "").localeCompare(b.name ? b.name : ""));
-    return out;
+    out.sort((a, b) => (a.name ? a.name : "").localeCompare(b.name ? b.name : ""))
+    return out
   }
 
   function launch(entry) {
-    if (!entry) return;
-    entry.execute();
-    Panels.close();
+    if (!entry) {
+      return
+    }
+    entry.execute()
+    Panels.close()
   }
 
   onOpened: {
-    query = "";
-    search.forceActiveFocus();
+    query = ""
+    search.forceActiveFocus()
   }
 
   Row {

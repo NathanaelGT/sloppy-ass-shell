@@ -14,20 +14,32 @@ PanelBase {
   readonly property bool charging: device ? (device.state === UPowerDeviceState.Charging || device.state === UPowerDeviceState.FullyCharged) : false
 
   function stateLabel() {
-    if (!device) return "Unknown";
-    if (device.state === UPowerDeviceState.Charging) return "Charging";
-    if (device.state === UPowerDeviceState.Discharging) return "Discharging";
-    if (device.state === UPowerDeviceState.FullyCharged) return "Full";
-    if (device.state === UPowerDeviceState.Empty) return "Empty";
-    return "Unknown";
+    if (!device) {
+      return "Unknown"
+    }
+    if (device.state === UPowerDeviceState.Charging) {
+      return "Charging"
+    }
+    if (device.state === UPowerDeviceState.Discharging) {
+      return "Discharging"
+    }
+    if (device.state === UPowerDeviceState.FullyCharged) {
+      return "Full"
+    }
+    if (device.state === UPowerDeviceState.Empty) {
+      return "Empty"
+    }
+    return "Unknown"
   }
 
   function formatTime(seconds) {
-    if (!seconds || seconds <= 0) return "—";
-    const total = Math.round(seconds / 60);
-    const h = Math.floor(total / 60);
-    const m = total % 60;
-    return h > 0 ? h + "h " + m + "m" : m + "m";
+    if (!seconds || seconds <= 0) {
+      return "—"
+    }
+    const total = Math.round(seconds / 60)
+    const h = Math.floor(total / 60)
+    const m = total % 60
+    return h > 0 ? h + "h " + m + "m" : m + "m"
   }
 
   PanelHeader {
@@ -41,11 +53,19 @@ PanelBase {
     Icon {
       anchors.verticalCenter: parent.verticalCenter
       name: {
-        if (root.charging) return "battery-charging";
-        if (root.pct > 0.85) return "battery-4";
-        if (root.pct > 0.6) return "battery-3";
-        if (root.pct > 0.35) return "battery-2";
-        return "battery-1";
+        if (root.charging) {
+          return "battery-charging"
+        }
+        if (root.pct > 0.85) {
+          return "battery-4"
+        }
+        if (root.pct > 0.6) {
+          return "battery-3"
+        }
+        if (root.pct > 0.35) {
+          return "battery-2"
+        }
+        return "battery-1"
       }
       color: root.pct <= 0.15 ? Theme.red : root.pct <= 0.3 ? Theme.yellow : Theme.text
       font.pixelSize: Math.round(28 * Theme.scale)
@@ -74,9 +94,18 @@ PanelBase {
 
   Repeater {
     model: root.device ? [
-      { label: "Time", value: root.charging ? root.formatTime(root.device.timeToFull) : root.formatTime(root.device.timeToEmpty) },
-      { label: "Health", value: root.device.healthSupported ? Math.round(root.device.healthPercentage) + "%" : "—" },
-      { label: "Model", value: root.device.model && root.device.model.length > 0 ? root.device.model : "—" }
+      {
+        label: "Time",
+        value: root.charging ? root.formatTime(root.device.timeToFull) : root.formatTime(root.device.timeToEmpty)
+      },
+      {
+        label: "Health",
+        value: root.device.healthSupported ? Math.round(root.device.healthPercentage) + "%" : "—"
+      },
+      {
+        label: "Model",
+        value: root.device.model && root.device.model.length > 0 ? root.device.model : "—"
+      }
     ] : []
 
     delegate: Row {

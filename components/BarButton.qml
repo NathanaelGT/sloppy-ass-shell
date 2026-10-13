@@ -4,9 +4,9 @@ import "../theme"
 Rectangle {
   id: root
 
-  signal clicked()
-  signal rightClicked()
-  signal middleClicked()
+  signal clicked
+  signal rightClicked
+  signal middleClicked
   signal wheeled(int delta)
 
   property bool capsule: true
@@ -29,7 +29,9 @@ Rectangle {
   antialiasing: true
 
   Behavior on color {
-    ColorAnimation { duration: 120 }
+    ColorAnimation {
+      duration: 120
+    }
   }
 
   HoverHandler {
@@ -42,7 +44,7 @@ Rectangle {
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-    onClicked: (e) => e.button === Qt.LeftButton ? root.clicked() : e.button === Qt.RightButton ? root.rightClicked() : root.middleClicked()
-    onWheel: (e) => root.wheeled(e.angleDelta.y)
+    onClicked: e => e.button === Qt.LeftButton ? root.clicked() : e.button === Qt.RightButton ? root.rightClicked() : root.middleClicked()
+    onWheel: e => root.wheeled(e.angleDelta.y)
   }
 }
