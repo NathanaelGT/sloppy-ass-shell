@@ -6,8 +6,10 @@ Rectangle {
 
   property string icon: ""
   property string text: ""
+  property int bodyHeight: 0
   property bool shown: false
   property bool instant: false
+  property bool animateHeight: true
   property bool rolling: false
   property bool displayed: false
   property string shownIcon: ""
@@ -17,7 +19,7 @@ Rectangle {
   readonly property bool morphActive: settleTimer.running || baseMorph.morphing
 
   width: parent ? parent.width : 0
-  height: displayed ? Math.round(76 * Theme.scale) + Theme.gap : 0
+  height: displayed ? (root.bodyHeight > 0 ? root.bodyHeight : Math.round(76 * Theme.scale) + Theme.gap) : 0
   radius: Theme.rowRadius
   color: Theme.surface
   antialiasing: true
@@ -25,6 +27,7 @@ Rectangle {
   clip: true
 
   Behavior on height {
+    enabled: root.animateHeight
     NumberAnimation {
       duration: 220
       easing.type: Easing.OutCubic

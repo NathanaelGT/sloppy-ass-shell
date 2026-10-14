@@ -1041,6 +1041,111 @@ ShellRoot {
       result.enabled = true
       return JSON.stringify(result)
     }
+
+    function launcherQuery(text: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testSetQuery(text)
+    }
+
+    function launcherSelect(index: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testSelect(index)
+    }
+
+    function launcherState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testState()
+      state.enabled = true
+      state.open = true
+      return JSON.stringify(state)
+    }
+
+    function launcherEval(expression: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify(panel.testEval(expression))
+    }
+
+    function launcherKitty(command: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify(panel.testKittyArgv(command))
+    }
+
+    function launcherActivate(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testActivate()
+    }
+
+    function launcherDebug(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const debug = panel.testDebug()
+      debug.enabled = true
+      debug.open = true
+      return JSON.stringify(debug)
+    }
+
+    function launcherFavorite(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testFavorite()
+    }
+
+    function launcherVisibleTarget(offset: int): int {
+      if (!TestDriver.active) {
+        return -2
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return -2
+      }
+      return panel.testVisibleTarget(offset)
+    }
   }
 
   Variants {
