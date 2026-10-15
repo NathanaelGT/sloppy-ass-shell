@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "../theme"
 import "../components"
 import "../services"
@@ -24,6 +25,10 @@ PanelBase {
   property string xfadeDir: ""
   property bool xfadeHold: false
   property int iconRefreshTick: 0
+  property string olSearchedTerm: ""
+  property var olResults: []
+  property bool olLoading: false
+  property string olError: ""
 
   readonly property int rowHeight: Math.round(48 * Theme.scale)
   readonly property int subtitleSize: Math.round(9 * Theme.scale)
@@ -53,6 +58,65 @@ PanelBase {
       }
     }
     return out
+  }
+
+  readonly property var atProviders: [
+    {
+      key: "ol",
+      name: "OneLook",
+      desc: "Find English definition and related words",
+      logo: "../assets/onelook.svg"
+    }
+  ]
+
+  readonly property bool atMode: root.query.trim().toLowerCase().indexOf("@") === 0
+  readonly property string atToken: root.atMode ? root.query.trim().slice(1).split(/\s+/)[0].toLowerCase() : ""
+  readonly property var atMatches: {
+    if (!root.atMode || root.olMode) {
+      return []
+    }
+    const out = []
+    for (let i = 0; i < root.atProviders.length; i++) {
+      if (root.atProviders[i].key.indexOf(root.atToken) === 0) {
+        out.push(root.atProviders[i])
+      }
+    }
+    return out
+  }
+  readonly property int atRowCount: root.atMode && !root.olMode ? root.atMatches.length : 0
+
+  readonly property bool olMode: {
+    const t = root.query.trim().toLowerCase()
+    return t === "@ol" || t.indexOf("@ol ") === 0
+  }
+  readonly property string olTerm: root.olMode ? root.query.trim().slice(3).trim() : ""
+  readonly property bool olDirty: root.olTerm !== root.olSearchedTerm
+  readonly property string olCard: {
+    if (!root.olMode) {
+      return ""
+    }
+    if (root.olTerm.length === 0) {
+      return "hint"
+    }
+    if (root.olDirty) {
+      return "search"
+    }
+    if (root.olLoading) {
+      return "loading"
+    }
+    return ""
+  }
+  readonly property int olRowCount: {
+    if (!root.olMode) {
+      return 0
+    }
+    if (root.olCard.length > 0) {
+      return 0
+    }
+    if (root.olError.length > 0) {
+      return 1
+    }
+    return root.olResults.length
   }
 
   readonly property var queryTokens: {
@@ -127,11 +191,45 @@ PanelBase {
   readonly property var calc: evaluate(query)
   readonly property bool commandMode: query.trim().indexOf("$") === 0
   readonly property string commandText: commandMode ? query.trim().slice(1).trim() : ""
-  readonly property int rowCount: commandMode ? (commandText.length > 0 ? 1 : 0) : results.length + (calc ? 1 : 0)
+  readonly property int rowCount: root.atMode ? (root.olMode ? root.olRowCount : root.atRowCount) : (commandMode ? (commandText.length > 0 ? 1 : 0) : results.length + (calc ? 1 : 0))
   readonly property int selected: rowCount === 0 ? -1 : Math.max(0, Math.min(selectedIndex, rowCount - 1))
 
   readonly property var entries: {
     const out = []
+    if (root.atMode && !root.olMode) {
+      for (let i = 0; i < root.atMatches.length; i++) {
+        out.push({
+          kind: "provider",
+          section: "",
+          label: "",
+          itemKey: "provider:" + root.atMatches[i].key,
+          active: selected === out.length
+        })
+      }
+      return out
+    }
+    if (root.olMode) {
+      if (root.olError.length > 0) {
+        out.push({
+          kind: "olError",
+          section: "",
+          label: "",
+          itemKey: "ol:error",
+          active: selected === 0
+        })
+      } else if (root.olCard.length === 0) {
+        for (let i = 0; i < root.olResults.length; i++) {
+          out.push({
+            kind: "onelook",
+            section: "",
+            label: "",
+            itemKey: "ol:" + i,
+            active: selected === out.length
+          })
+        }
+      }
+      return out
+    }
     if (commandMode) {
       if (commandText.length > 0) {
         out.push({
@@ -189,11 +287,19 @@ PanelBase {
     return (negative ? "-" : "") + grouped + (tail.length > 0 ? "," + tail : "")
   }
 
-  function errorHex() {
+  function hexOf(color) {
     function channel(v) {
       return Math.round(v * 255).toString(16).padStart(2, "0")
     }
-    return "#" + channel(Theme.red.r) + channel(Theme.red.g) + channel(Theme.red.b)
+    return "#" + channel(color.r) + channel(color.g) + channel(color.b)
+  }
+
+  function errorHex() {
+    return root.hexOf(Theme.red)
+  }
+
+  function olMutedHex() {
+    return root.hexOf(Theme.overlay)
   }
 
   function calcExpression() {
@@ -687,14 +793,210 @@ PanelBase {
     return root.activateIndex(index)
   }
 
+  function cleanOlDef(raw) {
+    const s = String(raw === undefined || raw === null ? "" : raw).trim().replace(/^[A-Za-z]+\t+/, "").trim()
+    return s
+  }
+
+  function olRichDef(plain) {
+    const e = String(plain).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    const paired = e.replace(/_([^_]+)_/g, "<i>$1</i>")
+    return paired.replace(/_([^\s_]+)/g, "<i>$1</i>")
+  }
+
+  function olIndexForKey(itemKey) {
+    const text = String(itemKey)
+    if (text.indexOf("ol:") !== 0) {
+      return -1
+    }
+    const n = parseInt(text.slice(3), 10)
+    if (isNaN(n)) {
+      return -1
+    }
+    return n
+  }
+
+  function olItemForKey(itemKey) {
+    const n = root.olIndexForKey(itemKey)
+    if (n < 0 || n >= root.olResults.length) {
+      return null
+    }
+    return root.olResults[n]
+  }
+
+  function splitOlBrackets(cleaned) {
+    const text = String(cleaned)
+    const groups = text.match(/\[[^\]]*\]/g)
+    let syn = ""
+    if (groups && groups.length > 0) {
+      syn = groups[0].slice(1, -1).trim()
+    }
+    return {
+      text: text.replace(/\[[^\]]*\]/g, "").replace(/\s+/g, " ").trim(),
+      syn: syn
+    }
+  }
+
+  function olTitleRich(word, syn) {
+    const w = String(word).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    const head = "<font color=\"" + root.hexOf(Theme.text) + "\">" + w + "</font>"
+    if (!syn || String(syn).length === 0) {
+      return head
+    }
+    return head + "<font color=\"" + root.olMutedHex() + "\" size=\"-2\"> " + root.olRichDef(syn) + "</font>"
+  }
+
+  function providerForKey(key) {
+    for (let i = 0; i < root.atProviders.length; i++) {
+      if (root.atProviders[i].key === key) {
+        return root.atProviders[i]
+      }
+    }
+    return null
+  }
+
+  function completeAtProvider(itemKey) {
+    const text = String(itemKey)
+    const key = text.indexOf("provider:") === 0 ? text.slice(9) : ""
+    const provider = root.providerForKey(key)
+    if (!provider) {
+      return false
+    }
+    searchInput.text = "@" + provider.key + " "
+    searchInput.forceActiveFocus()
+    return true
+  }
+
+  function mapOlItems(data) {
+    const out = []
+    if (!data || typeof data.length !== "number") {
+      return out
+    }
+    for (let i = 0; i < data.length && out.length < 8; i++) {
+      const item = data[i]
+      const word = item && item.word ? String(item.word) : ""
+      if (word.length === 0) {
+        continue
+      }
+      let raw = ""
+      if (item.defs && typeof item.defs.length === "number" && item.defs.length > 0) {
+        raw = item.defs[0]
+      }
+      const split = root.splitOlBrackets(root.cleanOlDef(raw))
+      if (split.text.length === 0) {
+        continue
+      }
+      out.push({
+        word: word,
+        def: split.text,
+        syn: split.syn
+      })
+    }
+    return out
+  }
+
+  function runOlSearch() {
+    if (!root.olMode || root.olTerm.length === 0 || root.olLoading) {
+      return false
+    }
+    if (!root.olDirty && (root.olResults.length > 0 || root.olError.length > 0)) {
+      return false
+    }
+    root.olSearchedTerm = root.olTerm
+    root.olResults = []
+    root.olError = ""
+    root.olLoading = true
+    const url = "https://onelook.com/api/sug?max=9&s=" + encodeURIComponent(root.olTerm)
+    if (olProc.running) {
+      olProc.running = false
+    }
+    olProc.command = ["curl", "-s", "--max-time", "10", "-A", "Mozilla/5.0", "-H", "Referer: https://www.onelook.com/", url]
+    olProc.running = true
+    return true
+  }
+
+  function handleOlOutput(text) {
+    if (!root.olLoading) {
+      return
+    }
+    let data = null
+    try {
+      data = JSON.parse(text)
+    } catch (e) {
+      data = null
+    }
+    if (!data || typeof data.length !== "number") {
+      root.olError = "Search failed"
+      root.olResults = []
+      root.olLoading = false
+      return
+    }
+    root.olResults = root.mapOlItems(data)
+    root.olError = ""
+    root.olLoading = false
+  }
+
+  function handleOlExit(code) {
+    if (!root.olLoading) {
+      return
+    }
+    if (code !== 0) {
+      root.olError = "Search failed"
+      root.olResults = []
+      root.olLoading = false
+    }
+  }
+
+  function testOlMock(payload) {
+    let data = null
+    try {
+      data = JSON.parse(payload)
+    } catch (e) {
+      return false
+    }
+    if (data && data.items && typeof data.items.length === "number") {
+      data = data.items
+    }
+    root.olSearchedTerm = root.olTerm
+    root.olResults = root.mapOlItems(data)
+    root.olError = ""
+    root.olLoading = false
+    return true
+  }
+
   function kittyArgv(command) {
     return ["kitty", "--hold", "-d", Quickshell.env("HOME"), "--class", "command-runner", "-o", "confirm_os_window_close=0", "-e", "bash", "-lc", command]
+  }
+
+  function acceptCurrent() {
+    if (root.selected >= 0) {
+      return root.activateIndex(root.selected)
+    }
+    if (root.olCard === "search") {
+      return root.runOlSearch()
+    }
+    return false
   }
 
   function activateIndex(index) {
     const entry = entries[index]
     if (!entry) {
       return false
+    }
+    if (entry.kind === "provider") {
+      return root.completeAtProvider(entry.itemKey)
+    }
+    if (entry.kind === "olError") {
+      return root.runOlSearch()
+    }
+    if (entry.kind === "onelook") {
+      const item = root.olItemForKey(entry.itemKey)
+      if (!item) {
+        return false
+      }
+      Quickshell.clipboardText = item.word
+      Panels.close()
+      return true
     }
     if (entry.kind === "calc") {
       if (!calc || calc.value === null) {
@@ -745,12 +1047,27 @@ PanelBase {
       const entry = root.entries[i]
       let name = ""
       let detail = ""
+      let syn = ""
       let icon = ""
       if (entry.kind === "calc") {
         name = root.calc && root.calc.value !== null ? root.formatDisplay(root.calc.value) : ""
         detail = root.calc ? root.calc.expression : ""
       } else if (entry.kind === "command") {
         name = root.commandText
+      } else if (entry.kind === "onelook") {
+        const item = root.olItemForKey(entry.itemKey)
+        name = item ? item.word : ""
+        detail = item ? item.def : ""
+        syn = item ? item.syn : ""
+        icon = ""
+      } else if (entry.kind === "provider") {
+        const provider = root.providerForKey(String(entry.itemKey).slice(9))
+        name = provider ? provider.name : entry.itemKey
+        detail = provider ? provider.desc : ""
+        icon = provider ? provider.logo : ""
+      } else if (entry.kind === "olError") {
+        name = "Search failed"
+        detail = "Press Enter to retry"
       } else if (entry.kind === "appimage") {
         const image = root.imageForKey(entry.itemKey)
         const metaName = image ? AppImages.nameFor(image.path) : ""
@@ -769,6 +1086,7 @@ PanelBase {
         kind: entry.kind,
         name: name,
         detail: detail,
+        syn: syn,
         icon: icon,
         error: entry.kind === "calc" && root.calc ? root.calc.error : null,
         score: match ? Math.round(match.score * 100) / 100 : 0,
@@ -781,6 +1099,14 @@ PanelBase {
       query: root.query,
       text: searchInput.text,
       selected: root.selected,
+      atMode: root.atMode,
+      atToken: root.atToken,
+      olMode: root.olMode,
+      olTerm: root.olTerm,
+      olCard: root.olCard,
+      olLoading: root.olLoading,
+      olError: root.olError,
+      clipboard: Quickshell.clipboardText,
       rows: rows,
       layout: root.testLayout()
     }
@@ -815,6 +1141,7 @@ PanelBase {
       morphOpacity: morphCard.opacity,
       emptyOpacity: emptyContent.opacity,
       commandOpacity: commandContent.opacity,
+      providerOpacity: providerContent.opacity,
       listVisible: list.visible,
       xfadeActive: root.xfadeActive,
       xfadeDir: root.xfadeDir,
@@ -850,10 +1177,7 @@ PanelBase {
   }
 
   function testActivate() {
-    if (root.selected < 0) {
-      return false
-    }
-    return root.activateIndex(root.selected)
+    return root.acceptCurrent()
   }
 
   function snapMorphHeight() {
@@ -863,7 +1187,7 @@ PanelBase {
     morphHeightBehavior.enabled = false
     morphHeightAnim.stop()
     morphCard.height = Qt.binding(function () {
-      return morphCard.mode === "empty" ? morphCard.emptyHeight : root.rowHeight
+      return morphCard.mode === "command" ? root.rowHeight : morphCard.emptyHeight
     })
     morphHeightBehavior.enabled = true
   }
@@ -935,6 +1259,16 @@ PanelBase {
     easing.type: Easing.OutCubic
   }
 
+  Process {
+    id: olProc
+
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: root.handleOlOutput(text)
+    }
+    onExited: code => root.handleOlExit(code)
+  }
+
   onEntriesChanged: root.handleEntriesChanged()
 
   Component.onCompleted: {
@@ -1004,9 +1338,7 @@ PanelBase {
         focus: true
         clip: true
         onTextChanged: root.query = text
-        onAccepted: if (root.selected >= 0) {
-          root.activateIndex(root.selected)
-        }
+        onAccepted: root.acceptCurrent()
 
         Text {
           anchors.verticalCenter: parent.verticalCenter
@@ -1056,13 +1388,13 @@ PanelBase {
     Rectangle {
       id: morphCard
 
-      property string mode: root.rowCount === 0 ? "empty" : "command"
+      property string mode: root.rowCount === 0 ? (root.olCard.length > 0 ? "provider" : "empty") : "command"
       readonly property int emptyHeight: 2 * root.rowHeight + Theme.gap
 
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.top: parent.top
-      height: morphCard.mode === "empty" ? morphCard.emptyHeight : root.rowHeight
+      height: morphCard.mode === "command" ? root.rowHeight : morphCard.emptyHeight
       visible: root.xfadeHold || root.rowCount === 0 || (root.commandMode && root.commandText.length > 0)
       z: 1
       radius: Theme.rowRadius
@@ -1077,9 +1409,15 @@ PanelBase {
           if (morphCard.mode === "empty") {
             emptyContent.opacity = 1
             commandContent.opacity = 0
+            providerContent.opacity = 0
+          } else if (morphCard.mode === "provider") {
+            emptyContent.opacity = 0
+            commandContent.opacity = 0
+            providerContent.opacity = 1
           } else {
             emptyContent.opacity = 0
             commandContent.opacity = 1
+            providerContent.opacity = 0
           }
         }
       }
@@ -1095,6 +1433,10 @@ PanelBase {
             target: commandContent
             opacity: 0
           }
+          PropertyChanges {
+            target: providerContent
+            opacity: 0
+          }
         },
         State {
           name: "command"
@@ -1104,6 +1446,25 @@ PanelBase {
           }
           PropertyChanges {
             target: commandContent
+            opacity: 1
+          }
+          PropertyChanges {
+            target: providerContent
+            opacity: 0
+          }
+        },
+        State {
+          name: "provider"
+          PropertyChanges {
+            target: emptyContent
+            opacity: 0
+          }
+          PropertyChanges {
+            target: commandContent
+            opacity: 0
+          }
+          PropertyChanges {
+            target: providerContent
             opacity: 1
           }
         }
@@ -1149,6 +1510,46 @@ PanelBase {
               easing.type: Easing.OutCubic
             }
           }
+        },
+        Transition {
+          from: "empty"
+          to: "provider"
+          SequentialAnimation {
+            NumberAnimation {
+              target: emptyContent
+              property: "opacity"
+              to: 0
+              duration: 110
+              easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+              target: providerContent
+              property: "opacity"
+              to: 1
+              duration: 110
+              easing.type: Easing.OutCubic
+            }
+          }
+        },
+        Transition {
+          from: "provider"
+          to: "empty"
+          SequentialAnimation {
+            NumberAnimation {
+              target: providerContent
+              property: "opacity"
+              to: 0
+              duration: 110
+              easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+              target: emptyContent
+              property: "opacity"
+              to: 1
+              duration: 110
+              easing.type: Easing.OutCubic
+            }
+          }
         }
       ]
 
@@ -1179,6 +1580,38 @@ PanelBase {
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           text: "No results"
+          color: Theme.subtext
+          font.family: Theme.fontFamily
+          font.pixelSize: Theme.fontSizeSmall
+        }
+      }
+
+      Column {
+        id: providerContent
+
+        anchors.centerIn: parent
+        spacing: Math.round(4 * Theme.scale)
+        opacity: 0
+
+        Image {
+          anchors.horizontalCenter: parent.horizontalCenter
+          width: Math.round(28 * Theme.scale)
+          height: width
+          source: "../assets/onelook.svg"
+          fillMode: Image.PreserveAspectFit
+        }
+
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: root.olCard === "loading" ? "Searching OneLook..." : (root.olCard === "search" ? "Search OneLook for \"" + root.olTerm + "\"" : "OneLook")
+          color: Theme.text
+          font.family: Theme.fontFamily
+          font.pixelSize: Theme.fontSize
+        }
+
+        Text {
+          anchors.horizontalCenter: parent.horizontalCenter
+          text: root.olCard === "loading" ? root.olTerm : (root.olCard === "search" ? "Press Enter to search" : "Type @ol <word> then Enter to search")
           color: Theme.subtext
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSizeSmall
@@ -1230,6 +1663,12 @@ PanelBase {
           hoverEnabled: true
         }
       }
+
+      MouseArea {
+        anchors.fill: parent
+        visible: morphCard.mode === "provider" && root.olCard === "search"
+        onClicked: root.runOlSearch()
+      }
     }
 
     SectionList {
@@ -1256,6 +1695,17 @@ PanelBase {
         property int iconTries: 0
         readonly property bool isCalc: kind === "calc"
         readonly property bool isImage: kind === "appimage"
+        readonly property bool isOneLook: kind === "onelook"
+        readonly property bool isProvider: kind === "provider"
+        readonly property bool isOlMeta: kind === "olError"
+        readonly property int olIndex: entry.isOneLook ? root.olIndexForKey(itemKey) : -1
+        readonly property color rankColor: {
+          const palette = [Theme.primary, Theme.green, Theme.yellow, Theme.red, "#cba6f7", "#f5c2e7", "#94e2d5", "#fab387"]
+          if (!entry.isOneLook || entry.olIndex < 0 || entry.olIndex >= palette.length) {
+            return Theme.surfaceHigh
+          }
+          return palette[entry.olIndex]
+        }
         readonly property bool calcError: kind === "calc" && !!root.calc && !!root.calc.error
         readonly property var app: kind === "app" ? root.appForKey(itemKey) : null
         readonly property var image: kind === "appimage" ? root.imageForKey(itemKey) : null
@@ -1264,12 +1714,25 @@ PanelBase {
         readonly property string imageName: entry.image ? AppImages.nameFor(entry.image.path) : ""
         readonly property string imageVersion: entry.image ? AppImages.versionFor(entry.image.path) : ""
         readonly property string placeholderIcon: entry.isImage ? Quickshell.iconPath("application-vnd.appimage", "application-x-executable") : ""
-        readonly property bool twoLine: entry.isCalc || entry.isImage || entry.appVersion.length > 0
+        readonly property bool twoLine: entry.isCalc || entry.isImage || entry.isOneLook || entry.isProvider || entry.isOlMeta || entry.appVersion.length > 0
         readonly property bool favoritable: entry.kind === "app" || entry.isImage
         readonly property bool favorite: entry.favoritable && Favorites.has(entry.itemKey)
+        readonly property int textRightMargin: entry.favoritable ? root.rowTextRight : root.iconInset
         readonly property string subtitle: {
           if (entry.isCalc) {
             return root.calcExpression()
+          }
+          if (entry.isOneLook) {
+            const arr = root.olResults
+            const item = entry.olIndex >= 0 && entry.olIndex < arr.length ? arr[entry.olIndex] : null
+            return item ? root.olRichDef(item.def) : ""
+          }
+          if (entry.kind === "olError") {
+            return "Press Enter to retry"
+          }
+          if (entry.isProvider) {
+            const provider = root.providerForKey(String(itemKey).slice(9))
+            return provider ? provider.desc : ""
           }
           if (entry.isImage) {
             return entry.imageVersion.length > 0 ? entry.imageVersion : (entry.image ? entry.image.detail : "")
@@ -1281,19 +1744,35 @@ PanelBase {
           if (entry.kind === "app") {
             return root.testAppIcon(entry.app, itemKey)
           }
+          if (entry.isProvider) {
+            const provider = root.providerForKey(String(itemKey).slice(9))
+            return provider ? provider.logo : ""
+          }
           if (entry.isImage) {
             return entry.resolvedIcon.length > 0 ? entry.resolvedIcon : entry.placeholderIcon
           }
           return ""
         }
         readonly property bool showsImage: entry.imageSource.length > 0 && rowIcon.status !== Image.Error
-        readonly property string glyphName: entry.isCalc ? "calculator" : (entry.kind === "command" ? "terminal" : "app-window")
+        readonly property string glyphName: entry.isCalc ? "calculator" : (entry.kind === "command" ? "terminal" : ((entry.isProvider || entry.isOlMeta) ? "search" : "app-window"))
         readonly property string title: {
           if (kind === "calc") {
             return root.calc && root.calc.value !== null ? root.formatDisplay(root.calc.value) : ""
           }
           if (kind === "command") {
             return root.commandText
+          }
+          if (kind === "onelook") {
+            const arr = root.olResults
+            const item = entry.olIndex >= 0 && entry.olIndex < arr.length ? arr[entry.olIndex] : null
+            return item ? root.olTitleRich(item.word, item.syn) : ""
+          }
+          if (kind === "provider") {
+            const provider = root.providerForKey(String(itemKey).slice(9))
+            return provider ? provider.name : ""
+          }
+          if (kind === "olError") {
+            return "Search failed"
           }
           if (kind === "appimage") {
             return entry.imageName.length > 0 ? entry.imageName : (image ? image.name : "")
@@ -1347,9 +1826,27 @@ PanelBase {
 
             Icon {
               anchors.centerIn: parent
-              visible: !entry.showsImage
+              visible: !entry.showsImage && !entry.isOneLook
               name: entry.glyphName
               font.pixelSize: Math.round(20 * Theme.scale)
+            }
+
+            Rectangle {
+              anchors.centerIn: parent
+              visible: entry.isOneLook
+              width: root.iconSlotSize
+              height: width
+              radius: Math.round(8 * Theme.scale)
+              color: Qt.alpha(entry.rankColor, 0.5)
+
+              Text {
+                anchors.centerIn: parent
+                text: entry.olIndex + 1
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: Math.round(13 * Theme.scale)
+                font.bold: true
+              }
             }
           }
 
@@ -1357,7 +1854,7 @@ PanelBase {
             anchors.left: iconSlot.right
             anchors.leftMargin: root.textGap
             anchors.right: parent.right
-            anchors.rightMargin: root.rowTextRight
+            anchors.rightMargin: entry.textRightMargin
             anchors.verticalCenter: parent.verticalCenter
             spacing: Math.round(2 * Theme.scale)
             visible: entry.twoLine
@@ -1366,7 +1863,8 @@ PanelBase {
               width: parent.width
               visible: !entry.calcError
               text: entry.title
-              color: Theme.text
+              textFormat: entry.isOneLook ? Text.StyledText : Text.PlainText
+              color: entry.isOneLook ? Theme.overlay : Theme.text
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSize
               elide: Text.ElideRight
@@ -1376,8 +1874,8 @@ PanelBase {
             Text {
               width: parent.width
               text: entry.subtitle
-              textFormat: entry.isCalc ? Text.StyledText : Text.PlainText
-              color: Theme.overlay
+              textFormat: (entry.isCalc || entry.isOneLook) ? Text.StyledText : Text.PlainText
+              color: entry.isOneLook ? Theme.text : Theme.overlay
               font.family: Theme.fontFamily
               font.pixelSize: entry.isCalc ? Theme.fontSizeSmall : root.subtitleSize
               elide: Text.ElideRight
@@ -1413,7 +1911,7 @@ PanelBase {
             anchors.left: iconSlot.right
             anchors.leftMargin: root.textGap
             anchors.right: parent.right
-            anchors.rightMargin: root.rowTextRight
+            anchors.rightMargin: entry.textRightMargin
             anchors.verticalCenter: parent.verticalCenter
             visible: !entry.twoLine
             text: entry.title

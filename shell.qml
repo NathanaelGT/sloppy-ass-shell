@@ -1146,6 +1146,17 @@ ShellRoot {
       }
       return panel.testVisibleTarget(offset)
     }
+
+    function launcherOlMock(payload: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testOlMock(payload)
+    }
   }
 
   Variants {
