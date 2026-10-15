@@ -23,6 +23,7 @@ PanelBase {
   property bool xfadeActive: false
   property string xfadeDir: ""
   property bool xfadeHold: false
+  property int iconRefreshTick: 0
 
   readonly property int rowHeight: Math.round(48 * Theme.scale)
   readonly property int subtitleSize: Math.round(9 * Theme.scale)
@@ -483,6 +484,19 @@ PanelBase {
     return null
   }
 
+  function testAppIcon(app, itemKey) {
+    const target = app ? app : root.appForKey(itemKey)
+    const iconName = target && target.icon ? target.icon : ""
+    if (iconName.length > 0 && iconName.charAt(0) === "/") {
+      return "file://" + iconName
+    }
+    if (ThemeIcons.has(iconName)) {
+      return Quickshell.iconPath(iconName, "")
+    }
+    const imagePath = root.appImagePathFor(target)
+    return imagePath.length > 0 ? AppImages.iconFor(imagePath) : ""
+  }
+
   function editDistance(a, b, limit) {
     if (Math.abs(a.length - b.length) > limit) {
       return limit + 1
@@ -748,6 +762,7 @@ PanelBase {
         const app = root.appForKey(entry.itemKey)
         name = app && app.name ? app.name : entry.itemKey
         detail = root.versionForItem(entry.itemKey)
+        icon = root.testAppIcon(app, entry.itemKey)
       }
       const match = scored[entry.itemKey]
       rows.push({
@@ -942,6 +957,7 @@ PanelBase {
     selectedIndex = 0
     scrollToTop()
     searchInput.forceActiveFocus()
+    root.iconRefreshTick += 1
   }
 
   headerData: Column {
@@ -1237,13 +1253,12 @@ PanelBase {
         required property string itemKey
         required property bool active
 
+        property int iconTries: 0
         readonly property bool isCalc: kind === "calc"
         readonly property bool isImage: kind === "appimage"
         readonly property bool calcError: kind === "calc" && !!root.calc && !!root.calc.error
         readonly property var app: kind === "app" ? root.appForKey(itemKey) : null
         readonly property var image: kind === "appimage" ? root.imageForKey(itemKey) : null
-        readonly property string appIconName: entry.app && entry.app.icon ? entry.app.icon : ""
-        readonly property string appImagePath: entry.kind === "app" ? root.appImagePathFor(entry.app) : ""
         readonly property string appVersion: entry.kind === "app" ? root.versionForItem(itemKey) : ""
         readonly property string resolvedIcon: entry.image ? AppImages.iconFor(entry.image.path) : ""
         readonly property string imageName: entry.image ? AppImages.nameFor(entry.image.path) : ""
@@ -1262,14 +1277,9 @@ PanelBase {
           return entry.appVersion
         }
         readonly property string imageSource: {
+          root.iconRefreshTick
           if (entry.kind === "app") {
-            if (entry.appIconName.length > 0 && entry.appIconName.charAt(0) === "/") {
-              return "file://" + entry.appIconName
-            }
-            if (ThemeIcons.has(entry.appIconName)) {
-              return Quickshell.iconPath(entry.appIconName, "")
-            }
-            return entry.appImagePath.length > 0 ? AppImages.iconFor(entry.appImagePath) : ""
+            return root.testAppIcon(entry.app, itemKey)
           }
           if (entry.isImage) {
             return entry.resolvedIcon.length > 0 ? entry.resolvedIcon : entry.placeholderIcon
@@ -1289,6 +1299,19 @@ PanelBase {
             return entry.imageName.length > 0 ? entry.imageName : (image ? image.name : "")
           }
           return app && app.name ? app.name : ""
+        }
+
+        onImageSourceChanged: entry.iconTries = 0
+
+        Timer {
+          id: iconRetry
+
+          interval: 600
+          onTriggered: {
+            rowIcon.source = Qt.binding(function () {
+              return entry.imageSource
+            })
+          }
         }
 
         width: list.width
@@ -1315,6 +1338,11 @@ PanelBase {
               visible: entry.showsImage
               sourceSize: Qt.size(width, height)
               source: entry.imageSource
+              onStatusChanged: if (status === Image.Error && entry.imageSource.length > 0 && entry.iconTries < 3) {
+                entry.iconTries += 1
+                source = ""
+                iconRetry.restart()
+              }
             }
 
             Icon {
