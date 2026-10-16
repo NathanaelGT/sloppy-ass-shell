@@ -66,13 +66,19 @@ PanelBase {
       name: "OneLook",
       desc: "Find English definition and related words",
       logo: "../assets/onelook.svg"
+    },
+    {
+      key: "tr",
+      name: "Translate",
+      desc: "Translate words and sentences",
+      logo: "../assets/google-translate.svg"
     }
   ]
 
   readonly property bool atMode: root.query.trim().toLowerCase().indexOf("@") === 0
   readonly property string atToken: root.atMode ? root.query.trim().slice(1).split(/\s+/)[0].toLowerCase() : ""
   readonly property var atMatches: {
-    if (!root.atMode || root.olMode) {
+    if (!root.atMode || root.olMode || root.trMode) {
       return []
     }
     const out = []
@@ -83,7 +89,7 @@ PanelBase {
     }
     return out
   }
-  readonly property int atRowCount: root.atMode && !root.olMode ? root.atMatches.length : 0
+  readonly property int atRowCount: root.atMode && !root.olMode && !root.trMode ? root.atMatches.length : 0
 
   readonly property bool olMode: {
     const t = root.query.trim().toLowerCase()
@@ -117,6 +123,57 @@ PanelBase {
       return 1
     }
     return root.olResults.length
+  }
+  property string trSearchedSpec: ""
+  property string trSearchedTerm: ""
+  property string trResult: ""
+  property bool trLoading: false
+  property string trError: ""
+
+  readonly property bool trMode: {
+    const t = root.query.trim().toLowerCase()
+    return t === "@tr" || t.indexOf("@tr ") === 0
+  }
+  readonly property string trRest: root.trMode ? root.query.trim().slice(3).trim() : ""
+  readonly property var trParts: root.trRest.length === 0 ? [] : root.trRest.split(/\s+/)
+  readonly property string trSpec: {
+    if (root.trParts.length === 0) {
+      return ""
+    }
+    const s = root.trParts[0].toLowerCase()
+    if (/^[a-z]{2}([a-z]{2})?$/.test(s)) {
+      return s
+    }
+    return ""
+  }
+  readonly property string trTerm: root.trSpec.length > 0 ? root.trParts.slice(1).join(" ") : ""
+  readonly property string trSource: root.trSpec.length === 4 ? root.trSpec.slice(0, 2) : "auto"
+  readonly property string trTarget: root.trSpec.length === 4 ? root.trSpec.slice(2) : root.trSpec
+  readonly property string trDir: root.trSource + " → " + root.trTarget
+  readonly property bool trDirty: root.trSpec !== root.trSearchedSpec || root.trTerm !== root.trSearchedTerm
+  readonly property string trCard: {
+    if (!root.trMode) {
+      return ""
+    }
+    if (root.trSpec.length === 0 || root.trTerm.length === 0) {
+      return "hint"
+    }
+    if (root.trDirty) {
+      return "search"
+    }
+    if (root.trLoading) {
+      return "loading"
+    }
+    return ""
+  }
+  readonly property int trRowCount: {
+    if (!root.trMode) {
+      return 0
+    }
+    if (root.trCard.length > 0) {
+      return 0
+    }
+    return 1
   }
 
   readonly property var queryTokens: {
@@ -191,12 +248,12 @@ PanelBase {
   readonly property var calc: evaluate(query)
   readonly property bool commandMode: query.trim().indexOf("$") === 0
   readonly property string commandText: commandMode ? query.trim().slice(1).trim() : ""
-  readonly property int rowCount: root.atMode ? (root.olMode ? root.olRowCount : root.atRowCount) : (commandMode ? (commandText.length > 0 ? 1 : 0) : results.length + (calc ? 1 : 0))
+  readonly property int rowCount: root.atMode ? (root.olMode ? root.olRowCount : (root.trMode ? root.trRowCount : root.atRowCount)) : (commandMode ? (commandText.length > 0 ? 1 : 0) : results.length + (calc ? 1 : 0))
   readonly property int selected: rowCount === 0 ? -1 : Math.max(0, Math.min(selectedIndex, rowCount - 1))
 
   readonly property var entries: {
     const out = []
-    if (root.atMode && !root.olMode) {
+    if (root.atMode && !root.olMode && !root.trMode) {
       for (let i = 0; i < root.atMatches.length; i++) {
         out.push({
           kind: "provider",
@@ -227,6 +284,29 @@ PanelBase {
             active: selected === out.length
           })
         }
+      }
+      return out
+    }
+    if (root.trMode) {
+      if (root.trCard.length > 0) {
+        return out
+      }
+      if (root.trError.length > 0) {
+        out.push({
+          kind: "trError",
+          section: "",
+          label: "",
+          itemKey: "tr:error",
+          active: selected === 0
+        })
+      } else if (root.trResult.length > 0) {
+        out.push({
+          kind: "translate",
+          section: "",
+          label: "",
+          itemKey: "tr:0",
+          active: selected === 0
+        })
       }
       return out
     }
@@ -964,6 +1044,102 @@ PanelBase {
     return true
   }
 
+  function mapTrTranslation(data) {
+    if (typeof data === "string") {
+      return data.trim()
+    }
+    if (!data || typeof data.length !== "number" || data.length === 0) {
+      return ""
+    }
+    const segments = data[0]
+    if (!segments || typeof segments.length !== "number") {
+      return ""
+    }
+    const parts = []
+    for (let i = 0; i < segments.length; i++) {
+      if (segments[i] && typeof segments[i][0] === "string") {
+        parts.push(segments[i][0])
+      }
+    }
+    return parts.join("").trim()
+  }
+
+  function runTrSearch() {
+    if (!root.trMode || root.trTerm.length === 0 || root.trLoading) {
+      return false
+    }
+    if (!root.trDirty && (root.trResult.length > 0 || root.trError.length > 0)) {
+      return false
+    }
+    root.trSearchedSpec = root.trSpec
+    root.trSearchedTerm = root.trTerm
+    root.trResult = ""
+    root.trError = ""
+    root.trLoading = true
+    const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + root.trSource + "&tl=" + root.trTarget + "&dt=t&q=" + encodeURIComponent(root.trTerm)
+    if (trProc.running) {
+      trProc.running = false
+    }
+    trProc.command = ["/nix/store/k2z212kirkjxi3n7ghvd8w4ha54q295c-curl-8.22.0-bin/bin/curl", "-s", "--max-time", "10", "-A", "Mozilla/5.0", "--http1.1", url]
+    trProc.running = true
+    return true
+  }
+
+  function handleTrOutput(text) {
+    if (!root.trLoading) {
+      return
+    }
+    let data = null
+    try {
+      data = JSON.parse(text)
+    } catch (e) {
+      data = null
+    }
+    const translation = root.mapTrTranslation(data)
+    if (translation.length === 0) {
+      root.trError = "Translation failed"
+      root.trResult = ""
+      root.trLoading = false
+      return
+    }
+    root.trResult = translation
+    root.trError = ""
+    root.trLoading = false
+  }
+
+  function handleTrExit(code) {
+    if (!root.trLoading) {
+      return
+    }
+    if (code !== 0) {
+      root.trError = "Translation failed"
+      root.trResult = ""
+      root.trLoading = false
+    }
+  }
+
+  function testTrMock(payload) {
+    let data = null
+    try {
+      data = JSON.parse(payload)
+    } catch (e) {
+      return false
+    }
+    if (data && typeof data.translation === "string") {
+      data = data.translation
+    }
+    const translation = root.mapTrTranslation(data)
+    if (translation.length === 0) {
+      return false
+    }
+    root.trSearchedSpec = root.trSpec
+    root.trSearchedTerm = root.trTerm
+    root.trResult = translation
+    root.trError = ""
+    root.trLoading = false
+    return true
+  }
+
   function kittyArgv(command) {
     return ["kitty", "--hold", "-d", Quickshell.env("HOME"), "--class", "command-runner", "-o", "confirm_os_window_close=0", "-e", "bash", "-lc", command]
   }
@@ -974,6 +1150,9 @@ PanelBase {
     }
     if (root.olCard === "search") {
       return root.runOlSearch()
+    }
+    if (root.trCard === "search") {
+      return root.runTrSearch()
     }
     return false
   }
@@ -988,6 +1167,17 @@ PanelBase {
     }
     if (entry.kind === "olError") {
       return root.runOlSearch()
+    }
+    if (entry.kind === "trError") {
+      return root.runTrSearch()
+    }
+    if (entry.kind === "translate") {
+      if (root.trResult.length === 0) {
+        return false
+      }
+      Quickshell.clipboardText = root.trResult
+      Panels.close()
+      return true
     }
     if (entry.kind === "onelook") {
       const item = root.olItemForKey(entry.itemKey)
@@ -1068,6 +1258,13 @@ PanelBase {
       } else if (entry.kind === "olError") {
         name = "Search failed"
         detail = "Press Enter to retry"
+      } else if (entry.kind === "translate") {
+        name = root.trResult
+        detail = root.trTerm
+        icon = ""
+      } else if (entry.kind === "trError") {
+        name = "Translation failed"
+        detail = "Press Enter to retry"
       } else if (entry.kind === "appimage") {
         const image = root.imageForKey(entry.itemKey)
         const metaName = image ? AppImages.nameFor(image.path) : ""
@@ -1106,6 +1303,15 @@ PanelBase {
       olCard: root.olCard,
       olLoading: root.olLoading,
       olError: root.olError,
+      trMode: root.trMode,
+      trSpec: root.trSpec,
+      trSource: root.trSource,
+      trTarget: root.trTarget,
+      trTerm: root.trTerm,
+      trCard: root.trCard,
+      trLoading: root.trLoading,
+      trError: root.trError,
+      trResult: root.trResult,
       clipboard: Quickshell.clipboardText,
       rows: rows,
       layout: root.testLayout()
@@ -1269,6 +1475,16 @@ PanelBase {
     onExited: code => root.handleOlExit(code)
   }
 
+  Process {
+    id: trProc
+
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: root.handleTrOutput(text)
+    }
+    onExited: code => root.handleTrExit(code)
+  }
+
   onEntriesChanged: root.handleEntriesChanged()
 
   Component.onCompleted: {
@@ -1388,7 +1604,7 @@ PanelBase {
     Rectangle {
       id: morphCard
 
-      property string mode: root.rowCount === 0 ? (root.olCard.length > 0 ? "provider" : "empty") : "command"
+      property string mode: root.rowCount === 0 ? ((root.olCard.length > 0 || root.trCard.length > 0) ? "provider" : "empty") : "command"
       readonly property int emptyHeight: 2 * root.rowHeight + Theme.gap
 
       anchors.left: parent.left
@@ -1597,13 +1813,13 @@ PanelBase {
           anchors.horizontalCenter: parent.horizontalCenter
           width: Math.round(28 * Theme.scale)
           height: width
-          source: "../assets/onelook.svg"
+          source: root.trMode ? "../assets/google-translate.svg" : "../assets/onelook.svg"
           fillMode: Image.PreserveAspectFit
         }
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
-          text: root.olCard === "loading" ? "Searching OneLook..." : (root.olCard === "search" ? "Search OneLook for \"" + root.olTerm + "\"" : "OneLook")
+          text: root.trMode ? (root.trCard === "loading" ? "Translating..." : (root.trCard === "search" ? "Translate \"" + root.trTerm + "\"" : "Translate")) : (root.olCard === "loading" ? "Searching OneLook..." : (root.olCard === "search" ? "Search OneLook for \"" + root.olTerm + "\"" : "OneLook"))
           color: Theme.text
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSize
@@ -1611,7 +1827,7 @@ PanelBase {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
-          text: root.olCard === "loading" ? root.olTerm : (root.olCard === "search" ? "Press Enter to search" : "Type @ol <word> then Enter to search")
+          text: root.trMode ? (root.trCard === "loading" ? root.trTerm : (root.trCard === "search" ? "Press Enter to translate (" + root.trDir + ")" : "@tr id hello · @tr enid halo")) : (root.olCard === "loading" ? root.olTerm : (root.olCard === "search" ? "Press Enter to search" : "Type @ol <word> then Enter to search"))
           color: Theme.subtext
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSizeSmall
@@ -1666,8 +1882,14 @@ PanelBase {
 
       MouseArea {
         anchors.fill: parent
-        visible: morphCard.mode === "provider" && root.olCard === "search"
-        onClicked: root.runOlSearch()
+        visible: morphCard.mode === "provider" && (root.olCard === "search" || root.trCard === "search")
+        onClicked: {
+          if (root.olCard === "search") {
+            root.runOlSearch()
+          } else {
+            root.runTrSearch()
+          }
+        }
       }
     }
 
@@ -1698,6 +1920,8 @@ PanelBase {
         readonly property bool isOneLook: kind === "onelook"
         readonly property bool isProvider: kind === "provider"
         readonly property bool isOlMeta: kind === "olError"
+        readonly property bool isTranslate: kind === "translate"
+        readonly property bool isTrMeta: kind === "trError"
         readonly property int olIndex: entry.isOneLook ? root.olIndexForKey(itemKey) : -1
         readonly property color rankColor: {
           const palette = [Theme.primary, Theme.green, Theme.yellow, Theme.red, "#cba6f7", "#f5c2e7", "#94e2d5", "#fab387"]
@@ -1714,7 +1938,7 @@ PanelBase {
         readonly property string imageName: entry.image ? AppImages.nameFor(entry.image.path) : ""
         readonly property string imageVersion: entry.image ? AppImages.versionFor(entry.image.path) : ""
         readonly property string placeholderIcon: entry.isImage ? Quickshell.iconPath("application-vnd.appimage", "application-x-executable") : ""
-        readonly property bool twoLine: entry.isCalc || entry.isImage || entry.isOneLook || entry.isProvider || entry.isOlMeta || entry.appVersion.length > 0
+        readonly property bool twoLine: entry.isCalc || entry.isImage || entry.isOneLook || entry.isProvider || entry.isOlMeta || entry.isTranslate || entry.isTrMeta || entry.appVersion.length > 0
         readonly property bool favoritable: entry.kind === "app" || entry.isImage
         readonly property bool favorite: entry.favoritable && Favorites.has(entry.itemKey)
         readonly property int textRightMargin: entry.favoritable ? root.rowTextRight : root.iconInset
@@ -1728,6 +1952,12 @@ PanelBase {
             return item ? root.olRichDef(item.def) : ""
           }
           if (entry.kind === "olError") {
+            return "Press Enter to retry"
+          }
+          if (entry.isTranslate) {
+            return root.trTerm
+          }
+          if (entry.kind === "trError") {
             return "Press Enter to retry"
           }
           if (entry.isProvider) {
@@ -1754,7 +1984,7 @@ PanelBase {
           return ""
         }
         readonly property bool showsImage: entry.imageSource.length > 0 && rowIcon.status !== Image.Error
-        readonly property string glyphName: entry.isCalc ? "calculator" : (entry.kind === "command" ? "terminal" : ((entry.isProvider || entry.isOlMeta) ? "search" : "app-window"))
+        readonly property string glyphName: entry.isCalc ? "calculator" : (entry.kind === "command" ? "terminal" : (entry.isTranslate ? "world" : ((entry.isProvider || entry.isOlMeta || entry.isTrMeta) ? "search" : "app-window")))
         readonly property string title: {
           if (kind === "calc") {
             return root.calc && root.calc.value !== null ? root.formatDisplay(root.calc.value) : ""
@@ -1773,6 +2003,12 @@ PanelBase {
           }
           if (kind === "olError") {
             return "Search failed"
+          }
+          if (kind === "translate") {
+            return root.trResult
+          }
+          if (kind === "trError") {
+            return "Translation failed"
           }
           if (kind === "appimage") {
             return entry.imageName.length > 0 ? entry.imageName : (image ? image.name : "")
