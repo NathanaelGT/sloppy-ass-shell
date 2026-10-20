@@ -60,7 +60,7 @@ PanelBase {
     return out
   }
 
-  readonly property bool atMode: root.query.trim().toLowerCase().indexOf("@") === 0
+  readonly property bool atMode: root.atModeQuery()
   readonly property string atToken: root.atMode ? root.query.trim().slice(1).split(/\s+/)[0].toLowerCase() : ""
   readonly property var atMatches: {
     if (!root.atMode || root.olMode || root.trMode) {
@@ -942,6 +942,20 @@ PanelBase {
     return head + "<font color=\"" + root.olMutedHex() + "\" size=\"-2\"> " + root.olRichDef(syn) + "</font>"
   }
 
+  function searchPlaceholder() {
+    if (root.pillActive) {
+      return root.providerParams().length > 0 ? "Search..." : "Search " + root.activeProvider.name + "..."
+    }
+    if (root.atMode) {
+      return "Type a provider"
+    }
+    return "Search applications"
+  }
+
+  function atModeQuery() {
+    return root.query.trim().toLowerCase().indexOf("@") === 0
+  }
+
   function providerForKey(key) {
     return Providers.providerForKey(key)
   }
@@ -1390,7 +1404,12 @@ PanelBase {
     }
     root.syncingInput = true
     const key = root.providerKeyOfQuery(root.query)
-    const next = key.length > 0 ? root.pillRemainderOf(root.query) : root.query
+    let next = root.query
+    if (key.length > 0) {
+      next = root.pillRemainderOf(root.query)
+    } else if (root.atModeQuery()) {
+      next = root.atTokenText()
+    }
     if (searchInput.text !== next) {
       searchInput.text = next
     }
@@ -1429,21 +1448,42 @@ PanelBase {
           root.syncInputToQuery()
         }
       }
-    } else {
-      const exact = root.exactProviderKey(text)
-      const next = exact.length > 0 ? "@" + exact + " " : text
+      return
+    }
+    if (root.atModeQuery()) {
+      const next = "@" + text
       if (root.query !== next) {
         root.query = next
+      } else {
+        root.syncInputToQuery()
       }
+      return
+    }
+    const exact = root.exactProviderKey(text)
+    const next = exact.length > 0 ? "@" + exact + " " : text
+    if (root.query !== next) {
+      root.query = next
     }
   }
 
-  function handlePillBackspace() {
-    if (!root.pillActive) {
+  function atTokenText() {
+    const trimmed = root.query.trim()
+    if (trimmed.charAt(0) !== "@") {
+      return ""
+    }
+    return trimmed.slice(1).split(/\s+/)[0]
+  }
+
+  function handleAtBackspace() {
+    if (searchInput.text.length > 0 || searchInput.selectionStart !== searchInput.selectionEnd) {
       return false
     }
-    if (searchInput.text.length === 0 && searchInput.selectionStart === searchInput.selectionEnd) {
+    if (root.pillActive) {
       root.query = "@"
+      return true
+    }
+    if (root.atModeQuery()) {
+      root.query = ""
       return true
     }
     return false
@@ -1982,7 +2022,7 @@ PanelBase {
   }
 
   function testBackspace() {
-    return root.handlePillBackspace()
+    return root.handleAtBackspace()
   }
 
   function testVisibleTarget(offset) {
@@ -2240,32 +2280,28 @@ PanelBase {
 
         Icon {
           anchors.centerIn: parent
-          name: "search"
+          name: root.atMode ? "at" : "search"
           font.pixelSize: Theme.iconSizeLarge
         }
       }
 
-      Rectangle {
+      Item {
         id: providerBadge
 
         anchors.left: searchIconSlot.right
         anchors.leftMargin: root.pillActive ? 0 : root.textGap
         anchors.verticalCenter: parent.verticalCenter
         visible: root.pillActive
-        width: visible ? badgeText.implicitWidth + Math.round(20 * Theme.scale) : 0
-        height: badgeText.implicitHeight + Math.round(10 * Theme.scale)
-        radius: height / 2
-        color: Theme.primary
+        width: visible ? root.iconSlotSize : 0
+        height: visible ? root.iconSlotSize : 0
 
-        Text {
-          id: badgeText
+        Image {
+          id: badgeLogo
 
-          anchors.centerIn: parent
-          text: root.activeProvider ? root.activeProvider.name : ""
-          color: Theme.onAccent
-          font.family: Theme.fontFamily
-          font.pixelSize: Theme.fontSizeSmall
-          font.bold: true
+          anchors.fill: parent
+          source: root.activeProvider ? root.activeProvider.logo : ""
+          sourceSize: Qt.size(width, height)
+          fillMode: Image.PreserveAspectFit
         }
 
         MouseArea {
@@ -2342,7 +2378,7 @@ PanelBase {
           width: parent.width
           anchors.verticalCenter: parent.verticalCenter
           visible: searchInput.text.length === 0
-          text: root.pillActive ? (root.providerParams().length > 0 ? "Search..." : "Search " + root.activeProvider.name + "...") : "Search applications"
+          text: root.searchPlaceholder()
           color: Theme.overlay
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSizeLarge
@@ -2359,7 +2395,7 @@ PanelBase {
           } else if (event.key === Qt.Key_Space && event.modifiers & Qt.ControlModifier) {
             root.focusTerm()
             event.accepted = true
-          } else if (event.key === Qt.Key_Backspace && root.handlePillBackspace()) {
+          } else if (event.key === Qt.Key_Backspace && root.handleAtBackspace()) {
             event.accepted = true
           } else if (event.key === Qt.Key_PageUp) {
             root.moveSelection(-root.maxVisibleRows)

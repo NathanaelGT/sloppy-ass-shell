@@ -51,6 +51,7 @@ Singleton {
       "clock": "\uea70",
       "calendar": "\uea53",
       "calendar-month": "\ufd2f",
+      "at": "\uea2b",
       "search": "\ueb1c",
       "x": "\ueb55",
       "chevron-up": "\uea62",
