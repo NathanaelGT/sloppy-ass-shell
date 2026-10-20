@@ -23,6 +23,14 @@ Singleton {
   readonly property real shadowOpacity: 0.5
   readonly property int shadowVerticalOffset: Math.round(2 * scale)
 
+  readonly property int chipHeight: Math.round(22 * scale)
+  readonly property int chipRadius: Math.round(6 * scale)
+  readonly property int chipPadX: Math.round(7 * scale)
+  readonly property int chipGap: Math.round(4 * scale)
+  readonly property int chipRowGap: Math.round(6 * scale)
+  readonly property int dropdownWidth: Math.round(190 * scale)
+  readonly property int dropdownRowHeight: Math.round(24 * scale)
+
   readonly property int fontSize: Math.round(12 * scale)
   readonly property int fontSizeSmall: Math.round(10 * scale)
   readonly property int fontSizeLarge: Math.round(15 * scale)

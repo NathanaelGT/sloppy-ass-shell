@@ -60,21 +60,6 @@ PanelBase {
     return out
   }
 
-  readonly property var atProviders: [
-    {
-      key: "ol",
-      name: "OneLook",
-      desc: "Find English definition and related words",
-      logo: "../assets/onelook.svg"
-    },
-    {
-      key: "tr",
-      name: "Translate",
-      desc: "Translate words and sentences",
-      logo: "../assets/google-translate.svg"
-    }
-  ]
-
   readonly property bool atMode: root.query.trim().toLowerCase().indexOf("@") === 0
   readonly property string atToken: root.atMode ? root.query.trim().slice(1).split(/\s+/)[0].toLowerCase() : ""
   readonly property var atMatches: {
@@ -82,14 +67,39 @@ PanelBase {
       return []
     }
     const out = []
-    for (let i = 0; i < root.atProviders.length; i++) {
-      if (root.atProviders[i].key.indexOf(root.atToken) === 0) {
-        out.push(root.atProviders[i])
+    for (let i = 0; i < Providers.providers.length; i++) {
+      if (Providers.providers[i].key.indexOf(root.atToken) === 0) {
+        out.push(Providers.providers[i])
       }
     }
     return out
   }
   readonly property int atRowCount: root.atMode && !root.olMode && !root.trMode ? root.atMatches.length : 0
+  readonly property string activeProviderKey: {
+    const t = root.query.trim().toLowerCase()
+    if (t.charAt(0) !== "@") {
+      return ""
+    }
+    const token = t.slice(1).split(/\s+/)[0]
+    for (let i = 0; i < Providers.providers.length; i++) {
+      if (Providers.providers[i].key === token) {
+        return token
+      }
+    }
+    return ""
+  }
+  readonly property var activeProvider: root.providerForKey(root.activeProviderKey)
+  readonly property bool pillActive: root.activeProviderKey.length > 0
+  property bool syncingInput: false
+  property var paramValues: ({})
+  property var paramCandidates: []
+  property int paramCandidateIndex: -1
+  property var activeChip: null
+  property var chipRegistry: ({})
+  property var currentProvider: null
+  property bool dropdownOpen: false
+  property bool focusLock: false
+  property string focusTarget: "term"
 
   readonly property bool olMode: {
     const t = root.query.trim().toLowerCase()
@@ -100,6 +110,9 @@ PanelBase {
   readonly property string olCard: {
     if (!root.olMode) {
       return ""
+    }
+    if (!root.paramsReady()) {
+      return "params"
     }
     if (root.olTerm.length === 0) {
       return "hint"
@@ -124,38 +137,41 @@ PanelBase {
     }
     return root.olResults.length
   }
-  property string trSearchedSpec: ""
+  property string trSearchedSource: ""
+  property string trSearchedTarget: ""
   property string trSearchedTerm: ""
   property string trResult: ""
   property bool trLoading: false
   property string trError: ""
 
+  readonly property string paramError: {
+    const params = root.providerParams()
+    for (let i = 0; i < params.length; i++) {
+      const state = root.paramState(params[i].key)
+      if (state && state.error.length > 0) {
+        return (params[i].label || params[i].key) + ": " + state.error
+      }
+    }
+    return ""
+  }
+
   readonly property bool trMode: {
     const t = root.query.trim().toLowerCase()
     return t === "@tr" || t.indexOf("@tr ") === 0
   }
-  readonly property string trRest: root.trMode ? root.query.trim().slice(3).trim() : ""
-  readonly property var trParts: root.trRest.length === 0 ? [] : root.trRest.split(/\s+/)
-  readonly property string trSpec: {
-    if (root.trParts.length === 0) {
-      return ""
-    }
-    const s = root.trParts[0].toLowerCase()
-    if (/^[a-z]{2}([a-z]{2})?$/.test(s)) {
-      return s
-    }
-    return ""
-  }
-  readonly property string trTerm: root.trSpec.length > 0 ? root.trParts.slice(1).join(" ") : ""
-  readonly property string trSource: root.trSpec.length === 4 ? root.trSpec.slice(0, 2) : "auto"
-  readonly property string trTarget: root.trSpec.length === 4 ? root.trSpec.slice(2) : root.trSpec
+  readonly property string trTerm: root.trMode ? root.query.trim().slice(3).trim() : ""
+  readonly property string trSource: root.paramValueOf("from")
+  readonly property string trTarget: root.paramValueOf("to")
   readonly property string trDir: root.trSource + " → " + root.trTarget
-  readonly property bool trDirty: root.trSpec !== root.trSearchedSpec || root.trTerm !== root.trSearchedTerm
+  readonly property bool trDirty: root.trTerm !== root.trSearchedTerm || root.trSource !== root.trSearchedSource || root.trTarget !== root.trSearchedTarget
   readonly property string trCard: {
     if (!root.trMode) {
       return ""
     }
-    if (root.trSpec.length === 0 || root.trTerm.length === 0) {
+    if (!root.paramsReady()) {
+      return "params"
+    }
+    if (root.trTerm.length === 0) {
       return "hint"
     }
     if (root.trDirty) {
@@ -927,12 +943,520 @@ PanelBase {
   }
 
   function providerForKey(key) {
-    for (let i = 0; i < root.atProviders.length; i++) {
-      if (root.atProviders[i].key === key) {
-        return root.atProviders[i]
+    return Providers.providerForKey(key)
+  }
+
+  function providerKeyOfQuery(query) {
+    const t = String(query).trim().toLowerCase()
+    for (let i = 0; i < Providers.providers.length; i++) {
+      const key = Providers.providers[i].key
+      if (t === "@" + key || t.indexOf("@" + key + " ") === 0) {
+        return key
       }
     }
-    return null
+    return ""
+  }
+
+  function pillRemainderOf(query) {
+    const m = String(query).match(/^\s*@[A-Za-z]+\s*/)
+    if (!m) {
+      return ""
+    }
+    return String(query).slice(m[0].length)
+  }
+
+  function providerParams() {
+    return Providers.paramsOf(root.currentProvider)
+  }
+
+  function findParam(key) {
+    return Providers.paramOf(root.currentProvider, key)
+  }
+
+  function paramState(key) {
+    return root.paramValues[key] ? root.paramValues[key] : null
+  }
+
+  function paramValueOf(key) {
+    const state = root.paramState(key)
+    if (!state || state.value === undefined || state.value === null) {
+      return ""
+    }
+    return String(state.value)
+  }
+
+  function initParams(provider) {
+    const target = provider === undefined ? root.activeProvider : provider
+    const values = {}
+    const params = Providers.paramsOf(target)
+    for (let i = 0; i < params.length; i++) {
+      const def = Providers.defaultOf(params[i])
+      values[params[i].key] = {
+        value: def === undefined ? "" : def,
+        text: "",
+        error: "",
+        set: false
+      }
+    }
+    root.paramValues = values
+    root.paramCandidates = []
+    root.paramCandidateIndex = -1
+    root.dropdownOpen = false
+  }
+
+  function writeParam(key, value, text, error, set) {
+    const values = {}
+    const keys = Object.keys(root.paramValues)
+    for (let i = 0; i < keys.length; i++) {
+      values[keys[i]] = root.paramValues[keys[i]]
+    }
+    values[key] = {
+      value: value,
+      text: text,
+      error: error,
+      set: set
+    }
+    root.paramValues = values
+  }
+
+  function missingParams() {
+    const params = root.providerParams()
+    const out = []
+    for (let i = 0; i < params.length; i++) {
+      const state = root.paramState(params[i].key)
+      const empty = !state || state.value === undefined || state.value === "" || state.value === null
+      if (params[i].required === true && (empty || state.error.length > 0)) {
+        out.push(params[i])
+      }
+    }
+    return out
+  }
+
+  function invalidParams() {
+    const params = root.providerParams()
+    const out = []
+    for (let i = 0; i < params.length; i++) {
+      const state = root.paramState(params[i].key)
+      const empty = !state || state.value === undefined || state.value === "" || state.value === null
+      const failed = !!state && !!state.error && state.error.length > 0
+      if (failed || (params[i].required === true && empty)) {
+        out.push(params[i])
+      }
+    }
+    return out
+  }
+
+  function focusInvalidParam() {
+    const invalid = root.invalidParams()
+    if (invalid.length === 0) {
+      return false
+    }
+    const key = invalid[0].key
+    const before = root.paramState(key)
+    const message = before && before.error && before.error.length > 0 ? before.error : "required"
+    root.focusParam(key)
+    const after = root.paramState(key)
+    if (after) {
+      root.writeParam(key, after.value, after.text, message, after.set)
+    }
+    return true
+  }
+
+  function paramsReady() {
+    return root.missingParams().length === 0
+  }
+
+  function missingLabel() {
+    const missing = root.missingParams()
+    if (missing.length === 0) {
+      return "Translate"
+    }
+    const names = []
+    for (let i = 0; i < missing.length; i++) {
+      names.push(missing[i].label || missing[i].key)
+    }
+    return "Set " + names.join(" / ")
+  }
+
+  function missingHint() {
+    const missing = root.missingParams()
+    if (missing.length === 0) {
+      return ""
+    }
+    const names = []
+    for (let i = 0; i < missing.length; i++) {
+      names.push(missing[i].desc || missing[i].key)
+    }
+    return "Tab to choose the " + names.join(" and ")
+  }
+
+  function providerCardTitle() {
+    if (root.trMode) {
+      if (root.trCard === "loading") {
+        return "Translating..."
+      }
+      if (root.trCard === "search") {
+        return "Translate \"" + root.trTerm + "\""
+      }
+      if (root.trCard === "params") {
+        return root.missingLabel()
+      }
+      return "Translate"
+    }
+    if (root.olCard === "loading") {
+      return "Searching OneLook..."
+    }
+    if (root.olCard === "search") {
+      return "Search OneLook for \"" + root.olTerm + "\""
+    }
+    if (root.olCard === "params") {
+      return root.missingLabel()
+    }
+    return "OneLook"
+  }
+
+  function providerCardHint() {
+    if (root.paramError.length > 0) {
+      return root.paramError
+    }
+    if (root.trMode) {
+      if (root.trCard === "loading") {
+        return root.trTerm
+      }
+      if (root.trCard === "search") {
+        return "Press Enter to translate (" + root.trDir + ")"
+      }
+      if (root.trCard === "params") {
+        return root.missingHint()
+      }
+      return "Type a phrase · Tab to change the language"
+    }
+    if (root.olCard === "loading") {
+      return root.olTerm
+    }
+    if (root.olCard === "search") {
+      return "Press Enter to search"
+    }
+    if (root.olCard === "params") {
+      return root.missingHint()
+    }
+    return "Type @ol <word> then Enter to search"
+  }
+
+  function focusTerm() {
+    root.focusLock = true
+    root.focusTarget = "term"
+    root.dropdownOpen = false
+    root.paramCandidates = []
+    root.paramCandidateIndex = -1
+    Qt.callLater(function () {
+      searchInput.forceActiveFocus()
+      root.focusLock = false
+    })
+  }
+
+  function paramKeyAt(index) {
+    const params = root.providerParams()
+    if (index < 0 || index >= params.length) {
+      return ""
+    }
+    return params[index].key
+  }
+
+  function jumpToParam(index) {
+    const key = root.paramKeyAt(index - 1)
+    if (key.length === 0) {
+      return false
+    }
+    root.focusParam(key)
+    return true
+  }
+
+  function registerChip(key, chip) {
+    const chips = {}
+    const keys = Object.keys(root.chipRegistry)
+    for (let i = 0; i < keys.length; i++) {
+      chips[keys[i]] = root.chipRegistry[keys[i]]
+    }
+    chips[key] = chip
+    root.chipRegistry = chips
+    if (root.focusTarget === key) {
+      chip.activateEditor()
+    }
+  }
+
+  function unregisterChip(key) {
+    const chips = {}
+    const keys = Object.keys(root.chipRegistry)
+    for (let i = 0; i < keys.length; i++) {
+      if (keys[i] !== key) {
+        chips[keys[i]] = root.chipRegistry[keys[i]]
+      }
+    }
+    root.chipRegistry = chips
+  }
+
+  function focusParam(key) {
+    const param = root.findParam(key)
+    if (!param) {
+      return false
+    }
+    const state = root.paramState(key)
+    if (state && Providers.hasDropdown(param) && state.text.length > 0) {
+      root.writeParam(key, state.value, "", "", state.set)
+    }
+    root.focusLock = true
+    root.focusTarget = key
+    root.paramCandidateIndex = -1
+    root.refreshCandidates()
+    const chip = root.chipRegistry[key]
+    if (chip) {
+      root.activeChip = chip
+      chip.activateEditor()
+    }
+    if (Providers.hasDropdown(param)) {
+      const value = root.paramValueOf(key)
+      for (let i = 0; i < root.paramCandidates.length; i++) {
+        if (Providers.valueOf(root.paramCandidates[i]) === value) {
+          root.paramCandidateIndex = i
+          break
+        }
+      }
+      if (root.paramCandidateIndex < 0 && root.paramCandidates.length > 0) {
+        root.paramCandidateIndex = 0
+      }
+    }
+    root.dropdownOpen = Providers.hasDropdown(param)
+    root.positionDropdown()
+    Qt.callLater(function () {
+      root.focusLock = false
+    })
+    return true
+  }
+
+  function onParamMoveFocus(direction) {
+    const params = root.providerParams()
+    if (params.length === 0) {
+      return false
+    }
+    let index = -1
+    for (let i = 0; i < params.length; i++) {
+      if (params[i].key === root.focusTarget) {
+        index = i
+      }
+    }
+    if (index < 0) {
+      root.focusParam(direction > 0 ? params[0].key : params[params.length - 1].key)
+      return true
+    }
+    const next = index + direction
+    if (next < 0 || next >= params.length) {
+      root.focusTerm()
+      return true
+    }
+    root.focusParam(params[next].key)
+    return true
+  }
+
+  function onParamEdited(key, text) {
+    const param = root.findParam(key)
+    if (!param) {
+      return false
+    }
+    const state = root.paramState(key)
+    const current = state ? state.value : ""
+    const wasSet = state ? state.set : false
+    if (Providers.hasDropdown(param)) {
+      const matched = Providers.matchOf(param, text)
+      if (matched) {
+        root.writeParam(key, Providers.valueOf(matched), text, "", true)
+      } else {
+        root.writeParam(key, current, text, "", wasSet)
+      }
+      root.refreshCandidates()
+      root.paramCandidateIndex = matched ? 0 : -1
+      if (key === root.focusTarget) {
+        root.dropdownOpen = true
+        root.positionDropdown()
+      }
+      return matched !== null
+    }
+    if (text.length === 0) {
+      const def = Providers.defaultOf(param)
+      if (param.required === true && def === undefined) {
+        root.writeParam(key, "", "", "required", false)
+        return false
+      }
+      root.writeParam(key, def === undefined ? "" : def, "", "", false)
+      return true
+    }
+    const result = Providers.validate(param, text)
+    root.writeParam(key, result.value, text, result.ok ? "" : result.error, true)
+    return result.ok
+  }
+
+  function onParamPicked(key, value) {
+    root.writeParam(key, value, value, "", true)
+    root.dropdownOpen = false
+    root.paramCandidates = []
+    root.paramCandidateIndex = -1
+  }
+
+  function onParamAccept() {
+    root.onParamMoveFocus(1)
+  }
+
+  function refreshCandidates() {
+    const param = root.findParam(root.focusTarget)
+    if (!param || !Providers.hasDropdown(param)) {
+      root.paramCandidates = []
+      root.paramCandidateIndex = -1
+      return
+    }
+    const state = root.paramState(root.focusTarget)
+    root.paramCandidates = Providers.candidates(param, state ? state.text : "")
+    if (root.paramCandidateIndex >= root.paramCandidates.length) {
+      root.paramCandidateIndex = -1
+    }
+  }
+
+  function candidateStep(direction) {
+    const count = root.paramCandidates.length
+    if (count === 0) {
+      return false
+    }
+    let index = root.paramCandidateIndex + direction
+    if (index < 0) {
+      index = count - 1
+    }
+    if (index >= count) {
+      index = 0
+    }
+    root.paramCandidateIndex = index
+    paramDropdown.reveal(index)
+    return true
+  }
+
+  function candidateAccept() {
+    const param = root.findParam(root.focusTarget)
+    if (!param) {
+      return false
+    }
+    if (root.paramCandidateIndex >= 0 && root.paramCandidateIndex < root.paramCandidates.length) {
+      root.onParamPicked(root.focusTarget, Providers.valueOf(root.paramCandidates[root.paramCandidateIndex]))
+      return true
+    }
+    const state = root.paramState(root.focusTarget)
+    const matched = Providers.matchOf(param, state ? state.text : "")
+    if (!matched) {
+      return false
+    }
+    root.onParamPicked(root.focusTarget, Providers.valueOf(matched))
+    return true
+  }
+
+  function positionDropdown() {
+    if (!root.activeChip || !paramDropdown || !paramDropdown.parent) {
+      return
+    }
+    const reference = paramDropdown.parent
+    const below = root.activeChip.mapToItem(reference, 0, root.activeChip.height + Math.round(4 * Theme.scale))
+    const above = root.activeChip.mapToItem(reference, 0, 0)
+    if (!below || !above) {
+      return
+    }
+    const margin = Math.round(6 * Theme.scale)
+    const roomBelow = reference.height - below.y - margin
+    const roomAbove = above.y - margin
+    const preferred = Theme.dropdownRowHeight * 8
+    let height = preferred
+    let y = below.y
+    if (roomBelow < preferred) {
+      if (roomAbove > roomBelow) {
+        height = Math.min(preferred, roomAbove)
+        y = above.y - height - Math.round(4 * Theme.scale)
+      } else {
+        height = Math.max(roomBelow, Theme.dropdownRowHeight * 2)
+      }
+    }
+    paramDropdown.maxHeight = Math.max(height, Theme.dropdownRowHeight)
+    paramDropdown.x = Math.max(0, Math.min(below.x, reference.width - paramDropdown.width - margin))
+    paramDropdown.y = y
+  }
+
+  function syncInputToQuery() {
+    if (root.syncingInput) {
+      return
+    }
+    root.syncingInput = true
+    const key = root.providerKeyOfQuery(root.query)
+    const next = key.length > 0 ? root.pillRemainderOf(root.query) : root.query
+    if (searchInput.text !== next) {
+      searchInput.text = next
+    }
+    root.syncingInput = false
+  }
+
+  function exactProviderKey(text) {
+    const t = String(text).trim().toLowerCase()
+    if (t.charAt(0) !== "@" || t.indexOf(" ") >= 0) {
+      return ""
+    }
+    const token = t.slice(1)
+    for (let i = 0; i < Providers.providers.length; i++) {
+      if (Providers.providers[i].key === token) {
+        return token
+      }
+    }
+    return ""
+  }
+
+  function handleSearchText(text) {
+    if (root.syncingInput) {
+      return
+    }
+    const key = root.providerKeyOfQuery(root.query)
+    if (key.length > 0) {
+      if (text.charAt(0) === "@") {
+        if (root.query !== text) {
+          root.query = text
+        }
+      } else {
+        const next = "@" + key + (text.length > 0 ? " " + text : "")
+        if (root.query !== next) {
+          root.query = next
+        } else {
+          root.syncInputToQuery()
+        }
+      }
+    } else {
+      const exact = root.exactProviderKey(text)
+      const next = exact.length > 0 ? "@" + exact + " " : text
+      if (root.query !== next) {
+        root.query = next
+      }
+    }
+  }
+
+  function handlePillBackspace() {
+    if (!root.pillActive) {
+      return false
+    }
+    if (searchInput.text.length === 0 && searchInput.selectionStart === searchInput.selectionEnd) {
+      root.query = "@"
+      return true
+    }
+    return false
+  }
+
+  function clearPill() {
+    if (!root.pillActive) {
+      return false
+    }
+    const term = searchInput.text
+    root.query = term.length > 0 ? term : "@"
+    searchInput.forceActiveFocus()
+    return true
   }
 
   function completeAtProvider(itemKey) {
@@ -942,7 +1466,8 @@ PanelBase {
     if (!provider) {
       return false
     }
-    searchInput.text = "@" + provider.key + " "
+    root.query = "@" + provider.key + " "
+    root.syncInputToQuery()
     searchInput.forceActiveFocus()
     return true
   }
@@ -1064,19 +1589,27 @@ PanelBase {
     return parts.join("").trim()
   }
 
+  function trUrl() {
+    return "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + root.trSource + "&tl=" + root.trTarget + "&dt=t&q=" + encodeURIComponent(root.trTerm)
+  }
+
   function runTrSearch() {
     if (!root.trMode || root.trTerm.length === 0 || root.trLoading) {
+      return false
+    }
+    if (!root.paramsReady()) {
       return false
     }
     if (!root.trDirty && (root.trResult.length > 0 || root.trError.length > 0)) {
       return false
     }
-    root.trSearchedSpec = root.trSpec
+    root.trSearchedSource = root.trSource
+    root.trSearchedTarget = root.trTarget
     root.trSearchedTerm = root.trTerm
     root.trResult = ""
     root.trError = ""
     root.trLoading = true
-    const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + root.trSource + "&tl=" + root.trTarget + "&dt=t&q=" + encodeURIComponent(root.trTerm)
+    const url = root.trUrl()
     if (trProc.running) {
       trProc.running = false
     }
@@ -1132,7 +1665,8 @@ PanelBase {
     if (translation.length === 0) {
       return false
     }
-    root.trSearchedSpec = root.trSpec
+    root.trSearchedSource = root.trSource
+    root.trSearchedTarget = root.trTarget
     root.trSearchedTerm = root.trTerm
     root.trResult = translation
     root.trError = ""
@@ -1145,6 +1679,9 @@ PanelBase {
   }
 
   function acceptCurrent() {
+    if (root.focusInvalidParam()) {
+      return true
+    }
     if (root.selected >= 0) {
       return root.activateIndex(root.selected)
     }
@@ -1218,7 +1755,7 @@ PanelBase {
   }
 
   function testSetQuery(text) {
-    root.query = text
+    searchInput.text = text
     return true
   }
 
@@ -1295,6 +1832,11 @@ PanelBase {
     return {
       query: root.query,
       text: searchInput.text,
+      inputFocus: searchInput.activeFocus,
+      pillActive: root.pillActive,
+      pillKey: root.activeProviderKey,
+      pillName: root.activeProvider ? root.activeProvider.name : "",
+      term: root.pillActive ? searchInput.text : "",
       selected: root.selected,
       atMode: root.atMode,
       atToken: root.atToken,
@@ -1304,22 +1846,143 @@ PanelBase {
       olLoading: root.olLoading,
       olError: root.olError,
       trMode: root.trMode,
-      trSpec: root.trSpec,
       trSource: root.trSource,
       trTarget: root.trTarget,
+      trDir: root.trDir,
       trTerm: root.trTerm,
       trCard: root.trCard,
       trLoading: root.trLoading,
       trError: root.trError,
       trResult: root.trResult,
+      focusTarget: root.focusTarget,
+      chipFocus: root.activeChip ? root.activeChip.editorFocused : false,
+      chipItemFocus: root.activeChip ? root.activeChip.editorHasFocus : false,
+      termItemFocus: searchInput.focus,
+      paramError: root.paramError,
+      dropdownOpen: root.dropdownOpen,
+      paramCandidateIndex: root.paramCandidateIndex,
+      paramCandidates: root.paramCandidateLabels(),
+      params: root.testParams(),
       clipboard: Quickshell.clipboardText,
       rows: rows,
       layout: root.testLayout()
     }
   }
 
+  function testParams() {
+    const params = root.providerParams()
+    const out = []
+    for (let i = 0; i < params.length; i++) {
+      const state = root.paramState(params[i].key)
+      out.push({
+        key: params[i].key,
+        label: params[i].label || params[i].key,
+        type: params[i].type || "string",
+        required: params[i].required === true,
+        value: state ? String(state.value) : "",
+        text: state ? state.text : "",
+        error: state ? state.error : "",
+        set: state ? state.set === true : false,
+        active: root.focusTarget === params[i].key
+      })
+    }
+    return out
+  }
+
+  function testParamCandidates() {
+    return root.paramCandidateLabels()
+  }
+
+  function paramCandidateLabels() {
+    const out = []
+    for (let i = 0; i < root.paramCandidates.length; i++) {
+      out.push(Providers.labelOf(root.paramCandidates[i]))
+    }
+    return out
+  }
+
+  function testSetParam(key, text) {
+    return root.onParamEdited(key, String(text))
+  }
+
+  function testFocusParam(key) {
+    return root.focusParam(String(key))
+  }
+
+  function testTypeParam(text) {
+    if (!root.activeChip) {
+      return false
+    }
+    root.activeChip.typeText(String(text))
+    return true
+  }
+
+  function testFocusTerm() {
+    root.focusTerm()
+    return true
+  }
+
+  function testMoveParamFocus(direction) {
+    return root.onParamMoveFocus(Number(direction))
+  }
+
+  function testPickParam(index) {
+    const target = Number(index)
+    if (target < 0 || target >= root.paramCandidates.length) {
+      return root.candidateAccept()
+    }
+    const item = root.paramCandidates[target]
+    if (!item) {
+      return false
+    }
+    root.onParamPicked(root.focusTarget, Providers.valueOf(item))
+    return true
+  }
+
+  function testCandidateStep(direction) {
+    return root.candidateStep(Number(direction))
+  }
+
+  function testParamKey(name, modifier) {
+    const keys = {
+      "tab": Qt.Key_Tab,
+      "backtab": Qt.Key_Backtab,
+      "up": Qt.Key_Up,
+      "down": Qt.Key_Down,
+      "return": Qt.Key_Return,
+      "enter": Qt.Key_Enter,
+      "escape": Qt.Key_Escape,
+      "space": Qt.Key_Space,
+      "f1": Qt.Key_F1,
+      "f2": Qt.Key_F2,
+      "f3": Qt.Key_F3,
+      "f4": Qt.Key_F4,
+      "f5": Qt.Key_F5,
+      "f6": Qt.Key_F6,
+      "f7": Qt.Key_F7,
+      "f8": Qt.Key_F8
+    }
+    const key = keys[String(name)]
+    if (key === undefined || !root.activeChip) {
+      return false
+    }
+    let modifiers = 0
+    const mode = Number(modifier)
+    if (mode === 1 || mode === 3) {
+      modifiers |= Qt.ShiftModifier
+    }
+    if (mode === 2 || mode === 3) {
+      modifiers |= Qt.ControlModifier
+    }
+    return root.activeChip.handleKey(key, modifiers)
+  }
+
   function testFavorite() {
     return root.favoriteSelected()
+  }
+
+  function testBackspace() {
+    return root.handlePillBackspace()
   }
 
   function testVisibleTarget(offset) {
@@ -1376,6 +2039,29 @@ PanelBase {
 
   function testKittyArgv(command) {
     return kittyArgv(command)
+  }
+
+  function testTrUrl() {
+    return root.trUrl()
+  }
+
+  function testValidate(spec, raw) {
+    const param = {
+      key: "t",
+      label: "t",
+      type: spec.type || "string",
+      required: spec.required === true,
+      list: spec.list || [],
+      min: spec.min,
+      max: spec.max,
+      size: spec.size || 0
+    }
+    const result = Providers.validate(param, String(raw))
+    return {
+      ok: result.ok,
+      value: String(result.value),
+      error: result.error
+    }
   }
 
   function testDebug() {
@@ -1492,7 +2178,25 @@ PanelBase {
     root.prevCount = root.entries.length
   }
 
-  onQueryChanged: selectedIndex = 0
+  onQueryChanged: {
+    selectedIndex = 0
+    root.syncInputToQuery()
+  }
+
+  onActiveProviderKeyChanged: {
+    const provider = root.providerForKey(root.activeProviderKey)
+    root.currentProvider = provider
+    root.initParams(provider)
+    root.focusTarget = "term"
+    root.dropdownOpen = false
+    const params = Providers.paramsOf(provider)
+    for (let i = 0; i < params.length; i++) {
+      if (params[i].required === true) {
+        root.focusParam(params[i].key)
+        break
+      }
+    }
+  }
 
   onSelectedChanged: if (selected >= 0) {
     ensureVisible(list.y + rowTop(selected), root.rowHeight, 0)
@@ -1503,7 +2207,9 @@ PanelBase {
     root.shownEntries = root.entries.slice()
     root.prevCount = root.entries.length
     root.query = ""
-    searchInput.text = root.query
+    root.syncInputToQuery()
+    root.initParams()
+    root.focusTarget = "term"
     selectedIndex = 0
     scrollToTop()
     searchInput.forceActiveFocus()
@@ -1520,7 +2226,7 @@ PanelBase {
       id: searchRow
 
       width: parent.width
-      height: Math.max(root.iconSlotSize, searchInput.implicitHeight)
+      height: Math.max(root.iconSlotSize, searchInput.implicitHeight, providerBadge.height, paramChips.height)
 
       Item {
         id: searchIconSlot
@@ -1528,7 +2234,8 @@ PanelBase {
         anchors.left: parent.left
         anchors.leftMargin: root.iconInset
         anchors.verticalCenter: parent.verticalCenter
-        width: root.iconSlotSize
+        visible: !root.pillActive
+        width: root.pillActive ? 0 : root.iconSlotSize
         height: width
 
         Icon {
@@ -1538,11 +2245,82 @@ PanelBase {
         }
       }
 
+      Rectangle {
+        id: providerBadge
+
+        anchors.left: searchIconSlot.right
+        anchors.leftMargin: root.pillActive ? 0 : root.textGap
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.pillActive
+        width: visible ? badgeText.implicitWidth + Math.round(20 * Theme.scale) : 0
+        height: badgeText.implicitHeight + Math.round(10 * Theme.scale)
+        radius: height / 2
+        color: Theme.primary
+
+        Text {
+          id: badgeText
+
+          anchors.centerIn: parent
+          text: root.activeProvider ? root.activeProvider.name : ""
+          color: Theme.onAccent
+          font.family: Theme.fontFamily
+          font.pixelSize: Theme.fontSizeSmall
+          font.bold: true
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.clearPill()
+        }
+      }
+
+      Row {
+        id: paramChips
+
+        anchors.left: providerBadge.right
+        anchors.leftMargin: Math.round(8 * Theme.scale)
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Theme.chipRowGap
+        visible: root.providerParams().length > 0
+
+        Repeater {
+          model: root.providerParams()
+
+          delegate: ParamChip {
+            id: chipItem
+
+            required property var modelData
+
+            param: modelData
+            valueState: root.paramState(modelData.key)
+            active: root.focusTarget === modelData.key
+            dropdown: Providers.hasDropdown(modelData)
+
+            onActiveChanged: if (active) {
+              root.activeChip = chipItem
+            }
+            onEdited: text => root.onParamEdited(modelData.key, text)
+            onMoveFocus: direction => root.onParamMoveFocus(direction)
+            onDismiss: root.focusTerm()
+            onAccept: root.onParamAccept()
+            onCandidateStep: direction => root.candidateStep(direction)
+            onCandidateAccept: root.candidateAccept()
+            onFocusRequested: root.focusParam(modelData.key)
+            onQueryRequested: root.focusTerm()
+            onParamJump: index => root.jumpToParam(index)
+            onReady: root.registerChip(modelData.key, chipItem)
+
+            Component.onDestruction: root.unregisterChip(modelData.key)
+          }
+        }
+      }
+
       TextInput {
         id: searchInput
 
         anchors.left: searchIconSlot.right
-        anchors.leftMargin: root.textGap
+        anchors.leftMargin: root.pillActive ? providerBadge.width + Math.round(8 * Theme.scale) + (paramChips.width > 0 ? paramChips.width + Math.round(8 * Theme.scale) : 0) : root.textGap
         anchors.right: parent.right
         anchors.rightMargin: root.iconInset
         anchors.verticalCenter: parent.verticalCenter
@@ -1551,24 +2329,39 @@ PanelBase {
         selectedTextColor: Theme.onAccent
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSizeLarge
-        focus: true
+        focus: root.focusTarget === "term"
         clip: true
-        onTextChanged: root.query = text
+        onTextChanged: root.handleSearchText(text)
         onAccepted: root.acceptCurrent()
+        onActiveFocusChanged: if (activeFocus && !root.focusLock) {
+          root.focusTarget = "term"
+          root.dropdownOpen = false
+        }
 
         Text {
+          width: parent.width
           anchors.verticalCenter: parent.verticalCenter
           visible: searchInput.text.length === 0
-          text: "Search applications"
+          text: root.pillActive ? (root.providerParams().length > 0 ? "Search..." : "Search " + root.activeProvider.name + "...") : "Search applications"
           color: Theme.overlay
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSizeLarge
+          elide: Text.ElideRight
+          maximumLineCount: 1
         }
 
         Keys.onUpPressed: root.moveSelection(-1)
         Keys.onDownPressed: root.moveSelection(1)
         Keys.onPressed: event => {
-          if (event.key === Qt.Key_PageUp) {
+          if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+            root.onParamMoveFocus(event.modifiers & Qt.ShiftModifier ? -1 : 1)
+            event.accepted = true
+          } else if (event.key === Qt.Key_Space && event.modifiers & Qt.ControlModifier) {
+            root.focusTerm()
+            event.accepted = true
+          } else if (event.key === Qt.Key_Backspace && root.handlePillBackspace()) {
+            event.accepted = true
+          } else if (event.key === Qt.Key_PageUp) {
             root.moveSelection(-root.maxVisibleRows)
             event.accepted = true
           } else if (event.key === Qt.Key_PageDown) {
@@ -1578,7 +2371,10 @@ PanelBase {
             root.favoriteSelected()
             event.accepted = true
           } else if (event.key >= Qt.Key_F1 && event.key < Qt.Key_F1 + root.maxVisibleRows) {
-            if (root.activateVisible(event.key - Qt.Key_F1)) {
+            if (root.providerParams().length > 0) {
+              root.jumpToParam(event.key - Qt.Key_F1 + 1)
+              event.accepted = true
+            } else if (root.activateVisible(event.key - Qt.Key_F1)) {
               event.accepted = true
             }
           }
@@ -1591,6 +2387,21 @@ PanelBase {
       width: parent.width
       height: 1
       color: Theme.surfaceHigh
+    }
+  }
+
+  overlayData: ParamDropdown {
+    id: paramDropdown
+
+    candidates: root.paramCandidates
+    currentIndex: root.paramCandidateIndex
+    currentValue: root.paramValueOf(root.focusTarget)
+    visible: root.dropdownOpen && root.activeChip !== null
+    onActivated: index => {
+      const item = root.paramCandidates[index]
+      if (item) {
+        root.onParamPicked(root.focusTarget, Providers.valueOf(item))
+      }
     }
   }
 
@@ -1819,7 +2630,7 @@ PanelBase {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
-          text: root.trMode ? (root.trCard === "loading" ? "Translating..." : (root.trCard === "search" ? "Translate \"" + root.trTerm + "\"" : "Translate")) : (root.olCard === "loading" ? "Searching OneLook..." : (root.olCard === "search" ? "Search OneLook for \"" + root.olTerm + "\"" : "OneLook"))
+          text: root.providerCardTitle()
           color: Theme.text
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSize
@@ -1827,8 +2638,8 @@ PanelBase {
 
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
-          text: root.trMode ? (root.trCard === "loading" ? root.trTerm : (root.trCard === "search" ? "Press Enter to translate (" + root.trDir + ")" : "@tr id hello · @tr enid halo")) : (root.olCard === "loading" ? root.olTerm : (root.olCard === "search" ? "Press Enter to search" : "Type @ol <word> then Enter to search"))
-          color: Theme.subtext
+          text: root.providerCardHint()
+          color: root.paramError.length > 0 ? Theme.red : Theme.subtext
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSizeSmall
         }

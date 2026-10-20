@@ -27,6 +27,7 @@ PanelWindow {
   property bool animateCardHeight: false
   default property alias cardData: bodyColumn.data
   property alias headerData: headerColumn.data
+  property alias overlayData: overlayArea.data
 
   signal opened
   signal scrolled
@@ -427,6 +428,13 @@ PanelWindow {
             color: "white"
             antialiasing: true
           }
+        }
+
+        Item {
+          id: overlayArea
+
+          anchors.fill: parent
+          z: 10
         }
 
         MouseArea {
