@@ -66,6 +66,7 @@ Singleton {
   readonly property color capsuleFill: surface
   readonly property color capsuleHover: surfaceHigh
   readonly property color capsuleBorder: surfaceHigher
+  readonly property color dropdownValueFill: "#4b4d61"
   readonly property color shadowColor: "#000000"
   readonly property color trackFill: surfaceHigh
   readonly property color knobFill: text

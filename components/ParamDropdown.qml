@@ -10,8 +10,34 @@ Rectangle {
   property int currentIndex: -1
   property string currentValue: ""
   property int maxHeight: Theme.dropdownRowHeight * 8
+  property int codeWidth: 0
 
   signal activated(int index)
+
+  readonly property int codeColumnWidth: root.codeWidth > 0 ? Math.ceil(codeRuler.implicitWidth) : 0
+
+  function optionText(item) {
+    const name = Providers.nameOf(item)
+    return name.length > 0 ? " - " + name : ""
+  }
+
+  function aligned(item) {
+    if (root.codeColumnWidth <= 0) {
+      return false
+    }
+    return Providers.nameOf(item).length > 0
+  }
+
+  function codeRulerText() {
+    const lines = ["0".repeat(root.codeWidth)]
+    for (let i = 0; i < root.candidates.length; i++) {
+      if (Providers.nameOf(root.candidates[i]).length === 0) {
+        continue
+      }
+      lines.push(Providers.valueOf(root.candidates[i]))
+    }
+    return lines.join("\n")
+  }
 
   function reveal(index) {
     if (index < 0) {
@@ -36,6 +62,15 @@ Rectangle {
   border.color: Theme.surfaceHigher
   antialiasing: true
   z: 100
+
+  Text {
+    id: codeRuler
+
+    visible: false
+    font.family: Theme.fontFamily
+    font.pixelSize: Theme.fontSizeSmall
+    text: root.codeRulerText()
+  }
 
   Flickable {
     id: flick
@@ -63,38 +98,42 @@ Rectangle {
           required property var modelData
           required property int index
 
+          readonly property bool selected: Providers.valueOf(optionRow.modelData) === root.currentValue
+
           width: column.width
           height: Theme.dropdownRowHeight
 
           Rectangle {
             anchors.fill: parent
             radius: Theme.rowRadius
-            color: optionRow.index === root.currentIndex ? Theme.surfaceHigher : "transparent"
+            color: optionRow.index === root.currentIndex ? Theme.surfaceHigher : (optionRow.selected ? Theme.dropdownValueFill : "transparent")
             antialiasing: true
           }
 
-          Icon {
-            id: optionCheck
+          Text {
+            id: optionCode
 
             anchors.left: parent.left
-            anchors.leftMargin: Math.round(6 * Theme.scale)
+            anchors.leftMargin: Math.round(10 * Theme.scale)
             anchors.verticalCenter: parent.verticalCenter
-            width: Math.round(14 * Theme.scale)
-            height: width
-            visible: Providers.valueOf(optionRow.modelData) === root.currentValue
-
-            name: "check"
-            color: Theme.primary
-            font.pixelSize: Math.round(11 * Theme.scale)
+            width: root.codeColumnWidth
+            visible: root.aligned(optionRow.modelData)
+            horizontalAlignment: Text.AlignRight
+            text: Providers.valueOf(optionRow.modelData)
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSmall
+            elide: Text.ElideRight
+            maximumLineCount: 1
           }
 
           Text {
-            anchors.left: optionCheck.right
-            anchors.leftMargin: Math.round(4 * Theme.scale)
+            anchors.left: optionCode.visible ? optionCode.right : parent.left
+            anchors.leftMargin: optionCode.visible ? 0 : Math.round(10 * Theme.scale)
             anchors.right: parent.right
             anchors.rightMargin: Math.round(8 * Theme.scale)
             anchors.verticalCenter: parent.verticalCenter
-            text: Providers.labelOf(optionRow.modelData)
+            text: optionCode.visible ? root.optionText(optionRow.modelData) : Providers.labelOf(optionRow.modelData)
             color: Theme.text
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSizeSmall

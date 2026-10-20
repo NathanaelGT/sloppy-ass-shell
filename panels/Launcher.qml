@@ -147,12 +147,36 @@ PanelBase {
   readonly property string paramError: {
     const params = root.providerParams()
     for (let i = 0; i < params.length; i++) {
-      const state = root.paramState(params[i].key)
-      if (state && state.error.length > 0) {
-        return (params[i].label || params[i].key) + ": " + state.error
+      const clash = root.paramClashes[params[i].key]
+      if (clash) {
+        return root.labelOfParam(params[i].key) + " and " + root.labelOfParam(clash) + " must differ"
+      }
+    }
+    for (let i = 0; i < params.length; i++) {
+      const text = root.errorTextOf(params[i].key)
+      if (text.length > 0) {
+        return (params[i].label || params[i].key) + ": " + text
       }
     }
     return ""
+  }
+
+  readonly property var paramClashes: {
+    const out = {}
+    const params = root.providerParams()
+    for (let i = 0; i < params.length; i++) {
+      const value = root.paramValueOf(params[i].key)
+      if (value.length === 0) {
+        continue
+      }
+      const keys = Providers.distinctOf(params[i])
+      for (let j = 0; j < keys.length; j++) {
+        if (root.paramValueOf(keys[j]) === value) {
+          out[params[i].key] = keys[j]
+        }
+      }
+    }
+    return out
   }
 
   readonly property bool trMode: {
@@ -987,6 +1011,11 @@ PanelBase {
     return Providers.paramOf(root.currentProvider, key)
   }
 
+  function labelOfParam(key) {
+    const param = root.findParam(key)
+    return param ? (param.label || param.key) : key
+  }
+
   function paramState(key) {
     return root.paramValues[key] ? root.paramValues[key] : null
   }
@@ -997,6 +1026,47 @@ PanelBase {
       return ""
     }
     return String(state.value)
+  }
+
+  function errorTextOf(key) {
+    const state = root.paramState(key)
+    if (state && state.error && state.error.length > 0) {
+      return state.error
+    }
+    const clash = root.paramClashes[key]
+    if (clash) {
+      return "same as " + clash
+    }
+    return ""
+  }
+
+  function paramStateWithError(key) {
+    const state = root.paramState(key)
+    if (!state) {
+      return null
+    }
+    const error = root.errorTextOf(key)
+    if (error === state.error) {
+      return state
+    }
+    return {
+      value: state.value,
+      text: state.text,
+      error: error,
+      set: state.set
+    }
+  }
+
+  function conflictingValues(param) {
+    const out = []
+    const keys = Providers.distinctOf(param)
+    for (let i = 0; i < keys.length; i++) {
+      const value = root.paramValueOf(keys[i])
+      if (value.length > 0) {
+        out.push(value)
+      }
+    }
+    return out
   }
 
   function initParams(provider) {
@@ -1039,7 +1109,7 @@ PanelBase {
     for (let i = 0; i < params.length; i++) {
       const state = root.paramState(params[i].key)
       const empty = !state || state.value === undefined || state.value === "" || state.value === null
-      if (params[i].required === true && (empty || state.error.length > 0)) {
+      if (params[i].required === true && (empty || root.errorTextOf(params[i].key).length > 0)) {
         out.push(params[i])
       }
     }
@@ -1052,7 +1122,7 @@ PanelBase {
     for (let i = 0; i < params.length; i++) {
       const state = root.paramState(params[i].key)
       const empty = !state || state.value === undefined || state.value === "" || state.value === null
-      const failed = !!state && !!state.error && state.error.length > 0
+      const failed = root.errorTextOf(params[i].key).length > 0
       if (failed || (params[i].required === true && empty)) {
         out.push(params[i])
       }
@@ -1066,6 +1136,10 @@ PanelBase {
       return false
     }
     const key = invalid[0].key
+    if (root.paramClashes[key]) {
+      root.focusParam(key)
+      return true
+    }
     const before = root.paramState(key)
     const message = before && before.error && before.error.length > 0 ? before.error : "required"
     root.focusParam(key)
@@ -1076,8 +1150,19 @@ PanelBase {
     return true
   }
 
+  function clashingParams() {
+    const params = root.providerParams()
+    const out = []
+    for (let i = 0; i < params.length; i++) {
+      if (root.paramClashes[params[i].key]) {
+        out.push(params[i])
+      }
+    }
+    return out
+  }
+
   function paramsReady() {
-    return root.missingParams().length === 0
+    return root.missingParams().length === 0 && root.clashingParams().length === 0
   }
 
   function missingLabel() {
@@ -1328,7 +1413,7 @@ PanelBase {
       return
     }
     const state = root.paramState(root.focusTarget)
-    root.paramCandidates = Providers.candidates(param, state ? state.text : "")
+    root.paramCandidates = Providers.candidates(param, state ? state.text : "", root.conflictingValues(param))
     if (root.paramCandidateIndex >= root.paramCandidates.length) {
       root.paramCandidateIndex = -1
     }
@@ -1921,7 +2006,7 @@ PanelBase {
         required: params[i].required === true,
         value: state ? String(state.value) : "",
         text: state ? state.text : "",
-        error: state ? state.error : "",
+        error: root.errorTextOf(params[i].key),
         set: state ? state.set === true : false,
         active: root.focusTarget === params[i].key
       })
@@ -2329,7 +2414,7 @@ PanelBase {
             required property var modelData
 
             param: modelData
-            valueState: root.paramState(modelData.key)
+            valueState: root.paramStateWithError(modelData.key)
             active: root.focusTarget === modelData.key
             dropdown: Providers.hasDropdown(modelData)
 
@@ -2432,6 +2517,7 @@ PanelBase {
     candidates: root.paramCandidates
     currentIndex: root.paramCandidateIndex
     currentValue: root.paramValueOf(root.focusTarget)
+    codeWidth: Providers.codeWidthOf(root.findParam(root.focusTarget))
     visible: root.dropdownOpen && root.activeChip !== null
     onActivated: index => {
       const item = root.paramCandidates[index]

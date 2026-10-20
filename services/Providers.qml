@@ -6,127 +6,578 @@ Singleton {
 
   readonly property url onelookLogo: "../assets/onelook.svg"
   readonly property url translateLogo: "../assets/google-translate.svg"
+  readonly property int hiddenMinChars: 2
 
-  readonly property var languages: [
+  readonly property var sourceLanguages: [
     {
       value: "auto",
-      label: "auto"
+      name: ""
     },
     {
       value: "en",
-      label: "en - English"
+      name: "English"
     },
     {
       value: "id",
-      label: "id - Bahasa Indonesia"
-    },
-    {
-      value: "ms",
-      label: "ms - Bahasa Melayu"
-    },
-    {
-      value: "de",
-      label: "de - Deutsch"
-    },
-    {
-      value: "fr",
-      label: "fr - Francais"
-    },
-    {
-      value: "es",
-      label: "es - Espanol"
-    },
-    {
-      value: "it",
-      label: "it - Italiano"
-    },
-    {
-      value: "pt",
-      label: "pt - Portugues"
-    },
-    {
-      value: "nl",
-      label: "nl - Nederlands"
-    },
-    {
-      value: "ru",
-      label: "ru - Russkij"
-    },
-    {
-      value: "uk",
-      label: "uk - Ukrainska"
+      name: "Bahasa Indonesia"
     },
     {
       value: "ja",
-      label: "ja - Nihongo"
+      name: "Nihongo"
+    }
+  ]
+
+  readonly property var targetLanguages: [
+    {
+      value: "en",
+      name: "English"
     },
     {
-      value: "ko",
-      label: "ko - Hangugeo"
+      value: "id",
+      name: "Bahasa Indonesia"
     },
     {
-      value: "zh",
-      label: "zh - Zhongwen"
+      value: "ja",
+      name: "Nihongo"
+    }
+  ]
+
+  readonly property var otherLanguages: [
+    {
+      value: "af",
+      name: "Afrikaans"
+    },
+    {
+      value: "sq",
+      name: "Albanian"
+    },
+    {
+      value: "am",
+      name: "Amharic"
     },
     {
       value: "ar",
-      label: "ar - Al-Arabiyah"
+      name: "Al-Arabiyah"
     },
     {
-      value: "hi",
-      label: "hi - Hindī"
+      value: "hy",
+      name: "Armenian"
     },
     {
-      value: "th",
-      label: "th - Thai"
+      value: "az",
+      name: "Azerbaijani"
     },
     {
-      value: "vi",
-      label: "vi - Tieng Viet"
+      value: "eu",
+      name: "Basque"
     },
     {
-      value: "tr",
-      label: "tr - Turkce"
+      value: "be",
+      name: "Belarusian"
     },
     {
-      value: "pl",
-      label: "pl - Polski"
+      value: "bn",
+      name: "Bengali"
     },
     {
-      value: "sv",
-      label: "sv - Svenska"
+      value: "bs",
+      name: "Bosnian"
     },
     {
-      value: "da",
-      label: "da - Dansk"
+      value: "bg",
+      name: "Bulgarian"
     },
     {
-      value: "fi",
-      label: "fi - Suomi"
+      value: "ca",
+      name: "Catalan"
     },
     {
-      value: "nb",
-      label: "nb - Norsk bokmal"
+      value: "ceb",
+      name: "Cebuano"
+    },
+    {
+      value: "ny",
+      name: "Chichewa"
+    },
+    {
+      value: "zh",
+      name: "Zhongwen"
+    },
+    {
+      value: "zh-tw",
+      name: "Zhongwen Tradisional"
+    },
+    {
+      value: "co",
+      name: "Corsican"
+    },
+    {
+      value: "hr",
+      name: "Croatian"
     },
     {
       value: "cs",
-      label: "cs - Cestina"
+      name: "Cestina"
+    },
+    {
+      value: "da",
+      name: "Dansk"
+    },
+    {
+      value: "nl",
+      name: "Nederlands"
+    },
+    {
+      value: "eo",
+      name: "Esperanto"
+    },
+    {
+      value: "et",
+      name: "Estonian"
+    },
+    {
+      value: "tl",
+      name: "Filipino"
+    },
+    {
+      value: "fi",
+      name: "Suomi"
+    },
+    {
+      value: "fr",
+      name: "Francais"
+    },
+    {
+      value: "fy",
+      name: "Frisian"
+    },
+    {
+      value: "gl",
+      name: "Galician"
+    },
+    {
+      value: "ka",
+      name: "Georgian"
+    },
+    {
+      value: "de",
+      name: "Deutsch"
     },
     {
       value: "el",
-      label: "el - Ellinika"
+      name: "Ellinika"
+    },
+    {
+      value: "gu",
+      name: "Gujarati"
+    },
+    {
+      value: "ht",
+      name: "Haitian Creole"
+    },
+    {
+      value: "ha",
+      name: "Hausa"
+    },
+    {
+      value: "haw",
+      name: "Hawaiian"
     },
     {
       value: "he",
-      label: "he - Ivrit"
+      name: "Ivrit"
+    },
+    {
+      value: "hi",
+      name: "Hindī"
+    },
+    {
+      value: "hmn",
+      name: "Hmong"
     },
     {
       value: "hu",
-      label: "hu - Magyar"
+      name: "Magyar"
+    },
+    {
+      value: "is",
+      name: "Icelandic"
+    },
+    {
+      value: "ig",
+      name: "Igbo"
+    },
+    {
+      value: "ga",
+      name: "Irish"
+    },
+    {
+      value: "it",
+      name: "Italiano"
+    },
+    {
+      value: "jv",
+      name: "Javanese"
+    },
+    {
+      value: "kn",
+      name: "Kannada"
+    },
+    {
+      value: "kk",
+      name: "Kazakh"
+    },
+    {
+      value: "km",
+      name: "Khmer"
+    },
+    {
+      value: "ko",
+      name: "Hangugeo"
+    },
+    {
+      value: "ku",
+      name: "Kurdish"
+    },
+    {
+      value: "ky",
+      name: "Kyrgyz"
+    },
+    {
+      value: "lo",
+      name: "Lao"
+    },
+    {
+      value: "la",
+      name: "Latin"
+    },
+    {
+      value: "lv",
+      name: "Latvian"
+    },
+    {
+      value: "lt",
+      name: "Lithuanian"
+    },
+    {
+      value: "lb",
+      name: "Luxembourgish"
+    },
+    {
+      value: "mk",
+      name: "Macedonian"
+    },
+    {
+      value: "mg",
+      name: "Malagasy"
+    },
+    {
+      value: "ms",
+      name: "Bahasa Melayu"
+    },
+    {
+      value: "ml",
+      name: "Malayalam"
+    },
+    {
+      value: "mt",
+      name: "Maltese"
+    },
+    {
+      value: "mi",
+      name: "Maori"
+    },
+    {
+      value: "mr",
+      name: "Marathi"
+    },
+    {
+      value: "mn",
+      name: "Mongolian"
+    },
+    {
+      value: "my",
+      name: "Burmese"
+    },
+    {
+      value: "ne",
+      name: "Nepali"
+    },
+    {
+      value: "nb",
+      name: "Norsk bokmal"
+    },
+    {
+      value: "ps",
+      name: "Pashto"
+    },
+    {
+      value: "fa",
+      name: "Persian"
+    },
+    {
+      value: "pl",
+      name: "Polski"
+    },
+    {
+      value: "pt",
+      name: "Portugues"
+    },
+    {
+      value: "pa",
+      name: "Punjabi"
     },
     {
       value: "ro",
-      label: "ro - Romana"
+      name: "Romana"
+    },
+    {
+      value: "ru",
+      name: "Russkij"
+    },
+    {
+      value: "sm",
+      name: "Samoan"
+    },
+    {
+      value: "gd",
+      name: "Scots Gaelic"
+    },
+    {
+      value: "sr",
+      name: "Serbian"
+    },
+    {
+      value: "st",
+      name: "Sesotho"
+    },
+    {
+      value: "sn",
+      name: "Shona"
+    },
+    {
+      value: "sd",
+      name: "Sindhi"
+    },
+    {
+      value: "si",
+      name: "Sinhala"
+    },
+    {
+      value: "sk",
+      name: "Slovak"
+    },
+    {
+      value: "sl",
+      name: "Slovenian"
+    },
+    {
+      value: "so",
+      name: "Somali"
+    },
+    {
+      value: "es",
+      name: "Espanol"
+    },
+    {
+      value: "su",
+      name: "Sundanese"
+    },
+    {
+      value: "sw",
+      name: "Swahili"
+    },
+    {
+      value: "sv",
+      name: "Svenska"
+    },
+    {
+      value: "tg",
+      name: "Tajik"
+    },
+    {
+      value: "ta",
+      name: "Tamil"
+    },
+    {
+      value: "te",
+      name: "Telugu"
+    },
+    {
+      value: "th",
+      name: "Thai"
+    },
+    {
+      value: "tr",
+      name: "Turkce"
+    },
+    {
+      value: "tk",
+      name: "Turkmen"
+    },
+    {
+      value: "tt",
+      name: "Tatar"
+    },
+    {
+      value: "uk",
+      name: "Ukrainska"
+    },
+    {
+      value: "ur",
+      name: "Urdu"
+    },
+    {
+      value: "ug",
+      name: "Uyghur"
+    },
+    {
+      value: "uz",
+      name: "Uzbek"
+    },
+    {
+      value: "vi",
+      name: "Tieng Viet"
+    },
+    {
+      value: "cy",
+      name: "Welsh"
+    },
+    {
+      value: "xh",
+      name: "Xhosa"
+    },
+    {
+      value: "yi",
+      name: "Yiddish"
+    },
+    {
+      value: "yo",
+      name: "Yoruba"
+    },
+    {
+      value: "zu",
+      name: "Zulu"
+    },
+    {
+      value: "br",
+      name: "Breton"
+    },
+    {
+      value: "gom",
+      name: "Goan Konkani"
+    },
+    {
+      value: "kok",
+      name: "Konkani"
+    },
+    {
+      value: "mai",
+      name: "Maithili"
+    },
+    {
+      value: "oc",
+      name: "Occitan"
+    },
+    {
+      value: "sat",
+      name: "Santali"
+    },
+    {
+      value: "ay",
+      name: "Aymara"
+    },
+    {
+      value: "bho",
+      name: "Bhojpuri"
+    },
+    {
+      value: "bm",
+      name: "Bambara"
+    },
+    {
+      value: "bo",
+      name: "Tibetan"
+    },
+    {
+      value: "doi",
+      name: "Dogri"
+    },
+    {
+      value: "dz",
+      name: "Dzongkha"
+    },
+    {
+      value: "ee",
+      name: "Ewe"
+    },
+    {
+      value: "ff",
+      name: "Fulah"
+    },
+    {
+      value: "gn",
+      name: "Guarani"
+    },
+    {
+      value: "kg",
+      name: "Kongo"
+    },
+    {
+      value: "lg",
+      name: "Ganda"
+    },
+    {
+      value: "lua",
+      name: "Luba-Katanga"
+    },
+    {
+      value: "mhr",
+      name: "Mari"
+    },
+    {
+      value: "mwr",
+      name: "Marwari"
+    },
+    {
+      value: "nso",
+      name: "Northern Sotho"
+    },
+    {
+      value: "om",
+      name: "Oromo"
+    },
+    {
+      value: "qu",
+      name: "Quechua"
+    },
+    {
+      value: "sah",
+      name: "Yakut"
+    },
+    {
+      value: "ss",
+      name: "Swati"
+    },
+    {
+      value: "ti",
+      name: "Tigrinya"
+    },
+    {
+      value: "tn",
+      name: "Tswana"
+    },
+    {
+      value: "tw",
+      name: "Twi"
+    },
+    {
+      value: "ve",
+      name: "Venda"
+    },
+    {
+      value: "wo",
+      name: "Wolof"
     }
   ]
 
@@ -150,18 +601,24 @@ Singleton {
           type: "enum",
           required: false,
           default: "auto",
-          list: root.languages,
+          list: root.sourceLanguages,
+          hiddenList: root.otherLanguages,
           size: 5,
-          desc: "source language"
+          desc: "source language",
+          codeWidth: 2,
+          distinct: ["to"]
         },
         {
           key: "to",
           label: "to",
           type: "enum",
           required: true,
-          list: root.languages,
+          list: root.targetLanguages,
+          hiddenList: root.otherLanguages,
           size: 5,
-          desc: "target language"
+          desc: "target language",
+          codeWidth: 2,
+          distinct: ["from"]
         }
       ]
     }
@@ -207,23 +664,64 @@ Singleton {
     return param.type === "enum" || param.type === "bool"
   }
 
+  function codeWidthOf(param) {
+    if (!param || param.codeWidth === undefined || param.codeWidth === null) {
+      return 0
+    }
+    return Number(param.codeWidth)
+  }
+
+  function distinctOf(param) {
+    if (!param || !param.distinct) {
+      return []
+    }
+    return param.distinct
+  }
+
   function listOf(param) {
     if (!param) {
       return []
     }
+    const out = []
+    const visible = root.visibleListOf(param)
+    for (let i = 0; i < visible.length; i++) {
+      out.push(visible[i])
+    }
+    const hidden = root.hiddenListOf(param)
+    for (let i = 0; i < hidden.length; i++) {
+      out.push(hidden[i])
+    }
+    return out
+  }
+
+  function visibleListOf(param) {
+    if (!param) {
+      return []
+    }
     if (param.type === "bool") {
-      return [
-        {
-          value: "true",
-          label: "true"
-        },
-        {
-          value: "false",
-          label: "false"
-        }
-      ]
+      return root.boolList()
     }
     return param.list || []
+  }
+
+  function hiddenListOf(param) {
+    if (!param || !param.hiddenList) {
+      return []
+    }
+    return param.hiddenList
+  }
+
+  function boolList() {
+    return [
+      {
+        value: "true",
+        label: "true"
+      },
+      {
+        value: "false",
+        label: "false"
+      }
+    ]
   }
 
   function valueOf(item) {
@@ -235,9 +733,22 @@ Singleton {
 
   function labelOf(item) {
     if (item !== null && typeof item === "object") {
-      return item.label === undefined ? String(item.value) : String(item.label)
+      if (item.label !== undefined) {
+        return String(item.label)
+      }
+      if (item.name !== undefined) {
+        return item.name.length > 0 ? String(item.value) + " - " + String(item.name) : String(item.value)
+      }
+      return String(item.value)
     }
     return String(item)
+  }
+
+  function nameOf(item) {
+    if (item !== null && typeof item === "object" && item.name !== undefined) {
+      return String(item.name)
+    }
+    return ""
   }
 
   function fuzzyMatch(text, query) {
@@ -276,18 +787,38 @@ Singleton {
     return -1
   }
 
-  function candidates(param, filter) {
-    const list = root.listOf(param)
+  function candidates(param, filter, exclude) {
     const query = String(filter === undefined || filter === null ? "" : filter).trim().toLowerCase()
+    const blocked = exclude === undefined || exclude === null ? [] : exclude
     const scored = []
-    for (let i = 0; i < list.length; i++) {
-      const score = root.scoreOf(list[i], query)
+    const visible = root.visibleListOf(param)
+    for (let i = 0; i < visible.length; i++) {
+      if (root.isBlocked(visible[i], blocked)) {
+        continue
+      }
+      const score = root.scoreOf(visible[i], query)
       if (score >= 0) {
         scored.push({
-          item: list[i],
+          item: visible[i],
           score: score,
           at: i
         })
+      }
+    }
+    if (query.length >= root.hiddenMinChars) {
+      const hidden = root.hiddenListOf(param)
+      for (let i = 0; i < hidden.length; i++) {
+        if (root.isBlocked(hidden[i], blocked)) {
+          continue
+        }
+        const score = root.scoreOf(hidden[i], query)
+        if (score >= 0) {
+          scored.push({
+            item: hidden[i],
+            score: score,
+            at: visible.length + i
+          })
+        }
       }
     }
     scored.sort(function (a, b) {
@@ -301,6 +832,15 @@ Singleton {
       out.push(scored[i].item)
     }
     return out
+  }
+
+  function isBlocked(item, blocked) {
+    for (let i = 0; i < blocked.length; i++) {
+      if (root.valueOf(item) === blocked[i]) {
+        return true
+      }
+    }
+    return false
   }
 
   function matchOf(param, filter) {
