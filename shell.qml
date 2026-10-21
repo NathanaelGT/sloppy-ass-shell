@@ -1158,7 +1158,7 @@ ShellRoot {
       return panel.testVisibleTarget(offset)
     }
 
-    function launcherOlMock(payload: string): bool {
+    function launcherProviderMock(key: string, payload: string): bool {
       if (!TestDriver.active) {
         return false
       }
@@ -1166,18 +1166,7 @@ ShellRoot {
       if (!panel || !panel.open) {
         return false
       }
-      return panel.testOlMock(payload)
-    }
-
-    function launcherTrMock(payload: string): bool {
-      if (!TestDriver.active) {
-        return false
-      }
-      const panel = TestDriver.panel("launcher")
-      if (!panel || !panel.open) {
-        return false
-      }
-      return panel.testTrMock(payload)
+      return panel.testProviderMock(key, payload)
     }
 
     function launcherParamState(): string {
@@ -1283,7 +1272,7 @@ ShellRoot {
       return panel.testTypeParam(text)
     }
 
-    function launcherTrUrl(): string {
+    function launcherProviderUrl(key: string): string {
       if (!TestDriver.active) {
         return ""
       }
@@ -1291,7 +1280,7 @@ ShellRoot {
       if (!panel || !panel.open) {
         return ""
       }
-      return panel.testTrUrl()
+      return panel.testProviderUrl(key)
     }
 
     function launcherValidate(spec: string, raw: string): string {

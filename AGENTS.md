@@ -98,11 +98,23 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
 - `PwNode.properties` is invalid unless the node is bound with `PwObjectTracker`.
 - Reuse before rewriting: `BarSurface`, `Slider`, `EditablePercent`, `EditableLabel`, `MuteButton`,
   `VolumeIcon`, `SectionHeader`, `PlaceholderCard`, `Pins`, `Aliases`, `Audio`.
+- Launcher `@provider` entries live in `providers/`, one `pragma Singleton` per provider;
+  `services/Providers.qml` is the registry (`providers` list + `providerForKey`) and holds the
+  shared param engine. A provider exposes `key`, `name`, `desc`, `logo`, `params`, `errorText` and
+  the functions `buildUrl(ctx)`, `requestArgs(url)`, `parse(text)`, `mock(payload)`, `rows(ctx)`,
+  `cardTitle(ctx)`, `cardHint(ctx)`; `rows(ctx)` returns row descriptors
+  (`key`, `title`, `titleRich`, `titleColor`, `subtitle`, `subtitleRich`, `subtitleColor`, `glyph`,
+  `image`, `badge`, `badgeColor`, `action`, `copyText`). Adding a provider is one new file plus one
+  registry line — `panels/Launcher.qml` stays provider-agnostic.
+- Providers are stateless: the launcher owns the per-provider session (searched term/values,
+  results, loading, error) keyed by provider key, because the launcher is instantiated per screen
+  and a singleton would leak state between screens.
 
 ## Style
 
 - 2-space indent, no comments, `id: root`, functions before the markup.
-- `panels/` screens, `components/` reusable items, `services/` singletons, `theme/` tokens.
+- `panels/` screens, `components/` reusable items, `services/` singletons, `providers/` launcher
+  providers, `theme/` tokens.
 - Prefer `Column`/`Flickable` over `ListView`; Quickshell 0.3.1 models are `ObjectModel` — read `.values`.
 - Format as the last step of the task, after the behavior checks: `find . -name '*.qml' | sort >
   /tmp/opencode/qmlformat-files.txt` then the `qmlformat` binary under `/nix/store/*qtdeclarative-6*/bin`

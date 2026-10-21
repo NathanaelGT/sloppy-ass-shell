@@ -25,10 +25,6 @@ PanelBase {
   property string xfadeDir: ""
   property bool xfadeHold: false
   property int iconRefreshTick: 0
-  property string olSearchedTerm: ""
-  property var olResults: []
-  property bool olLoading: false
-  property string olError: ""
 
   readonly property int rowHeight: Math.round(48 * Theme.scale)
   readonly property int subtitleSize: Math.round(9 * Theme.scale)
@@ -63,7 +59,7 @@ PanelBase {
   readonly property bool atMode: root.atModeQuery()
   readonly property string atToken: root.atMode ? root.query.trim().slice(1).split(/\s+/)[0].toLowerCase() : ""
   readonly property var atMatches: {
-    if (!root.atMode || root.olMode || root.trMode) {
+    if (!root.atMode || root.providerMode) {
       return []
     }
     const out = []
@@ -74,7 +70,7 @@ PanelBase {
     }
     return out
   }
-  readonly property int atRowCount: root.atMode && !root.olMode && !root.trMode ? root.atMatches.length : 0
+  readonly property int atRowCount: root.atMode && !root.providerMode ? root.atMatches.length : 0
   readonly property string activeProviderKey: {
     const t = root.query.trim().toLowerCase()
     if (t.charAt(0) !== "@") {
@@ -88,61 +84,51 @@ PanelBase {
     }
     return ""
   }
-  readonly property var activeProvider: root.providerForKey(root.activeProviderKey)
-  readonly property bool pillActive: root.activeProviderKey.length > 0
+  property var currentProvider: null
+  readonly property bool providerMode: root.currentProvider !== null
+  readonly property bool pillActive: root.providerMode
   property bool syncingInput: false
   property var paramValues: ({})
   property var paramCandidates: []
   property int paramCandidateIndex: -1
   property var activeChip: null
   property var chipRegistry: ({})
-  property var currentProvider: null
   property bool dropdownOpen: false
   property bool focusLock: false
   property string focusTarget: "term"
 
-  readonly property bool olMode: {
-    const t = root.query.trim().toLowerCase()
-    return t === "@ol" || t.indexOf("@ol ") === 0
-  }
-  readonly property string olTerm: root.olMode ? root.query.trim().slice(3).trim() : ""
-  readonly property bool olDirty: root.olTerm !== root.olSearchedTerm
-  readonly property string olCard: {
-    if (!root.olMode) {
+  property var providerSessions: ({})
+  property var providerProcs: ({})
+
+  readonly property var providerSession: root.sessionFor(root.activeProviderKey)
+  readonly property string providerTerm: root.providerMode ? root.query.trim().slice(1 + root.activeProviderKey.length).trim() : ""
+  readonly property var providerValues: root.providerValuesFor(root.currentProvider)
+  readonly property string providerValuesKey: root.valuesKeyOf(root.providerValues)
+  readonly property bool providerDirty: root.providerTerm !== root.providerSession.searchedTerm || root.providerValuesKey !== root.providerSession.searchedValues
+  readonly property string providerCard: {
+    if (!root.providerMode) {
       return ""
     }
     if (!root.paramsReady()) {
       return "params"
     }
-    if (root.olTerm.length === 0) {
+    if (root.providerTerm.length === 0) {
       return "hint"
     }
-    if (root.olDirty) {
+    if (root.providerDirty) {
       return "search"
     }
-    if (root.olLoading) {
+    if (root.providerSession.loading) {
       return "loading"
     }
     return ""
   }
-  readonly property int olRowCount: {
-    if (!root.olMode) {
-      return 0
+  readonly property var providerRows: {
+    if (!root.providerMode || root.providerCard.length > 0) {
+      return []
     }
-    if (root.olCard.length > 0) {
-      return 0
-    }
-    if (root.olError.length > 0) {
-      return 1
-    }
-    return root.olResults.length
+    return root.currentProvider.rows(root.providerCtx())
   }
-  property string trSearchedSource: ""
-  property string trSearchedTarget: ""
-  property string trSearchedTerm: ""
-  property string trResult: ""
-  property bool trLoading: false
-  property string trError: ""
 
   readonly property string paramError: {
     const params = root.providerParams()
@@ -177,43 +163,6 @@ PanelBase {
       }
     }
     return out
-  }
-
-  readonly property bool trMode: {
-    const t = root.query.trim().toLowerCase()
-    return t === "@tr" || t.indexOf("@tr ") === 0
-  }
-  readonly property string trTerm: root.trMode ? root.query.trim().slice(3).trim() : ""
-  readonly property string trSource: root.paramValueOf("from")
-  readonly property string trTarget: root.paramValueOf("to")
-  readonly property string trDir: root.trSource + " → " + root.trTarget
-  readonly property bool trDirty: root.trTerm !== root.trSearchedTerm || root.trSource !== root.trSearchedSource || root.trTarget !== root.trSearchedTarget
-  readonly property string trCard: {
-    if (!root.trMode) {
-      return ""
-    }
-    if (!root.paramsReady()) {
-      return "params"
-    }
-    if (root.trTerm.length === 0) {
-      return "hint"
-    }
-    if (root.trDirty) {
-      return "search"
-    }
-    if (root.trLoading) {
-      return "loading"
-    }
-    return ""
-  }
-  readonly property int trRowCount: {
-    if (!root.trMode) {
-      return 0
-    }
-    if (root.trCard.length > 0) {
-      return 0
-    }
-    return 1
   }
 
   readonly property var queryTokens: {
@@ -288,12 +237,12 @@ PanelBase {
   readonly property var calc: evaluate(query)
   readonly property bool commandMode: query.trim().indexOf("$") === 0
   readonly property string commandText: commandMode ? query.trim().slice(1).trim() : ""
-  readonly property int rowCount: root.atMode ? (root.olMode ? root.olRowCount : (root.trMode ? root.trRowCount : root.atRowCount)) : (commandMode ? (commandText.length > 0 ? 1 : 0) : results.length + (calc ? 1 : 0))
+  readonly property int rowCount: root.atMode ? (root.providerMode ? root.providerRows.length : root.atRowCount) : (commandMode ? (commandText.length > 0 ? 1 : 0) : results.length + (calc ? 1 : 0))
   readonly property int selected: rowCount === 0 ? -1 : Math.max(0, Math.min(selectedIndex, rowCount - 1))
 
   readonly property var entries: {
     const out = []
-    if (root.atMode && !root.olMode && !root.trMode) {
+    if (root.atMode && !root.providerMode) {
       for (let i = 0; i < root.atMatches.length; i++) {
         out.push({
           kind: "provider",
@@ -305,47 +254,14 @@ PanelBase {
       }
       return out
     }
-    if (root.olMode) {
-      if (root.olError.length > 0) {
+    if (root.providerMode) {
+      for (let i = 0; i < root.providerRows.length; i++) {
         out.push({
-          kind: "olError",
+          kind: "providerRow",
           section: "",
           label: "",
-          itemKey: "ol:error",
-          active: selected === 0
-        })
-      } else if (root.olCard.length === 0) {
-        for (let i = 0; i < root.olResults.length; i++) {
-          out.push({
-            kind: "onelook",
-            section: "",
-            label: "",
-            itemKey: "ol:" + i,
-            active: selected === out.length
-          })
-        }
-      }
-      return out
-    }
-    if (root.trMode) {
-      if (root.trCard.length > 0) {
-        return out
-      }
-      if (root.trError.length > 0) {
-        out.push({
-          kind: "trError",
-          section: "",
-          label: "",
-          itemKey: "tr:error",
-          active: selected === 0
-        })
-      } else if (root.trResult.length > 0) {
-        out.push({
-          kind: "translate",
-          section: "",
-          label: "",
-          itemKey: "tr:0",
-          active: selected === 0
+          itemKey: root.providerRows[i].key,
+          active: selected === out.length
         })
       }
       return out
@@ -407,19 +323,8 @@ PanelBase {
     return (negative ? "-" : "") + grouped + (tail.length > 0 ? "," + tail : "")
   }
 
-  function hexOf(color) {
-    function channel(v) {
-      return Math.round(v * 255).toString(16).padStart(2, "0")
-    }
-    return "#" + channel(color.r) + channel(color.g) + channel(color.b)
-  }
-
   function errorHex() {
-    return root.hexOf(Theme.red)
-  }
-
-  function olMutedHex() {
-    return root.hexOf(Theme.overlay)
+    return Colors.hex(Theme.red)
   }
 
   function calcExpression() {
@@ -913,62 +818,9 @@ PanelBase {
     return root.activateIndex(index)
   }
 
-  function cleanOlDef(raw) {
-    const s = String(raw === undefined || raw === null ? "" : raw).trim().replace(/^[A-Za-z]+\t+/, "").trim()
-    return s
-  }
-
-  function olRichDef(plain) {
-    const e = String(plain).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    const paired = e.replace(/_([^_]+)_/g, "<i>$1</i>")
-    return paired.replace(/_([^\s_]+)/g, "<i>$1</i>")
-  }
-
-  function olIndexForKey(itemKey) {
-    const text = String(itemKey)
-    if (text.indexOf("ol:") !== 0) {
-      return -1
-    }
-    const n = parseInt(text.slice(3), 10)
-    if (isNaN(n)) {
-      return -1
-    }
-    return n
-  }
-
-  function olItemForKey(itemKey) {
-    const n = root.olIndexForKey(itemKey)
-    if (n < 0 || n >= root.olResults.length) {
-      return null
-    }
-    return root.olResults[n]
-  }
-
-  function splitOlBrackets(cleaned) {
-    const text = String(cleaned)
-    const groups = text.match(/\[[^\]]*\]/g)
-    let syn = ""
-    if (groups && groups.length > 0) {
-      syn = groups[0].slice(1, -1).trim()
-    }
-    return {
-      text: text.replace(/\[[^\]]*\]/g, "").replace(/\s+/g, " ").trim(),
-      syn: syn
-    }
-  }
-
-  function olTitleRich(word, syn) {
-    const w = String(word).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    const head = "<font color=\"" + root.hexOf(Theme.text) + "\">" + w + "</font>"
-    if (!syn || String(syn).length === 0) {
-      return head
-    }
-    return head + "<font color=\"" + root.olMutedHex() + "\" size=\"-2\"> " + root.olRichDef(syn) + "</font>"
-  }
-
   function searchPlaceholder() {
     if (root.pillActive) {
-      return root.providerParams().length > 0 ? "Search..." : "Search " + root.activeProvider.name + "..."
+      return root.providerParams().length > 0 ? "Search..." : "Search " + root.currentProvider.name + "..."
     }
     if (root.atMode) {
       return "Type a provider"
@@ -982,6 +834,81 @@ PanelBase {
 
   function providerForKey(key) {
     return Providers.providerForKey(key)
+  }
+
+  function sessionFor(key) {
+    const k = String(key)
+    const session = k.length > 0 ? root.providerSessions[k] : null
+    return session ? session : {
+      searchedTerm: "",
+      searchedValues: "",
+      loading: false,
+      error: "",
+      results: []
+    }
+  }
+
+  function updateSession(key, patch) {
+    const k = String(key)
+    if (k.length === 0) {
+      return
+    }
+    const current = root.sessionFor(k)
+    const next = {
+      searchedTerm: current.searchedTerm,
+      searchedValues: current.searchedValues,
+      loading: current.loading,
+      error: current.error,
+      results: current.results
+    }
+    for (let name in patch) {
+      next[name] = patch[name]
+    }
+    const all = {}
+    const keys = Object.keys(root.providerSessions)
+    for (let i = 0; i < keys.length; i++) {
+      all[keys[i]] = root.providerSessions[keys[i]]
+    }
+    all[k] = next
+    root.providerSessions = all
+  }
+
+  function providerValuesFor(provider) {
+    const out = {}
+    const params = Providers.paramsOf(provider)
+    for (let i = 0; i < params.length; i++) {
+      out[params[i].key] = root.paramValueOf(params[i].key)
+    }
+    return out
+  }
+
+  function valuesKeyOf(values) {
+    const keys = Object.keys(values)
+    let out = ""
+    for (let i = 0; i < keys.length; i++) {
+      out += String(values[keys[i]]) + "\u0000"
+    }
+    return out
+  }
+
+  function providerCtx() {
+    return {
+      term: root.providerTerm,
+      values: root.providerValues,
+      results: root.providerSession.results,
+      error: root.providerSession.error,
+      state: root.providerCard
+    }
+  }
+
+  function providerRowFor(itemKey) {
+    const key = String(itemKey)
+    for (let i = 0; i < root.providerRows.length; i++) {
+      if (root.providerRows[i].key === key) {
+        return root.providerRows[i]
+      }
+    }
+    return null
   }
 
   function providerKeyOfQuery(query) {
@@ -1070,7 +997,7 @@ PanelBase {
   }
 
   function initParams(provider) {
-    const target = provider === undefined ? root.activeProvider : provider
+    const target = provider === undefined ? root.currentProvider : provider
     const values = {}
     const params = Providers.paramsOf(target)
     for (let i = 0; i < params.length; i++) {
@@ -1168,7 +1095,7 @@ PanelBase {
   function missingLabel() {
     const missing = root.missingParams()
     if (missing.length === 0) {
-      return "Translate"
+      return root.currentProvider ? root.currentProvider.name : ""
     }
     const names = []
     for (let i = 0; i < missing.length; i++) {
@@ -1190,56 +1117,26 @@ PanelBase {
   }
 
   function providerCardTitle() {
-    if (root.trMode) {
-      if (root.trCard === "loading") {
-        return "Translating..."
-      }
-      if (root.trCard === "search") {
-        return "Translate \"" + root.trTerm + "\""
-      }
-      if (root.trCard === "params") {
-        return root.missingLabel()
-      }
-      return "Translate"
+    if (!root.providerMode) {
+      return ""
     }
-    if (root.olCard === "loading") {
-      return "Searching OneLook..."
-    }
-    if (root.olCard === "search") {
-      return "Search OneLook for \"" + root.olTerm + "\""
-    }
-    if (root.olCard === "params") {
+    if (root.providerCard === "params") {
       return root.missingLabel()
     }
-    return "OneLook"
+    return root.currentProvider.cardTitle(root.providerCtx())
   }
 
   function providerCardHint() {
     if (root.paramError.length > 0) {
       return root.paramError
     }
-    if (root.trMode) {
-      if (root.trCard === "loading") {
-        return root.trTerm
-      }
-      if (root.trCard === "search") {
-        return "Press Enter to translate (" + root.trDir + ")"
-      }
-      if (root.trCard === "params") {
-        return root.missingHint()
-      }
-      return "Type a phrase · Tab to change the language"
+    if (!root.providerMode) {
+      return ""
     }
-    if (root.olCard === "loading") {
-      return root.olTerm
-    }
-    if (root.olCard === "search") {
-      return "Press Enter to search"
-    }
-    if (root.olCard === "params") {
+    if (root.providerCard === "params") {
       return root.missingHint()
     }
-    return "Type @ol <word> then Enter to search"
+    return root.currentProvider.cardHint(root.providerCtx())
   }
 
   function focusTerm() {
@@ -1597,206 +1494,116 @@ PanelBase {
     return true
   }
 
-  function mapOlItems(data) {
-    const out = []
-    if (!data || typeof data.length !== "number") {
-      return out
-    }
-    for (let i = 0; i < data.length && out.length < 8; i++) {
-      const item = data[i]
-      const word = item && item.word ? String(item.word) : ""
-      if (word.length === 0) {
-        continue
-      }
-      let raw = ""
-      if (item.defs && typeof item.defs.length === "number" && item.defs.length > 0) {
-        raw = item.defs[0]
-      }
-      const split = root.splitOlBrackets(root.cleanOlDef(raw))
-      if (split.text.length === 0) {
-        continue
-      }
-      out.push({
-        word: word,
-        def: split.text,
-        syn: split.syn
-      })
-    }
-    return out
-  }
-
-  function runOlSearch() {
-    if (!root.olMode || root.olTerm.length === 0 || root.olLoading) {
-      return false
-    }
-    if (!root.olDirty && (root.olResults.length > 0 || root.olError.length > 0)) {
-      return false
-    }
-    root.olSearchedTerm = root.olTerm
-    root.olResults = []
-    root.olError = ""
-    root.olLoading = true
-    const url = "https://onelook.com/api/sug?max=9&s=" + encodeURIComponent(root.olTerm)
-    if (olProc.running) {
-      olProc.running = false
-    }
-    olProc.command = ["curl", "-s", "--max-time", "10", "-A", "Mozilla/5.0", "-H", "Referer: https://www.onelook.com/", url]
-    olProc.running = true
-    return true
-  }
-
-  function handleOlOutput(text) {
-    if (!root.olLoading) {
-      return
-    }
-    let data = null
-    try {
-      data = JSON.parse(text)
-    } catch (e) {
-      data = null
-    }
-    if (!data || typeof data.length !== "number") {
-      root.olError = "Search failed"
-      root.olResults = []
-      root.olLoading = false
-      return
-    }
-    root.olResults = root.mapOlItems(data)
-    root.olError = ""
-    root.olLoading = false
-  }
-
-  function handleOlExit(code) {
-    if (!root.olLoading) {
-      return
-    }
-    if (code !== 0) {
-      root.olError = "Search failed"
-      root.olResults = []
-      root.olLoading = false
-    }
-  }
-
-  function testOlMock(payload) {
-    let data = null
-    try {
-      data = JSON.parse(payload)
-    } catch (e) {
-      return false
-    }
-    if (data && data.items && typeof data.items.length === "number") {
-      data = data.items
-    }
-    root.olSearchedTerm = root.olTerm
-    root.olResults = root.mapOlItems(data)
-    root.olError = ""
-    root.olLoading = false
-    return true
-  }
-
-  function mapTrTranslation(data) {
-    if (typeof data === "string") {
-      return data.trim()
-    }
-    if (!data || typeof data.length !== "number" || data.length === 0) {
-      return ""
-    }
-    const segments = data[0]
-    if (!segments || typeof segments.length !== "number") {
-      return ""
-    }
-    const parts = []
-    for (let i = 0; i < segments.length; i++) {
-      if (segments[i] && typeof segments[i][0] === "string") {
-        parts.push(segments[i][0])
-      }
-    }
-    return parts.join("").trim()
-  }
-
-  function trUrl() {
-    return "https://translate.googleapis.com/translate_a/single?client=gtx&sl=" + root.trSource + "&tl=" + root.trTarget + "&dt=t&q=" + encodeURIComponent(root.trTerm)
-  }
-
-  function runTrSearch() {
-    if (!root.trMode || root.trTerm.length === 0 || root.trLoading) {
+  function runProviderSearch() {
+    const provider = root.currentProvider
+    if (!provider || root.providerTerm.length === 0 || root.providerSession.loading) {
       return false
     }
     if (!root.paramsReady()) {
       return false
     }
-    if (!root.trDirty && (root.trResult.length > 0 || root.trError.length > 0)) {
+    if (!root.providerDirty && root.providerSession.results.length > 0) {
       return false
     }
-    root.trSearchedSource = root.trSource
-    root.trSearchedTarget = root.trTarget
-    root.trSearchedTerm = root.trTerm
-    root.trResult = ""
-    root.trError = ""
-    root.trLoading = true
-    const url = root.trUrl()
-    if (trProc.running) {
-      trProc.running = false
+    const key = root.activeProviderKey
+    const ctx = root.providerCtx()
+    root.updateSession(key, {
+      searchedTerm: root.providerTerm,
+      searchedValues: root.providerValuesKey,
+      loading: true,
+      error: "",
+      results: []
+    })
+    const proc = root.providerProc(key)
+    if (!proc) {
+      return false
     }
-    trProc.command = ["/nix/store/k2z212kirkjxi3n7ghvd8w4ha54q295c-curl-8.22.0-bin/bin/curl", "-s", "--max-time", "10", "-A", "Mozilla/5.0", "--http1.1", url]
-    trProc.running = true
+    if (proc.running) {
+      proc.running = false
+    }
+    proc.command = provider.requestArgs(provider.buildUrl(ctx))
+    proc.running = true
     return true
   }
 
-  function handleTrOutput(text) {
-    if (!root.trLoading) {
+  function handleProviderOutput(key, text) {
+    const session = root.sessionFor(key)
+    if (!session.loading) {
       return
     }
-    let data = null
-    try {
-      data = JSON.parse(text)
-    } catch (e) {
-      data = null
-    }
-    const translation = root.mapTrTranslation(data)
-    if (translation.length === 0) {
-      root.trError = "Translation failed"
-      root.trResult = ""
-      root.trLoading = false
+    const provider = root.providerForKey(key)
+    if (!provider) {
       return
     }
-    root.trResult = translation
-    root.trError = ""
-    root.trLoading = false
+    const parsed = provider.parse(text)
+    root.updateSession(key, {
+      loading: false,
+      error: parsed.error,
+      results: parsed.results
+    })
   }
 
-  function handleTrExit(code) {
-    if (!root.trLoading) {
+  function handleProviderExit(key, code) {
+    const session = root.sessionFor(key)
+    if (!session.loading) {
       return
     }
     if (code !== 0) {
-      root.trError = "Translation failed"
-      root.trResult = ""
-      root.trLoading = false
+      const provider = root.providerForKey(key)
+      root.updateSession(key, {
+        loading: false,
+        error: provider ? provider.errorText : "",
+        results: []
+      })
     }
   }
 
-  function testTrMock(payload) {
-    let data = null
-    try {
-      data = JSON.parse(payload)
-    } catch (e) {
+  function testProviderMock(key, payload) {
+    if (key !== root.activeProviderKey) {
       return false
     }
-    if (data && typeof data.translation === "string") {
-      data = data.translation
-    }
-    const translation = root.mapTrTranslation(data)
-    if (translation.length === 0) {
+    const provider = root.providerForKey(key)
+    if (!provider) {
       return false
     }
-    root.trSearchedSource = root.trSource
-    root.trSearchedTarget = root.trTarget
-    root.trSearchedTerm = root.trTerm
-    root.trResult = translation
-    root.trError = ""
-    root.trLoading = false
+    const parsed = provider.mock(payload)
+    if (!parsed || parsed.error.length > 0) {
+      return false
+    }
+    root.updateSession(key, {
+      searchedTerm: root.providerTerm,
+      searchedValues: root.providerValuesKey,
+      loading: false,
+      error: "",
+      results: parsed.results
+    })
     return true
+  }
+
+  function providerUrl(key) {
+    if (key !== root.activeProviderKey) {
+      return ""
+    }
+    const provider = root.currentProvider
+    if (!provider) {
+      return ""
+    }
+    return provider.buildUrl(root.providerCtx())
+  }
+
+  function providerProc(key) {
+    const proc = root.providerProcs[String(key)]
+    return proc ? proc : null
+  }
+
+  function registerProviderProc(key, proc) {
+    const procs = {}
+    const keys = Object.keys(root.providerProcs)
+    for (let i = 0; i < keys.length; i++) {
+      procs[keys[i]] = root.providerProcs[keys[i]]
+    }
+    procs[String(key)] = proc
+    root.providerProcs = procs
   }
 
   function kittyArgv(command) {
@@ -1810,11 +1617,8 @@ PanelBase {
     if (root.selected >= 0) {
       return root.activateIndex(root.selected)
     }
-    if (root.olCard === "search") {
-      return root.runOlSearch()
-    }
-    if (root.trCard === "search") {
-      return root.runTrSearch()
+    if (root.providerCard === "search") {
+      return root.runProviderSearch()
     }
     return false
   }
@@ -1827,28 +1631,23 @@ PanelBase {
     if (entry.kind === "provider") {
       return root.completeAtProvider(entry.itemKey)
     }
-    if (entry.kind === "olError") {
-      return root.runOlSearch()
-    }
-    if (entry.kind === "trError") {
-      return root.runTrSearch()
-    }
-    if (entry.kind === "translate") {
-      if (root.trResult.length === 0) {
+    if (entry.kind === "providerRow") {
+      const row = root.providerRowFor(entry.itemKey)
+      if (!row) {
         return false
       }
-      Quickshell.clipboardText = root.trResult
-      Panels.close()
-      return true
-    }
-    if (entry.kind === "onelook") {
-      const item = root.olItemForKey(entry.itemKey)
-      if (!item) {
-        return false
+      if (row.action === "copy") {
+        if (!row.copyText || row.copyText.length === 0) {
+          return false
+        }
+        Quickshell.clipboardText = row.copyText
+        Panels.close()
+        return true
       }
-      Quickshell.clipboardText = item.word
-      Panels.close()
-      return true
+      if (row.action === "search") {
+        return root.runProviderSearch()
+      }
+      return false
     }
     if (entry.kind === "calc") {
       if (!calc || calc.value === null) {
@@ -1899,34 +1698,22 @@ PanelBase {
       const entry = root.entries[i]
       let name = ""
       let detail = ""
-      let syn = ""
       let icon = ""
       if (entry.kind === "calc") {
         name = root.calc && root.calc.value !== null ? root.formatDisplay(root.calc.value) : ""
         detail = root.calc ? root.calc.expression : ""
       } else if (entry.kind === "command") {
         name = root.commandText
-      } else if (entry.kind === "onelook") {
-        const item = root.olItemForKey(entry.itemKey)
-        name = item ? item.word : ""
-        detail = item ? item.def : ""
-        syn = item ? item.syn : ""
-        icon = ""
+      } else if (entry.kind === "providerRow") {
+        const row = root.providerRowFor(entry.itemKey)
+        name = row ? root.plainText(row.title) : ""
+        detail = row ? root.plainText(row.subtitle) : ""
+        icon = row ? row.glyph : ""
       } else if (entry.kind === "provider") {
         const provider = root.providerForKey(String(entry.itemKey).slice(9))
         name = provider ? provider.name : entry.itemKey
         detail = provider ? provider.desc : ""
         icon = provider ? provider.logo : ""
-      } else if (entry.kind === "olError") {
-        name = "Search failed"
-        detail = "Press Enter to retry"
-      } else if (entry.kind === "translate") {
-        name = root.trResult
-        detail = root.trTerm
-        icon = ""
-      } else if (entry.kind === "trError") {
-        name = "Translation failed"
-        detail = "Press Enter to retry"
       } else if (entry.kind === "appimage") {
         const image = root.imageForKey(entry.itemKey)
         const metaName = image ? AppImages.nameFor(image.path) : ""
@@ -1945,7 +1732,6 @@ PanelBase {
         kind: entry.kind,
         name: name,
         detail: detail,
-        syn: syn,
         icon: icon,
         error: entry.kind === "calc" && root.calc ? root.calc.error : null,
         score: match ? Math.round(match.score * 100) / 100 : 0,
@@ -1960,25 +1746,18 @@ PanelBase {
       inputFocus: searchInput.activeFocus,
       pillActive: root.pillActive,
       pillKey: root.activeProviderKey,
-      pillName: root.activeProvider ? root.activeProvider.name : "",
+      pillName: root.currentProvider ? root.currentProvider.name : "",
       term: root.pillActive ? searchInput.text : "",
       selected: root.selected,
       atMode: root.atMode,
       atToken: root.atToken,
-      olMode: root.olMode,
-      olTerm: root.olTerm,
-      olCard: root.olCard,
-      olLoading: root.olLoading,
-      olError: root.olError,
-      trMode: root.trMode,
-      trSource: root.trSource,
-      trTarget: root.trTarget,
-      trDir: root.trDir,
-      trTerm: root.trTerm,
-      trCard: root.trCard,
-      trLoading: root.trLoading,
-      trError: root.trError,
-      trResult: root.trResult,
+      providerMode: root.providerMode,
+      providerKey: root.activeProviderKey,
+      providerTerm: root.providerTerm,
+      providerCard: root.providerCard,
+      providerLoading: root.providerSession.loading,
+      providerError: root.providerSession.error,
+      providerValues: root.providerValues,
       focusTarget: root.focusTarget,
       chipFocus: root.activeChip ? root.activeChip.editorFocused : false,
       chipItemFocus: root.activeChip ? root.activeChip.editorHasFocus : false,
@@ -2166,8 +1945,12 @@ PanelBase {
     return kittyArgv(command)
   }
 
-  function testTrUrl() {
-    return root.trUrl()
+  function plainText(markup) {
+    return String(markup === undefined || markup === null ? "" : markup).replace(/<[^>]*>/g, "")
+  }
+
+  function testProviderUrl(key) {
+    return root.providerUrl(String(key))
   }
 
   function testValidate(spec, raw) {
@@ -2276,24 +2059,31 @@ PanelBase {
     easing.type: Easing.OutCubic
   }
 
-  Process {
-    id: olProc
+  Repeater {
+    id: providerProcRepeater
 
-    running: false
-    stdout: StdioCollector {
-      onStreamFinished: root.handleOlOutput(text)
+    model: Providers.providers
+
+    delegate: Item {
+      id: providerProcItem
+
+      required property var modelData
+
+      width: 0
+      height: 0
+
+      Component.onCompleted: root.registerProviderProc(providerProcItem.modelData.key, providerProc)
+
+      Process {
+        id: providerProc
+
+        running: false
+        stdout: StdioCollector {
+          onStreamFinished: root.handleProviderOutput(providerProcItem.modelData.key, text)
+        }
+        onExited: code => root.handleProviderExit(providerProcItem.modelData.key, code)
+      }
     }
-    onExited: code => root.handleOlExit(code)
-  }
-
-  Process {
-    id: trProc
-
-    running: false
-    stdout: StdioCollector {
-      onStreamFinished: root.handleTrOutput(text)
-    }
-    onExited: code => root.handleTrExit(code)
   }
 
   onEntriesChanged: root.handleEntriesChanged()
@@ -2384,7 +2174,7 @@ PanelBase {
           id: badgeLogo
 
           anchors.fill: parent
-          source: root.activeProvider ? root.activeProvider.logo : ""
+          source: root.currentProvider ? root.currentProvider.logo : ""
           sourceSize: Qt.size(width, height)
           fillMode: Image.PreserveAspectFit
         }
@@ -2537,7 +2327,7 @@ PanelBase {
     Rectangle {
       id: morphCard
 
-      property string mode: root.rowCount === 0 ? ((root.olCard.length > 0 || root.trCard.length > 0) ? "provider" : "empty") : "command"
+      property string mode: root.rowCount === 0 ? (root.providerCard.length > 0 ? "provider" : "empty") : "command"
       readonly property int emptyHeight: 2 * root.rowHeight + Theme.gap
 
       anchors.left: parent.left
@@ -2746,7 +2536,7 @@ PanelBase {
           anchors.horizontalCenter: parent.horizontalCenter
           width: Math.round(28 * Theme.scale)
           height: width
-          source: root.trMode ? "../assets/google-translate.svg" : "../assets/onelook.svg"
+          source: root.currentProvider ? root.currentProvider.logo : ""
           fillMode: Image.PreserveAspectFit
         }
 
@@ -2815,14 +2605,8 @@ PanelBase {
 
       MouseArea {
         anchors.fill: parent
-        visible: morphCard.mode === "provider" && (root.olCard === "search" || root.trCard === "search")
-        onClicked: {
-          if (root.olCard === "search") {
-            root.runOlSearch()
-          } else {
-            root.runTrSearch()
-          }
-        }
+        visible: morphCard.mode === "provider" && root.providerCard === "search"
+        onClicked: root.runProviderSearch()
       }
     }
 
@@ -2850,19 +2634,15 @@ PanelBase {
         property int iconTries: 0
         readonly property bool isCalc: kind === "calc"
         readonly property bool isImage: kind === "appimage"
-        readonly property bool isOneLook: kind === "onelook"
         readonly property bool isProvider: kind === "provider"
-        readonly property bool isOlMeta: kind === "olError"
-        readonly property bool isTranslate: kind === "translate"
-        readonly property bool isTrMeta: kind === "trError"
-        readonly property int olIndex: entry.isOneLook ? root.olIndexForKey(itemKey) : -1
-        readonly property color rankColor: {
-          const palette = [Theme.primary, Theme.green, Theme.yellow, Theme.red, "#cba6f7", "#f5c2e7", "#94e2d5", "#fab387"]
-          if (!entry.isOneLook || entry.olIndex < 0 || entry.olIndex >= palette.length) {
-            return Theme.surfaceHigh
-          }
-          return palette[entry.olIndex]
-        }
+        readonly property bool isProviderRow: kind === "providerRow"
+        readonly property var providerRow: entry.isProviderRow ? root.providerRowFor(itemKey) : null
+        readonly property bool hasBadge: entry.providerRow !== null && entry.providerRow.badge.length > 0
+        readonly property bool providerTitleRich: entry.providerRow !== null && entry.providerRow.titleRich
+        readonly property bool providerSubtitleRich: entry.providerRow !== null && entry.providerRow.subtitleRich
+        readonly property color providerTitleColor: entry.providerRow ? entry.providerRow.titleColor : Theme.text
+        readonly property color providerSubtitleColor: entry.providerRow ? entry.providerRow.subtitleColor : Theme.overlay
+        readonly property color providerBadgeColor: entry.providerRow ? entry.providerRow.badgeColor : Theme.surfaceHigh
         readonly property bool calcError: kind === "calc" && !!root.calc && !!root.calc.error
         readonly property var app: kind === "app" ? root.appForKey(itemKey) : null
         readonly property var image: kind === "appimage" ? root.imageForKey(itemKey) : null
@@ -2871,7 +2651,7 @@ PanelBase {
         readonly property string imageName: entry.image ? AppImages.nameFor(entry.image.path) : ""
         readonly property string imageVersion: entry.image ? AppImages.versionFor(entry.image.path) : ""
         readonly property string placeholderIcon: entry.isImage ? Quickshell.iconPath("application-vnd.appimage", "application-x-executable") : ""
-        readonly property bool twoLine: entry.isCalc || entry.isImage || entry.isOneLook || entry.isProvider || entry.isOlMeta || entry.isTranslate || entry.isTrMeta || entry.appVersion.length > 0
+        readonly property bool twoLine: entry.isCalc || entry.isImage || entry.isProviderRow || entry.isProvider || entry.appVersion.length > 0
         readonly property bool favoritable: entry.kind === "app" || entry.isImage
         readonly property bool favorite: entry.favoritable && Favorites.has(entry.itemKey)
         readonly property int textRightMargin: entry.favoritable ? root.rowTextRight : root.iconInset
@@ -2879,19 +2659,8 @@ PanelBase {
           if (entry.isCalc) {
             return root.calcExpression()
           }
-          if (entry.isOneLook) {
-            const arr = root.olResults
-            const item = entry.olIndex >= 0 && entry.olIndex < arr.length ? arr[entry.olIndex] : null
-            return item ? root.olRichDef(item.def) : ""
-          }
-          if (entry.kind === "olError") {
-            return "Press Enter to retry"
-          }
-          if (entry.isTranslate) {
-            return root.trTerm
-          }
-          if (entry.kind === "trError") {
-            return "Press Enter to retry"
+          if (entry.isProviderRow) {
+            return entry.providerRow ? entry.providerRow.subtitle : ""
           }
           if (entry.isProvider) {
             const provider = root.providerForKey(String(itemKey).slice(9))
@@ -2907,6 +2676,9 @@ PanelBase {
           if (entry.kind === "app") {
             return root.testAppIcon(entry.app, itemKey)
           }
+          if (entry.isProviderRow) {
+            return entry.providerRow ? entry.providerRow.image : ""
+          }
           if (entry.isProvider) {
             const provider = root.providerForKey(String(itemKey).slice(9))
             return provider ? provider.logo : ""
@@ -2917,7 +2689,18 @@ PanelBase {
           return ""
         }
         readonly property bool showsImage: entry.imageSource.length > 0 && rowIcon.status !== Image.Error
-        readonly property string glyphName: entry.isCalc ? "calculator" : (entry.kind === "command" ? "terminal" : (entry.isTranslate ? "world" : ((entry.isProvider || entry.isOlMeta || entry.isTrMeta) ? "search" : "app-window")))
+        readonly property string glyphName: {
+          if (entry.isProviderRow) {
+            return entry.providerRow ? entry.providerRow.glyph : ""
+          }
+          if (entry.isCalc) {
+            return "calculator"
+          }
+          if (entry.kind === "command") {
+            return "terminal"
+          }
+          return entry.isProvider ? "search" : "app-window"
+        }
         readonly property string title: {
           if (kind === "calc") {
             return root.calc && root.calc.value !== null ? root.formatDisplay(root.calc.value) : ""
@@ -2925,23 +2708,12 @@ PanelBase {
           if (kind === "command") {
             return root.commandText
           }
-          if (kind === "onelook") {
-            const arr = root.olResults
-            const item = entry.olIndex >= 0 && entry.olIndex < arr.length ? arr[entry.olIndex] : null
-            return item ? root.olTitleRich(item.word, item.syn) : ""
+          if (kind === "providerRow") {
+            return entry.providerRow ? entry.providerRow.title : ""
           }
           if (kind === "provider") {
             const provider = root.providerForKey(String(itemKey).slice(9))
             return provider ? provider.name : ""
-          }
-          if (kind === "olError") {
-            return "Search failed"
-          }
-          if (kind === "translate") {
-            return root.trResult
-          }
-          if (kind === "trError") {
-            return "Translation failed"
           }
           if (kind === "appimage") {
             return entry.imageName.length > 0 ? entry.imageName : (image ? image.name : "")
@@ -2995,22 +2767,22 @@ PanelBase {
 
             Icon {
               anchors.centerIn: parent
-              visible: !entry.showsImage && !entry.isOneLook
+              visible: !entry.showsImage && !entry.hasBadge
               name: entry.glyphName
               font.pixelSize: Math.round(20 * Theme.scale)
             }
 
             Rectangle {
               anchors.centerIn: parent
-              visible: entry.isOneLook
+              visible: entry.hasBadge
               width: root.iconSlotSize
               height: width
               radius: Math.round(8 * Theme.scale)
-              color: Qt.alpha(entry.rankColor, 0.5)
+              color: entry.providerRow ? Qt.alpha(entry.providerBadgeColor, 0.5) : "transparent"
 
               Text {
                 anchors.centerIn: parent
-                text: entry.olIndex + 1
+                text: entry.providerRow ? entry.providerRow.badge : ""
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: Math.round(13 * Theme.scale)
@@ -3032,8 +2804,8 @@ PanelBase {
               width: parent.width
               visible: !entry.calcError
               text: entry.title
-              textFormat: entry.isOneLook ? Text.StyledText : Text.PlainText
-              color: entry.isOneLook ? Theme.overlay : Theme.text
+              textFormat: entry.isProviderRow ? (entry.providerTitleRich ? Text.StyledText : Text.PlainText) : Text.PlainText
+              color: entry.isProviderRow ? entry.providerTitleColor : Theme.text
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSize
               elide: Text.ElideRight
@@ -3043,8 +2815,8 @@ PanelBase {
             Text {
               width: parent.width
               text: entry.subtitle
-              textFormat: (entry.isCalc || entry.isOneLook) ? Text.StyledText : Text.PlainText
-              color: entry.isOneLook ? Theme.text : Theme.overlay
+              textFormat: entry.isProviderRow ? (entry.providerSubtitleRich ? Text.StyledText : Text.PlainText) : (entry.isCalc ? Text.StyledText : Text.PlainText)
+              color: entry.isProviderRow ? entry.providerSubtitleColor : Theme.overlay
               font.family: Theme.fontFamily
               font.pixelSize: entry.isCalc ? Theme.fontSizeSmall : root.subtitleSize
               elide: Text.ElideRight
