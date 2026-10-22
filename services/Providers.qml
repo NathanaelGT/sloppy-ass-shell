@@ -7,7 +7,7 @@ Singleton {
 
   readonly property int hiddenMinChars: 2
 
-  readonly property var providers: [OneLookProvider, TranslateProvider]
+  readonly property var providers: [OneLookProvider, TranslateProvider, KbbiProvider]
 
   function providerForKey(key) {
     for (let i = 0; i < root.providers.length; i++) {
