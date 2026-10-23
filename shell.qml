@@ -877,6 +877,108 @@ ShellRoot {
       return panel.testSetSection(section, state)
     }
 
+    function bluetoothState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testBluetoothState()
+      state.enabled = true
+      state.open = true
+      return JSON.stringify(state)
+    }
+
+    function bluetoothSectionToggle(section: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleSection(section)
+    }
+
+    function bluetoothSectionSet(section: string, state: bool): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testSetSection(section, state)
+    }
+
+    function bluetoothExpand(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleExpanded(address)
+    }
+
+    function bluetoothRemoveAsk(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testAskRemove(address)
+    }
+
+    function bluetoothRemoveConfirm(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testConfirmRemove()
+    }
+
+    function bluetoothRemoveCancel(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testCancelRemove()
+    }
+
+    function bluetoothTrusted(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleTrusted(address)
+    }
+
+    function bluetoothConnected(address: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("bluetooth")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testToggleConnected(address)
+    }
+
     function panelRect(name: string, screen: string): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
@@ -938,6 +1040,259 @@ ShellRoot {
       const result = TestDriver.shotResult
       result.enabled = true
       return JSON.stringify(result)
+    }
+
+    function launcherQuery(text: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testSetQuery(text)
+    }
+
+    function launcherSelect(index: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testSelect(index)
+    }
+
+    function launcherState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testState()
+      state.enabled = true
+      state.open = true
+      return JSON.stringify(state)
+    }
+
+    function launcherEval(expression: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify(panel.testEval(expression))
+    }
+
+    function launcherKitty(command: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify(panel.testKittyArgv(command))
+    }
+
+    function launcherActivate(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testActivate()
+    }
+
+    function launcherDebug(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const debug = panel.testDebug()
+      debug.enabled = true
+      debug.open = true
+      return JSON.stringify(debug)
+    }
+
+    function launcherFavorite(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testFavorite()
+    }
+
+    function launcherBackspace(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testBackspace()
+    }
+
+    function launcherVisibleTarget(offset: int): int {
+      if (!TestDriver.active) {
+        return -2
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return -2
+      }
+      return panel.testVisibleTarget(offset)
+    }
+
+    function launcherProviderMock(key: string, payload: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testProviderMock(key, payload)
+    }
+
+    function launcherParamState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testParams()
+      state.enabled = true
+      state.open = true
+      state.candidates = panel.testParamCandidates()
+      return JSON.stringify(state)
+    }
+
+    function launcherSetParam(key: string, text: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testSetParam(key, text)
+    }
+
+    function launcherFocusParam(key: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testFocusParam(key)
+    }
+
+    function launcherFocusTerm(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testFocusTerm()
+    }
+
+    function launcherParamFocus(direction: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testMoveParamFocus(direction)
+    }
+
+    function launcherCandidateStep(direction: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testCandidateStep(direction)
+    }
+
+    function launcherCandidateAccept(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testPickParam(0)
+    }
+
+    function launcherParamKey(name: string, modifier: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testParamKey(name, modifier)
+    }
+
+    function launcherTypeParam(text: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testTypeParam(text)
+    }
+
+    function launcherProviderUrl(key: string): string {
+      if (!TestDriver.active) {
+        return ""
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return ""
+      }
+      return panel.testProviderUrl(key)
+    }
+
+    function launcherValidate(spec: string, raw: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const parsed = JSON.parse(spec)
+      return JSON.stringify(panel.testValidate(parsed, raw))
     }
   }
 

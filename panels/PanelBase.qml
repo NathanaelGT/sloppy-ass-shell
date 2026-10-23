@@ -20,11 +20,14 @@ PanelWindow {
   property int maxCardHeight: (modelData ? modelData.height : 0) - Theme.barThickness - Math.round(40 * Theme.scale)
   property bool externalRequested: false
   property bool exclusiveFocus: false
+  property bool ownerFocused: false
   property bool dismissOnBackdrop: true
   property bool autoFocusKeyCatcher: true
   property var cancelItem: null
   property bool animateCardHeight: false
   default property alias cardData: bodyColumn.data
+  property alias headerData: headerColumn.data
+  property alias overlayData: overlayArea.data
 
   signal opened
   signal scrolled
@@ -80,12 +83,13 @@ PanelWindow {
   }
 
   WlrLayershell.layer: exclusiveFocus ? WlrLayer.Overlay : WlrLayer.Top
-  WlrLayershell.keyboardFocus: exclusiveFocus ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
+  WlrLayershell.keyboardFocus: root.exclusiveFocus && root.ownerFocused ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
 
   readonly property int shadowPad: Theme.shadowPad
   readonly property int contentPad: Math.round(14 * Theme.scale)
   readonly property int cornerRadius: attached ? Math.min(Theme.cardRadius, edge) : Theme.cardRadius
-  property int cardHeight: Math.min(bodyColumn.implicitHeight + contentPad * 2, maxCardHeight)
+  readonly property int headerHeight: headerColumn.implicitHeight
+  property int cardHeight: Math.min(bodyColumn.implicitHeight + (root.headerHeight > 0 ? root.headerHeight + Theme.gap : 0) + contentPad * 2, maxCardHeight)
 
   Behavior on cardHeight {
     enabled: root.animateCardHeight
@@ -96,12 +100,31 @@ PanelWindow {
   }
   readonly property int cardX: align === "center" ? Math.round((width - cardWidth) / 2) : align === "left" ? edge : width - cardWidth - edge
   readonly property int restingY: vertical === "center" ? Math.round(((modelData ? modelData.height : 0) - cardHeight) / 2) : topMargin
+  readonly property int contentWidth: cardWidth - contentPad * 2
   readonly property real contentHeight: bodyColumn.implicitHeight
   readonly property real viewportHeight: scroller.height
+  readonly property real scrollY: scroller.contentY
 
   function scrollBy(delta) {
     const limit = Math.max(0, scroller.contentHeight - scroller.height)
     scroller.contentY = Math.max(0, Math.min(limit, scroller.contentY - delta / 2))
+  }
+
+  function ensureVisible(y, height, margin) {
+    const viewH = scroller.height
+    const maxY = Math.max(0, scroller.contentHeight - viewH)
+    const pad = margin === undefined ? Math.round(8 * Theme.scale) : margin
+    let target = scroller.contentY
+    if (y - pad < target) {
+      target = y - pad
+    } else if (y + height + pad > target + viewH) {
+      target = y + height + pad - viewH
+    }
+    scroller.contentY = Math.max(0, Math.min(maxY, target))
+  }
+
+  function scrollToTop() {
+    scroller.contentY = 0
   }
 
   function hitCancelTarget(lx, ly) {
@@ -153,6 +176,7 @@ PanelWindow {
   onRequestedChanged: {
     if (requested) {
       closeDelay.stop()
+      root.ownerFocused = Hypr.focusedScreenName === root.screenId
       open = true
       if (Panels.closingScreen === root.screenId) {
         Panels.closingScreen = ""
@@ -335,11 +359,38 @@ PanelWindow {
           }
         }
 
+        Item {
+          id: headerArea
+
+          anchors.top: contentClip.top
+          anchors.left: contentClip.left
+          anchors.right: contentClip.right
+          anchors.topMargin: root.contentPad
+          anchors.leftMargin: root.contentPad
+          anchors.rightMargin: root.contentPad
+          height: root.headerHeight
+          visible: root.headerHeight > 0
+          clip: true
+
+          Column {
+            id: headerColumn
+
+            width: parent.width
+            spacing: Theme.gap
+          }
+        }
+
         Flickable {
           id: scroller
 
-          anchors.fill: parent
-          anchors.margins: root.contentPad
+          anchors.left: contentClip.left
+          anchors.right: contentClip.right
+          anchors.bottom: contentClip.bottom
+          anchors.leftMargin: root.contentPad
+          anchors.rightMargin: root.contentPad
+          anchors.bottomMargin: root.contentPad
+          anchors.top: headerArea.visible ? headerArea.bottom : contentClip.top
+          anchors.topMargin: headerArea.visible ? Theme.gap : root.contentPad
           contentWidth: width
           contentHeight: bodyColumn.implicitHeight
           flickableDirection: Flickable.VerticalFlick
@@ -377,6 +428,13 @@ PanelWindow {
             color: "white"
             antialiasing: true
           }
+        }
+
+        Item {
+          id: overlayArea
+
+          anchors.fill: parent
+          z: 10
         }
 
         MouseArea {
