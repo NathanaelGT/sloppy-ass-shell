@@ -100,7 +100,8 @@ PanelBase {
   property var providerSessions: ({})
   property var providerProcs: ({})
 
-  readonly property var providerSession: root.sessionFor(root.activeProviderKey)
+  readonly property bool providerLocal: root.currentProvider !== null && root.currentProvider.local === true
+  readonly property var providerSession: root.providerLocal ? root.localSession() : root.sessionFor(root.activeProviderKey)
   readonly property string providerTerm: root.providerMode ? root.query.trim().slice(1 + root.activeProviderKey.length).trim() : ""
   readonly property var providerValues: root.providerValuesFor(root.currentProvider)
   readonly property string providerValuesKey: root.valuesKeyOf(root.providerValues)
@@ -112,7 +113,7 @@ PanelBase {
     if (!root.paramsReady()) {
       return "params"
     }
-    if (root.providerTerm.length === 0) {
+    if (root.providerTerm.length === 0 && !(root.currentProvider && root.currentProvider.listOnEmpty === true)) {
       return "hint"
     }
     if (root.providerDirty) {
@@ -845,6 +846,21 @@ PanelBase {
       loading: false,
       error: "",
       results: []
+    }
+  }
+
+  function localSession() {
+    const stored = root.sessionFor(root.activeProviderKey)
+    if (stored.results.length > 0 && stored.searchedTerm === root.providerTerm) {
+      return stored
+    }
+    const parsed = root.currentProvider.parse(root.providerTerm)
+    return {
+      searchedTerm: root.providerTerm,
+      searchedValues: root.providerValuesKey,
+      loading: false,
+      error: parsed.error,
+      results: parsed.results
     }
   }
 
@@ -1585,7 +1601,7 @@ PanelBase {
       return ""
     }
     const provider = root.currentProvider
-    if (!provider) {
+    if (!provider || !provider.buildUrl) {
       return ""
     }
     return provider.buildUrl(root.providerCtx())

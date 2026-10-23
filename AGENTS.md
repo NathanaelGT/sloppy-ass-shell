@@ -109,6 +109,8 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
 - Providers are stateless: the launcher owns the per-provider session (searched term/values,
   results, loading, error) keyed by provider key, because the launcher is instantiated per screen
   and a singleton would leak state between screens.
+- A provider with `local: true` resolves offline: the launcher calls its `parse(term)` on every
+  keystroke and skips the "press Enter to look up" state, so it exposes no `buildUrl`/`requestArgs`.
 
 ## Style
 
