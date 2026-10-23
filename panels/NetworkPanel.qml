@@ -38,6 +38,12 @@ PanelBase {
     return null
   }
 
+  onDeviceChanged: {
+    if (root.device) {
+      root.device.scannerEnabled = true
+    }
+  }
+
   readonly property var allNetworks: {
     if (!device || !device.networks) {
       return []
@@ -179,6 +185,7 @@ PanelBase {
     if (!device || scanProc.running) {
       return
     }
+    root.device.scannerEnabled = true
     root.scanning = true
     scanProc.command = ["nmcli", "device", "wifi", "list", "ifname", device.name, "--rescan", "yes"]
     scanProc.running = true
@@ -628,6 +635,9 @@ PanelBase {
   }
 
   onOpened: {
+    if (root.device) {
+      root.device.scannerEnabled = true
+    }
     root.maybeRescan()
     pending = ""
     confirmForget = ""
