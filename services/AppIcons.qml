@@ -2,13 +2,16 @@ pragma Singleton
 import Quickshell
 
 Singleton {
-  function resolve(cls) {
+  function describe(cls) {
     if (!cls) {
-      return ""
+      return null
     }
     const exact = DesktopEntries.heuristicLookup(cls)
-    if (exact && exact.icon) {
-      return exact.icon
+    if (exact && (exact.icon || exact.name)) {
+      return {
+        name: exact.name ? String(exact.name) : String(cls),
+        icon: exact.icon ? String(exact.icon) : ""
+      }
     }
     const all = DesktopEntries.applications ? DesktopEntries.applications.values : []
     const lower = String(cls).toLowerCase()
@@ -17,15 +20,23 @@ Singleton {
       const id = entry.id ? String(entry.id).toLowerCase() : ""
       const sc = entry.startupClass ? String(entry.startupClass).toLowerCase() : ""
       const nm = entry.name ? String(entry.name).toLowerCase() : ""
-      if (id === lower || sc === lower || nm === lower) {
-        return entry.icon ? entry.icon : cls
+      if (id === lower || sc === lower || nm === lower || id.indexOf(lower + "-") === 0 || lower.indexOf(id + "-") === 0 || (sc && (sc.indexOf(lower + "-") === 0 || lower.indexOf(sc + "-") === 0))) {
+        return {
+          name: entry.name ? String(entry.name) : String(cls),
+          icon: entry.icon ? String(entry.icon) : ""
+        }
       }
-      if (id.indexOf(lower + "-") === 0 || lower.indexOf(id + "-") === 0) {
-        return entry.icon ? entry.icon : cls
-      }
-      if (sc && (sc.indexOf(lower + "-") === 0 || lower.indexOf(sc + "-") === 0)) {
-        return entry.icon ? entry.icon : cls
-      }
+    }
+    return null
+  }
+
+  function resolve(cls) {
+    if (!cls) {
+      return ""
+    }
+    const d = describe(cls)
+    if (d && d.icon) {
+      return d.icon
     }
     return cls
   }

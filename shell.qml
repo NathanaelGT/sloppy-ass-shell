@@ -1294,6 +1294,86 @@ ShellRoot {
       const parsed = JSON.parse(spec)
       return JSON.stringify(panel.testValidate(parsed, raw))
     }
+
+    function procRows(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify(panel.testProcRows())
+    }
+
+    function procMenu(row: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testProcMenu(row)
+    }
+
+    function procMenuState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify(panel.testProcMenuState())
+    }
+
+    function procMenuInvoke(index: int): string {
+      if (!TestDriver.active) {
+        return ""
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return ""
+      }
+      return panel.testProcMenuInvoke(index)
+    }
+
+    function procMenuClose(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testProcMenuClose()
+    }
+
+    function procRowRect(row: int): string {
+      if (!TestDriver.active) {
+        return "{}"
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return "{}"
+      }
+      const local = panel.testProcRowRect(row)
+      if (!local) {
+        return "{}"
+      }
+      const mon = TestDriver.monitorRect(panel.screenId)
+      if (!mon) {
+        return "{}"
+      }
+      return JSON.stringify({
+        x: mon.x + Math.round(local.x),
+        y: mon.y + Math.round(local.y),
+        width: Math.round(local.width),
+        height: Math.round(local.height),
+        monitor: mon.name
+      })
+    }
   }
 
   Variants {

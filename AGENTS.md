@@ -27,6 +27,10 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   chevrons; `wifiForgetAsk`/`wifiForgetCancel` stage and drop the confirm strip. Live ammo:
   `wifiPassSubmit` attempts a real join, `wifiForgetConfirm` really forgets (reconnect by hand
   afterwards) — announce first, like `routeStream`.
+  Battery process list: `test procRows` dumps the rows (kind/key/name/count); `test procMenu <row>`
+  opens the right-click context menu for a row, `test procMenuState` reads it back,
+  `test procMenuInvoke <index>` clicks an entry (dangerous ones arm first and return `armed`,
+  the second invoke executes — kills are real), `test procMenuClose` drops it.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no

@@ -33,6 +33,7 @@ PanelWindow {
   signal scrolled
   signal keyPressed(var event)
   signal cancelRequested
+  signal contentClicked(var globalPos)
 
   screen: modelData
   readonly property string screenId: modelData ? modelData.name : ""
@@ -415,9 +416,9 @@ PanelWindow {
         Item {
           id: scrollerMask
 
-          x: scroller.x
+          x: contentClip.x
           y: scroller.y
-          width: scroller.width
+          width: contentClip.width
           height: scroller.height
           visible: false
           layer.enabled: true
@@ -435,6 +436,15 @@ PanelWindow {
 
           anchors.fill: parent
           z: 10
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          z: 20
+          onPressed: mouse => {
+            root.contentClicked(mapToItem(null, mouse.x, mouse.y))
+            mouse.accepted = false
+          }
         }
 
         MouseArea {
