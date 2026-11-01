@@ -32,7 +32,7 @@ PanelWindow {
   aboveWindows: !reserveSpace
 
   property bool revealed: false
-  readonly property bool floatingPanel: Panels.panel === "session" || Panels.panel === "window-switcher"
+  readonly property bool floatingPanel: Panels.panel === "window-switcher"
   readonly property bool menuOpen: Panels.panel !== "" && !floatingPanel && Panels.screenName === screen.name
   readonly property bool shown: !autoHide || revealed || menuOpen || Panels.closingScreen === screen.name
 

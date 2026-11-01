@@ -33,6 +33,7 @@ PanelWindow {
   signal opened
   signal scrolled
   signal keyPressed(var event)
+  signal keyReleased(var event)
   signal cancelRequested
   signal contentClicked(var globalPos)
 
@@ -483,5 +484,6 @@ PanelWindow {
         root.keyPressed(event)
       }
     }
+    Keys.onReleased: event => root.keyReleased(event)
   }
 }

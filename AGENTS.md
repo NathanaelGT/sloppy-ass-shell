@@ -38,6 +38,11 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `test folderSearch <query>` runs the subtree search immediately (poll `folderState` until
   `pending:false`); `test folderRowRect <index>` aims at a row. None of these move the
   cursor or touch playback — row play and double-click have no driver seam and are audible.
+  Power menu flows: `test powerState` dumps open/focusRow/holds/suppressed (no cursor or focus
+  effects); `powerBeginHold <row>`/`powerEndHold <row>` drive the hold gesture;
+  `powerSuppressFire <bool>` arms dry-run so a completed hold closes the menu without executing —
+  arm it before any hold test (rows 2-4 are lock&suspend/reboot/shutdown; unsuppressed completion
+  is real, announce first). Lock fires instantly on click, F1, or Return when focused.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no
@@ -107,6 +112,8 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
 - Buttons: `BarButton` (capsule) and `IconButton`; hover `Theme.surfaceHigh`, active `Theme.primary`.
 - Interaction convention: left-click opens, right-click performs the same action immediately,
   middle-click restarts the backing service, wheel steps 5 % on the bar and 1 % inside a menu.
+  Exception: the power menu's destructive rows ignore right-click so the hold-to-confirm cannot be
+  bypassed; Lock right-clicks instantly.
 - All ten menus are built on `panels/PanelBase.qml` (card + Flickable + wheel scroll + slide). Its
   knobs: `attached` (concave vs floating rounded, and hides the bar when a floating one opens),
   `vertical`/`topMargin`, `cardWidth`/`maxCardHeight`, `externalRequested`, `exclusiveFocus`,

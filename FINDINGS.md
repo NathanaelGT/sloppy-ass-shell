@@ -71,7 +71,7 @@ or a decision worth knowing. LOW: cosmetic, edge case, or note.
   radii; items do not clip, so it is invisible today, but any future parent that clips would cut it.
 - **M9 — Centered menus slide down from off-screen, not from the bar. LOW, BY DESIGN.**
   `y: root.open ? root.restingY - root.shadowPad : -height` (`panels/PanelBase.qml:150`). For
-  `vertical: "center"` (Session, Window switcher, Polkit) the card rests at
+  `vertical: "center"` (Window switcher, Polkit; Session joined the attached menus in M17) the card rests at
   `(screenHeight - cardHeight) / 2` (`panels/PanelBase.qml:61`) and enters from above the screen, so
   it slides down over empty desktop rather than from the bar. Same 220 ms OutCubic as the top menus.
 - **M10 — Two migrated panels drifted a few pixels. LOW, BY DESIGN.** Control Center's content padding
@@ -101,7 +101,7 @@ or a decision worth knowing. LOW: cosmetic, edge case, or note.
   clips the shadow; the hidden-source pattern does not. The bar sits at the screen top, so its top
   shadow is off-screen; left/right only show on the floating HDMI bar.
 - **M15 — Floating menus get normal round corners and hide the bar. MEDIUM, BY DESIGN.**
-  `attached: false` on Session, Window switcher and Polkit swaps `BarSurface` for a plain rounded
+  `attached: false` on Window switcher and Polkit swaps `BarSurface` for a plain rounded
   `Rectangle` (`panels/PanelBase.qml:159-174`); `bar/Bar.qml` `floatingMenuOpen` slides the bar away
   while one is open. On eDP-1 the 56 px `exclusiveZone` stays reserved, so the bar's strip is left
   empty rather than reclaimed by maximised windows. Launcher keeps the bar-attached look.
@@ -114,6 +114,34 @@ or a decision worth knowing. LOW: cosmetic, edge case, or note.
   backdrop click; Polkit sets it false (`panels/PolkitPrompt.qml:14`) and so stays open. Verified on
   eDP-1: focus zen, open volume, click the openchamber window off-card → active zen→openchamber and the
   menu closed; an off-card wheel kept it open; a click inside the card left both unchanged.
+
+- **M17 — Power menu rework: rename, attached chrome, hold-to-confirm. MEDIUM, BY REQUEST
+  (verified).** `panels/SessionMenu.qml` is replaced by `panels/PowerMenu.qml` (`panelName: "power"`,
+  IPC `shell.power`, Control Center tile relabelled "Power", `panels/ControlCenter.qml:77-83`); the
+  ALT+RETURN keybind follows (`~/.config/hypr/hyprland/keybinds/desktop.lua:30`). The menu is now
+  attached: concave corners, 0.5 × `Theme.panelWidth` (238 px) card centred, card top at y=56 = the
+  bar bottom, and
+  `bar/Bar.qml:35` no longer lists it as floating, so the bar stays visible while it is open. Four
+  launcher-style rows (48×scale, `Theme.rowRadius`, `Theme.surface` highlight on hover OR arrow
+  focus, `Theme.primary` sweep at 0.25 opacity while holding; per-action icon tints — Lock
+  `Theme.primary`, Lock & Suspend `Theme.mauve`, Reboot `Theme.yellow`, Shutdown `Theme.red`):
+  Lock fires instantly on click, F1 or
+  Return-on-focus; rows 2-4 are hold-to-confirm — 2000 ms hold, 150 ms drain, no armed state; the
+  hold tick is guarded on `root.open`, so a close mid-hold can never fire. Right-click fires Lock
+  but is ignored on rows 2-4. Keyboard: `PanelBase` gained `keyReleased` forwarding
+  (`panels/PanelBase.qml:36`, keyCatcher `Keys.onReleased` at :487); arrows move focus with wrap;
+  holding F2-F4 or Return (press→release, auto-repeat ignored) drives the focused/corresponding
+  row. Test seams: `test powerState`, `powerBeginHold`/`powerEndHold <row>`, `powerSuppressFire
+  <bool>` — dry-run gates `execDetached` through `TestDriver.fireSuppressed()`, fail-safe because a
+  name mismatch aborts `run()` before the close. Verified on eDP-1 via the seams plus `wtype`:
+  card top at the bar bottom, sweep pixels match the primary-over-base blend (56,67,96 sampled vs
+  56,67,97 expected), early release drains to 0, held Return drives the arrow-focused row, F1 press
+  closes under suppression with no hyprlock spawned, a 2.3 s hold closes with no suspend. NOT
+  verified: mouse right-click on the rows, real unsuppressed fires. Gotchas: bare F1/F2 are also
+  Hyprland monitor-brightness binds (`keybinds/monitor.lua:4-5`, ddcutil), so F-key testing may
+  nudge HDMI brightness ±2; `wtype -k F1` taps sometimes failed to deliver while `-P` presses
+  always did. PanelBase line citations in older entries predate the two added lines (:36, :487)
+  and read one low below :36.
 
 ## 5. Volume panel
 
@@ -312,16 +340,6 @@ or a decision worth knowing. LOW: cosmetic, edge case, or note.
   its `IconName` update failures also spam the log every few seconds.
 - **D6 — MPRIS demarshal warnings. NOT OURS.** Blanket publishes `Position` in a type the DBus
   property watcher rejects (`Error demarshalling property update ... Position`).
-
-## 8. Environment / blocked
-
-- **E1 — hyprlock cannot authenticate. HIGH, BLOCKED (needs your action).** `/etc/pam.d/hyprlock` does
-  not exist, so PAM falls back to `/etc/pam.d/su`, whose `auth required pam_wheel.so use_uid` fails
-  because this user is not in `wheel`. On NixOS: add `security.pam.services.hyprlock = {};` and
-  `nixos-rebuild switch`.
-- **E2 — Repo has no commits. LOW.** This directory is a git repo on `main` with zero commits, 61
-  files staged (6 with further worktree modifications) and only `services/TestDriver.qml`
-  untracked. Commits are never made from here (hard rule).
 
 ---
 

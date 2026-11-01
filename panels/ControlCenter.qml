@@ -77,9 +77,9 @@ PanelBase {
     Tile {
       width: (tiles.width - Theme.gap) / 2
       icon: "power"
-      label: "Session"
+      label: "Power"
       active: false
-      onClicked: Panels.open("session", screenId)
+      onClicked: Panels.open("power", screenId)
     }
   }
 

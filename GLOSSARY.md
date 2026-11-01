@@ -46,3 +46,14 @@ A collection of tracks marked for heavy rotation and quick access.
 
 **Favorites**:
 A collection of tracks marked as loved.
+
+## Power
+
+**Power menu**:
+The menu of actions that end or pause the session: lock, lock & suspend,
+reboot, shutdown.
+_Avoid_: session menu, session shell
+
+**Hold-to-confirm**:
+The destructive-action gesture: press and hold an action until it fires;
+releasing early cancels. Lock is exempt and fires on press.

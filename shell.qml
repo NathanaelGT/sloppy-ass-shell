@@ -42,8 +42,8 @@ ShellRoot {
       Panels.toggle("launcher", Hypr.focusedScreenName)
     }
 
-    function session(): void {
-      Panels.toggle("session", Hypr.focusedScreenName)
+    function power(): void {
+      Panels.toggle("power", Hypr.focusedScreenName)
     }
 
     function controlCenter(): void {
@@ -439,6 +439,47 @@ ShellRoot {
         return false
       }
       Panels.close()
+      return true
+    }
+
+    function powerState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("power")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false,\"suppressed\":" + (TestDriver.fireSuppressed() ? "true" : "false") + "}"
+      }
+      return JSON.stringify(panel.testPowerState())
+    }
+
+    function powerBeginHold(row: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("power")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testBeginHold(row)
+    }
+
+    function powerEndHold(row: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("power")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testEndHold(row)
+    }
+
+    function powerSuppressFire(enabled: bool): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      TestDriver.suppressFire = enabled
       return true
     }
 
@@ -1779,7 +1820,7 @@ ShellRoot {
   Variants {
     model: Quickshell.screens
     delegate: Component {
-      SessionMenu {}
+      PowerMenu {}
     }
   }
 
