@@ -46,8 +46,8 @@ ShellRoot {
       Panels.toggle("power", Hypr.focusedScreenName)
     }
 
-    function controlCenter(): void {
-      Panels.toggle("control-center", Hypr.focusedScreenName)
+    function dashboard(): void {
+      Panels.toggle("dashboard", Hypr.focusedScreenName)
     }
 
     function network(): void {
@@ -481,6 +481,58 @@ ShellRoot {
       }
       TestDriver.suppressFire = enabled
       return true
+    }
+
+    function dashState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("dashboard")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return panel.testDashState()
+    }
+
+    function dashPick(index: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("dashboard")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testDashPick(index)
+    }
+
+    function dashPlayerOpen(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("dashboard")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testDashPlayerOpen()
+    }
+
+    function dashMonth(delta: int): string {
+      if (!TestDriver.active) {
+        return ""
+      }
+      const panel = TestDriver.panel("dashboard")
+      if (!panel || !panel.open) {
+        return ""
+      }
+      return panel.testDashMonth(delta)
+    }
+
+    function clockAltTime(enabled: bool): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      ClockState.showAltTime = enabled
+      return ClockState.showAltTime
     }
 
     function volumeState(): string {
@@ -1764,7 +1816,7 @@ ShellRoot {
   Variants {
     model: Quickshell.screens
     delegate: Component {
-      ControlCenter {}
+      Dashboard {}
     }
   }
 

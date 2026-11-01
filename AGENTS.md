@@ -43,6 +43,19 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `powerSuppressFire <bool>` arms dry-run so a completed hold closes the menu without executing —
   arm it before any hold test (rows 2-4 are lock&suspend/reboot/shutdown; unsuppressed completion
   is real, announce first). Lock fires instantly on click, F1, or Return when focused.
+  Dashboard flows: `test dashState` dumps players (identity/playing), the manual pick (-1 =
+  auto), and the shown target with its playing flag and ticking local position;
+  `test dashPick <index>` sets the
+  manual pick (false when out of bounds); reopening resets the pick.
+  `test dashPlayerOpen` opens the MPRIS player dropdown, `test dashMonth <±1>` steps the calendar
+  month (returns the new month; slides are not capturable — the calendar slides its day
+  numbers and week numbers vertically, the "wk" label and day names stay put). The
+  player dropdown selection and MPRIS transport/seek have no driver seam — seeks
+  change real state.
+  Bar clock: `test clockAltTime <true|false>` sets the alt-time display directly — the same flag
+  the pill's right-click toggles (system zone with its own abbreviation vs WITA: +1 hour,
+  labelled `WITA`). Verify with `test shotBar`; the flag is global across screens and resets
+  on reload or restart.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no
@@ -113,7 +126,8 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
 - Interaction convention: left-click opens, right-click performs the same action immediately,
   middle-click restarts the backing service, wheel steps 5 % on the bar and 1 % inside a menu.
   Exception: the power menu's destructive rows ignore right-click so the hold-to-confirm cannot be
-  bypassed; Lock right-clicks instantly.
+  bypassed; Lock right-clicks instantly. Exception: the bar clock's right-click does not open the
+  dashboard — it toggles the alt-time display (system zone vs WITA).
 - All ten menus are built on `panels/PanelBase.qml` (card + Flickable + wheel scroll + slide). Its
   knobs: `attached` (concave vs floating rounded, and hides the bar when a floating one opens),
   `vertical`/`topMargin`, `cardWidth`/`maxCardHeight`, `externalRequested`, `exclusiveFocus`,

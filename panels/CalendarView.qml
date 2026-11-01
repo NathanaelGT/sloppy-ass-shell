@@ -6,11 +6,15 @@ Column {
   id: root
 
   property date cursor: new Date()
+  property date previousCursor: cursor
+  property var previousWeeks: []
 
   spacing: Math.round(6 * Theme.scale)
 
   readonly property date today: new Date()
   readonly property int cellSize: Math.round(30 * Theme.scale)
+  readonly property int gridSpacing: Math.round(4 * Theme.scale)
+  readonly property int contentWidth: cellSize * 8 + gridSpacing * 7
 
   readonly property var dayNames: {
     const names = []
@@ -23,7 +27,7 @@ Column {
   readonly property var weeks: {
     const first = new Date(root.cursor.getFullYear(), root.cursor.getMonth(), 1)
     const offset = (first.getDay() + 6) % 7
-    const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset)
+    const start = new Date(first.getFullYear(), root.cursor.getMonth(), 1 - offset)
     const result = []
     for (let w = 0; w < 6; w++) {
       const row = []
@@ -47,14 +51,26 @@ Column {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   }
 
+  function step(delta) {
+    root.previousCursor = root.cursor
+    root.previousWeeks = root.weeks
+    root.cursor = new Date(root.cursor.getFullYear(), root.cursor.getMonth() + delta, 1)
+    currentStrip.y = delta > 0 ? numbersClip.height : -numbersClip.height
+    previousStrip.y = 0
+    slideAnim.to = 0
+    prevSlideAnim.to = delta > 0 ? -numbersClip.height : numbersClip.height
+    prevSlideAnim.restart()
+    slideAnim.restart()
+  }
+
   Row {
     width: parent.width
-    spacing: Math.round(4 * Theme.scale)
+    spacing: root.gridSpacing
 
     BarButton {
       implicitWidth: Math.round(26 * Theme.scale)
       implicitHeight: Math.round(26 * Theme.scale)
-      onClicked: root.cursor = new Date(root.cursor.getFullYear(), root.cursor.getMonth() - 1, 1)
+      onClicked: root.step(-1)
       Icon {
         anchors.centerIn: parent
         name: "chevron-left"
@@ -76,7 +92,7 @@ Column {
     BarButton {
       implicitWidth: Math.round(26 * Theme.scale)
       implicitHeight: Math.round(26 * Theme.scale)
-      onClicked: root.cursor = new Date(root.cursor.getFullYear(), root.cursor.getMonth() + 1, 1)
+      onClicked: root.step(1)
       Icon {
         anchors.centerIn: parent
         name: "chevron-right"
@@ -85,11 +101,12 @@ Column {
     }
   }
 
-  Row {
-    spacing: Math.round(4 * Theme.scale)
+  Column {
+    spacing: root.gridSpacing
 
-    Column {
-      spacing: Math.round(4 * Theme.scale)
+    Row {
+      spacing: root.gridSpacing
+
       Text {
         width: root.cellSize
         height: Math.round(18 * Theme.scale)
@@ -100,27 +117,9 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
       }
-      Repeater {
-        model: root.weeks
-        delegate: Text {
-          required property var modelData
-          width: root.cellSize
-          height: root.cellSize
-          text: root.isoWeek(modelData[0])
-          color: Theme.overlay
-          font.family: Theme.fontFamily
-          font.pixelSize: Theme.fontSizeSmall
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
-        }
-      }
-    }
-
-    Column {
-      spacing: Math.round(4 * Theme.scale)
 
       Row {
-        spacing: Math.round(4 * Theme.scale)
+        spacing: root.gridSpacing
         Repeater {
           model: root.dayNames
           delegate: Text {
@@ -137,34 +136,147 @@ Column {
           }
         }
       }
+    }
 
-      Repeater {
-        model: root.weeks
-        delegate: Row {
-          required property var modelData
-          spacing: Math.round(4 * Theme.scale)
+    Item {
+      id: numbersClip
 
+      width: currentStrip.implicitWidth
+      height: currentStrip.implicitHeight
+      clip: true
+
+      Row {
+        id: previousStrip
+
+        property date refDate: root.previousCursor
+
+        visible: root.previousWeeks.length > 0
+        spacing: root.gridSpacing
+
+        Column {
+          spacing: root.gridSpacing
           Repeater {
-            model: modelData
-            delegate: Rectangle {
+            model: root.previousWeeks
+            delegate: Text {
               required property var modelData
               width: root.cellSize
               height: root.cellSize
-              radius: Math.round(8 * Theme.scale)
-              color: root.sameDay(modelData, root.today) ? Theme.primary : (modelData.getMonth() === root.cursor.getMonth() ? Theme.surface : "transparent")
+              text: root.isoWeek(modelData[0])
+              color: Theme.overlay
+              font.family: Theme.fontFamily
+              font.pixelSize: Theme.fontSizeSmall
+              horizontalAlignment: Text.AlignHCenter
+              verticalAlignment: Text.AlignVCenter
+            }
+          }
+        }
 
-              Text {
-                anchors.centerIn: parent
-                text: modelData.getDate()
-                color: root.sameDay(modelData, root.today) ? Theme.onAccent : (modelData.getMonth() === root.cursor.getMonth() ? Theme.text : Theme.overlay)
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSmall
-                font.bold: root.sameDay(modelData, root.today)
+        Column {
+          spacing: root.gridSpacing
+          Repeater {
+            model: root.previousWeeks
+            delegate: Row {
+              required property var modelData
+              spacing: root.gridSpacing
+
+              Repeater {
+                model: modelData
+                delegate: Rectangle {
+                  required property var modelData
+                  width: root.cellSize
+                  height: root.cellSize
+                  radius: Math.round(8 * Theme.scale)
+                  color: root.sameDay(modelData, root.today) ? Theme.primary : (modelData.getMonth() === previousStrip.refDate.getMonth() ? Theme.surface : "transparent")
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: modelData.getDate()
+                    color: root.sameDay(modelData, root.today) ? Theme.onAccent : (modelData.getMonth() === previousStrip.refDate.getMonth() ? Theme.text : Theme.overlay)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.bold: root.sameDay(modelData, root.today)
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      Row {
+        id: currentStrip
+
+        property date refDate: root.cursor
+
+        spacing: root.gridSpacing
+
+        Column {
+          spacing: root.gridSpacing
+          Repeater {
+            model: root.weeks
+            delegate: Text {
+              required property var modelData
+              width: root.cellSize
+              height: root.cellSize
+              text: root.isoWeek(modelData[0])
+              color: Theme.overlay
+              font.family: Theme.fontFamily
+              font.pixelSize: Theme.fontSizeSmall
+              horizontalAlignment: Text.AlignHCenter
+              verticalAlignment: Text.AlignVCenter
+            }
+          }
+        }
+
+        Column {
+          spacing: root.gridSpacing
+          Repeater {
+            model: root.weeks
+            delegate: Row {
+              required property var modelData
+              spacing: root.gridSpacing
+
+              Repeater {
+                model: modelData
+                delegate: Rectangle {
+                  required property var modelData
+                  width: root.cellSize
+                  height: root.cellSize
+                  radius: Math.round(8 * Theme.scale)
+                  color: root.sameDay(modelData, root.today) ? Theme.primary : (modelData.getMonth() === currentStrip.refDate.getMonth() ? Theme.surface : "transparent")
+
+                  Text {
+                    anchors.centerIn: parent
+                    text: modelData.getDate()
+                    color: root.sameDay(modelData, root.today) ? Theme.onAccent : (modelData.getMonth() === currentStrip.refDate.getMonth() ? Theme.text : Theme.overlay)
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.bold: root.sameDay(modelData, root.today)
+                  }
+                }
               }
             }
           }
         }
       }
     }
+  }
+
+  NumberAnimation {
+    id: slideAnim
+
+    target: currentStrip
+    property: "y"
+    duration: 200
+    easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: prevSlideAnim
+
+    target: previousStrip
+    property: "y"
+    duration: 200
+    easing.type: Easing.OutCubic
   }
 }

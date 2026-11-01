@@ -15,7 +15,7 @@ Singleton {
   readonly property int capsuleRadius: Math.round(capsuleThickness / 2)
   readonly property int gap: Math.round(8 * scale)
   readonly property int cardRadius: Math.round(16 * scale)
-  readonly property int controlCenterWidth: Math.round(400 * scale)
+  readonly property int dashboardWidth: Math.round(400 * scale)
   readonly property int panelWidth: Math.round(380 * scale)
   readonly property int rowRadius: Math.round(10 * scale)
   readonly property int shadowPad: Math.round(14 * scale)

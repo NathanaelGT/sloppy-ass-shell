@@ -4,6 +4,13 @@ A hand-written Quickshell desktop shell: status bar, attached menus (panels), an
 background services. This glossary covers the domain language of the shell's own
 concepts, not general QML/programming vocabulary.
 
+## Bar
+
+**Alt time**:
+The bar clock's right-click display mode: WITA — one hour ahead, labelled
+`WITA` — instead of the system zone with its own abbreviation. Display-only:
+it changes what the clock shows, never the system timezone.
+
 ## Music
 
 **Music panel**:
@@ -46,6 +53,18 @@ A collection of tracks marked for heavy rotation and quick access.
 
 **Favorites**:
 A collection of tracks marked as loved.
+
+## Dashboard
+
+**Dashboard**:
+The menu attached to the bar's clock widget: the now-playing card and the
+month calendar. Shows nothing another panel already owns.
+_Avoid_: control center (retired name)
+
+**Now-playing card**:
+The dashboard's mini-player for MPRIS players: one card for the active player,
+navigable between players. Distinct from the Music panel, which drives MPD
+only.
 
 ## Power
 

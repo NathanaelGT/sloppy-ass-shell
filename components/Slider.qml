@@ -10,6 +10,7 @@ Item {
   property color fillColor: Theme.primary
   property var node: null
   property bool wave: true
+  readonly property alias pressed: slideMouse.pressed
 
   signal moved(real value)
   signal wheeled(real angleDelta)
