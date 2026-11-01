@@ -31,6 +31,13 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   opens the right-click context menu for a row, `test procMenuState` reads it back,
   `test procMenuInvoke <index>` clicks an entry (dangerous ones arm first and return `armed`,
   the second invoke executes — kills are real), `test procMenuClose` drops it.
+  Music flows: `test musicState` dumps player+queue state; `test musicTab <0|1>` switches
+  tabs; `test musicCmd <toggle|play|pause|next|prev|...>` drives transport. Folder tab
+  (drill-down): `test folderState` (path, search, pending, breadcrumb, meta, typed rows) is
+  the deterministic read; `test folderNavigate <path|pinned|favorites|back>` enters/leaves;
+  `test folderSearch <query>` runs the subtree search immediately (poll `folderState` until
+  `pending:false`); `test folderRowRect <index>` aims at a row. None of these move the
+  cursor or touch playback — row play and double-click have no driver seam and are audible.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no
@@ -41,11 +48,18 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
 - Fall back to input injection (`ydotool`, `wtype`, `dotool`; `/dev/uinput` is writable) only for
   interactions the driver does not cover, and only after notifying the user 2 s beforehand
   through quickshell's own notification server (`dunstify` is only the sender CLI — dunst itself
-  is not used): `dunstify -a opencode -u normal "opencode" "about to move the cursor"` then
-  sleep 2, since the user is active on HDMI-A-1. `test beginWork` / `test endWork` already toast
+  is not used; it is not on PATH, use
+  `/nix/store/4s17jbdfs1jfapwsg9mp68xai83dblxr-dunst-1.13.2/bin/dunstify`, `notify-send` is
+  broken here): `dunstify -a opencode -u normal "opencode" "about to move the cursor"` then
+  sleep 2, since the user is active on HDMI-A-1. The toast itself closes the focused panel
+  (focus steal, 5 s lifetime), so wait it out and reopen the panel before interacting.
+  `test beginWork` / `test endWork` already toast
   session start/end the same way, so a separate done notice is only needed for sessions that
   never armed test mode: `dunstify -a opencode -u low "opencode" "testing done — all yours". Run `ydotoold` once for `ydotool`, or pipe commands
-  straight to `dotool` (`echo "mousemove 100 0" | dotool`). `ydotoold`'s virtual device is broken
+  straight to `dotool` — but `mousemove X Y` is RELATIVE (deltas); aim with
+  `mouseto X Y` (0.0–1.0 fractions of the whole 3840x1080 layout, e.g.
+  `mouseto 0.23724 0.48611` for (911,525)) and verify with `hyprctl cursorpos`.
+  `ydotoold`'s virtual device is broken
   here (`unable to find device pointer`), so prefer `dotool`. Re-capture geometry immediately
   before aiming: live lists such as wifi signal resorting invalidate coordinates within seconds
   (a stale aim once disconnected the active network; recovered with
@@ -72,6 +86,12 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   instead of hunting the popup; `test workState` shows armed/watch flags when diagnosing
   a stuck session (stuck watch-off recovers with `endWork`).
 - Toggle once: `quickshell ipc call shell close` then `volumePanel`. Two calls in a row cancel out.
+- Cursor shape is invisible to the driver: move the pointer, then `grim -c` with a tight `-g`
+  crop. A hover highlight proves delivery, never the cursor. Every `MouseArea` claims
+  `Qt.ArrowCursor` by default and Qt uses the topmost claimant, so an overlay `MouseArea` above a
+  button leaves the arrow. Name the thief by restarting quickshell with
+  `QT_LOGGING_RULES=qt.quick.hover.cursor=true` and reading `setting cursor … from
+  QQuickMouseArea(…, z=…)`; relaunch plain afterwards.
 
 ## Design decisions to keep
 
@@ -94,6 +114,13 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   an input hole; `VolumePanel` feeds it `activeNameEditor`, `testDispatch(x, y)` emulates a press
   for tests). Scroll the menu with `MouseArea.onWheel`, not a
   `WheelHandler` child (a `MouseArea` consumes the wheel, so the handler never fires).
+- Cursor ownership: Qt takes the cursor from the topmost item that has one, not from the item
+  under the pointer, and a bare `MouseArea` has `Qt.ArrowCursor`. So nothing full-surface may sit
+  above interactive content — in `panels/PanelBase.qml` the press catcher and the wheel catcher
+  stay below `headerArea`/`scroller` (the press catcher was once `z: 20` above them, which made
+  every menu button show the arrow while its hover colour still worked). Buttons and clickable
+  rows set `cursorShape: Qt.PointingHandCursor`; plain `Item` overlays (`overlayArea`,
+  `keyCatcher`, `layer.effect`) claim nothing and are safe.
 - Anything that must outlive a restart lives in `~/.local/state/quickshell/*.json`;
   `PersistentProperties` only survives reloads.
 - PipeWire stream facts: `properties["pulse.corked"]` means paused, `object.serial` is the
@@ -115,6 +142,27 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   and a singleton would leak state between screens.
 - A provider with `local: true` resolves offline: the launcher calls its `parse(term)` on every
   keystroke and skips the "press Enter to look up" state, so it exposes no `buildUrl`/`requestArgs`.
+- Music Folders tab is a single drill-down browser (docs/adr/0001): click enters a folder or
+  collection (Pinned/Favorites live at the root), breadcrumb + back button navigate up; the
+  expandable tree, the separate browse view, the split animation and `expandedFolders`
+  persistence are retired — do not reintroduce them. The tab opens at the root every session;
+  only `lastTab`/`playSource` persist in `music/state.json` (stale `expandedFolders` keys in the
+  file are ignored on load).
+- Folders-tab search is a subtree filter: MPD `search` with a `(base "path")` filter over the
+  folder you are in, matching title/artist/album/filename, tracks only; inside a collection it
+  falls back to in-place title/artist matching. While searching, the header button plays the
+  result set. The Queue tab keeps the old in-place `matchesSearch` row filter.
+- Track rows: single click inert, double-click plays from that track (`playFolderTrack` honors
+  the uri), `+` appends, hover heart/pin toggle per-track stickers (`setFavorite`/`setPinned`
+  take a uri; the header heart/pin act on the playing song). Collection uris resolve through
+  `Mpd.songsByUri` (`listallinfo` cache, invalidated on `database` idle).
+- Queue and Folders track cards share one design (docs/adr/0002): 44px card, circular
+  accessory buttons, folder card carries the now-playing state keyed on `Mpd.song.file`. The
+  two delegates in `panels/MusicPanel.qml` mirror each other's metrics and must be kept in
+  sync by hand (no shared component — the queue card's drag/swipe state and test seams cannot
+  move into one). The full-card hover MouseArea stays below the trailing buttons, and the
+  card's hover state is OR-ed across the row area and every button (`rowHovered`), like the
+  queue row's `rowHover`.
 
 ## Style
 

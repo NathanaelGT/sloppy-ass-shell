@@ -9,11 +9,16 @@ Item {
   property string rowObjectName: ""
   property int minTarget: -1
   property int maxTarget: -1
+  property var flickable: null
+  property real edgeZone: 48
+  property real scrollSpeed: 6
 
   property string dragKey: ""
   property int dragFrom: -1
   property int dragTarget: -1
   property real dragStartY: 0
+  property real lastSceneY: 0
+  property real scrollShift: 0
   property real dragDelta: 0
   property bool dragging: false
   property string settleKey: ""
@@ -24,6 +29,47 @@ Item {
   property bool snapPreview: false
 
   signal moved(string key, int target)
+
+  Timer {
+    id: edgeTimer
+
+    interval: 16
+    running: root.dragging && root.flickable !== null
+    repeat: true
+    onTriggered: root.scrollTick()
+  }
+
+  function scrollTick() {
+    if (!root.dragging || !root.flickable) {
+      return
+    }
+    const f = root.flickable
+    const localY = root.lastSceneY - f.mapToItem(null, 0, 0).y
+    let speed = 0
+    if (localY < root.edgeZone) {
+      const depth = 1 - Math.max(0, localY) / root.edgeZone
+      speed = -root.scrollSpeed * depth * depth
+    } else if (localY > f.height - root.edgeZone) {
+      const depth = Math.min(1, (localY - (f.height - root.edgeZone)) / root.edgeZone)
+      speed = root.scrollSpeed * depth * depth
+    }
+    if (speed === 0) {
+      return
+    }
+    const max = Math.max(0, f.contentHeight - f.height)
+    const next = Math.max(0, Math.min(max, f.contentY + speed))
+    const applied = next - f.contentY
+    if (applied === 0) {
+      return
+    }
+    f.contentY = next
+    root.scrollShift = root.scrollShift + applied
+    root.dragDelta = root.dragDelta + applied
+    const target = root.rowIndexAt(root.lastSceneY)
+    if (target >= 0) {
+      root.dragTarget = root.clampTarget(target)
+    }
+  }
 
   Behavior on dropShift {
     enabled: root.dropArmed
@@ -52,7 +98,7 @@ Item {
       return -1
     }
     for (let i = 0; i < root.model.count; i++) {
-      if (root.model.get(i)[root.keyRole] === key) {
+      if (String(root.model.get(i)[root.keyRole]) === String(key)) {
         return i
       }
     }
@@ -100,6 +146,8 @@ Item {
     root.dragFrom = root.indexOfKey(key)
     root.dragTarget = root.dragFrom
     root.dragStartY = sceneY
+    root.lastSceneY = sceneY
+    root.scrollShift = 0
     root.dragDelta = 0
     root.dragging = true
   }
@@ -108,10 +156,11 @@ Item {
     if (!root.dragging) {
       return
     }
+    root.lastSceneY = sceneY
     const dragged = root.listView.itemAtIndex(root.dragFrom)
     const top = dragged ? dragged.y : 0
     const height = dragged ? dragged.height : 0
-    const raw = sceneY - root.dragStartY
+    const raw = sceneY - root.dragStartY + root.scrollShift
     root.dragDelta = Math.max(-top, Math.min(root.listView.contentHeight - top - height, raw))
     const target = root.rowIndexAt(sceneY)
     if (target >= 0) {

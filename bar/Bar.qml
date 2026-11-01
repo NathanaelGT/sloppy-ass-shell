@@ -110,7 +110,16 @@ PanelWindow {
       }
 
       Clock {
+        id: clockWidget
+
         anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        screen: root.screen
+      }
+
+      Music {
+        anchors.right: clockWidget.left
+        anchors.rightMargin: Math.round(4 * Theme.scale)
         anchors.verticalCenter: parent.verticalCenter
         screen: root.screen
       }

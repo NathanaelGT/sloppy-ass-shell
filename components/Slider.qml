@@ -9,6 +9,7 @@ Item {
   property real fullMark: -1
   property color fillColor: Theme.primary
   property var node: null
+  property bool wave: true
 
   signal moved(real value)
   signal wheeled(real angleDelta)
@@ -23,20 +24,15 @@ Item {
     return Math.max(0, Math.min(1, v))
   }
 
-  onNodeChanged: {
-    root.history = []
-    root.live = false
-  }
-
   PwNodePeakMonitor {
     id: peakMon
     node: root.node
-    enabled: root.node !== null
+    enabled: root.wave && root.node !== null
   }
 
   Timer {
     interval: 50
-    running: root.node !== null
+    running: root.wave && root.node !== null
     repeat: true
     triggeredOnStart: true
     onTriggered: {
@@ -82,7 +78,7 @@ Item {
   }
 
   Rectangle {
-    visible: root.node === null || !root.live
+    visible: !root.wave || root.node === null || !root.live
     anchors.verticalCenter: parent.verticalCenter
     width: root.clamp(root.value) * track.width
     height: track.height
@@ -100,7 +96,7 @@ Item {
   }
 
   Item {
-    visible: root.node !== null && root.live
+    visible: root.wave && root.node !== null && root.live
     anchors.verticalCenter: parent.verticalCenter
     width: root.clamp(root.value) * track.width
     height: Math.round(10 * Theme.scale)

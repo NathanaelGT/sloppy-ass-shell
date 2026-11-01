@@ -66,6 +66,10 @@ ShellRoot {
       Panels.toggle("battery", Hypr.focusedScreenName)
     }
 
+    function music(): void {
+      Panels.toggle("music", Hypr.focusedScreenName)
+    }
+
     function notifications(): void {
       Panels.toggle("notifications", Hypr.focusedScreenName)
     }
@@ -233,6 +237,201 @@ ShellRoot {
       }
       Panels.open("volume", screen ? screen : "eDP-1")
       return true
+    }
+
+    function queueState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testQueueState()
+      state.enabled = true
+      return JSON.stringify(state)
+    }
+
+    function queueDrag(from: int, to: int): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const moved = panel.testQueueDrag(from, to)
+      moved.enabled = true
+      moved.open = true
+      return JSON.stringify(moved)
+    }
+
+    function queueDragHold(from: int, to: int): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const moved = panel.testQueueDragHold(from, to)
+      moved.enabled = true
+      moved.open = true
+      return JSON.stringify(moved)
+    }
+
+    function queueDrop(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      panel.testQueueDrop()
+      return JSON.stringify({
+        enabled: true,
+        open: true,
+        dropped: true
+      })
+    }
+
+    function queueDragEdge(edge: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      panel.testQueueDragEdge(edge)
+      return JSON.stringify({
+        enabled: true,
+        open: true,
+        edge: edge
+      })
+    }
+
+    function queueDragY(y: real): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      panel.testQueueDragUpdate(y)
+      return JSON.stringify({
+        enabled: true,
+        open: true,
+        y: y
+      })
+    }
+
+    function queueCancel(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      panel.testQueueCancel()
+      return JSON.stringify({
+        enabled: true,
+        open: true,
+        cancelled: true
+      })
+    }
+
+    function queueRects(index: int): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const rects = panel.testControlRects(index)
+      if (!rects) {
+        return "{\"enabled\":true,\"open\":true,\"empty\":true}"
+      }
+      rects.enabled = true
+      rects.open = true
+      return JSON.stringify(rects)
+    }
+
+    function queueSwipe(index: int, offset: int, release: bool): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testSwipe(index, offset, release)
+      if (!state) {
+        return "{\"enabled\":true,\"open\":true,\"empty\":true}"
+      }
+      state.enabled = true
+      state.open = true
+      return JSON.stringify(state)
+    }
+
+    function queueRelease(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testSwipeRelease()
+      if (!state) {
+        return "{\"enabled\":true,\"open\":true,\"empty\":true}"
+      }
+      state.enabled = true
+      state.open = true
+      return JSON.stringify(state)
+    }
+
+    function musicRouteState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testRouteState()
+      state.enabled = true
+      return JSON.stringify(state)
+    }
+
+    function musicRouteOpen(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify({
+        enabled: true,
+        open: true,
+        popup: panel.testRouteOpen()
+      })
+    }
+
+    function musicRoute(name: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testRouteTo(name)
     }
 
     function closePanel(): bool {
@@ -519,6 +718,144 @@ ShellRoot {
         open: true,
         screen: panel.screenId
       })
+    }
+
+    function musicState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      return JSON.stringify({
+        enabled: true,
+        open: panel !== null && panel !== undefined && panel.open,
+        connected: Mpd.connected,
+        version: Mpd.version,
+        state: Mpd.state,
+        song: Mpd.song,
+        elapsed: Mpd.elapsed,
+        volume: Mpd.volume,
+        displayVolume: Mpd.displayVolume,
+        streamStable: Mpd.streamStable,
+        repeat: Mpd.repeat,
+        random: Mpd.random,
+        single: Mpd.single,
+        queueLength: Mpd.queue.length,
+        queue: Mpd.queue,
+        musicDir: Mpd.musicDir,
+        artUrl: Mpd.artUrl,
+        socketPath: Mpd.socketPath
+      })
+    }
+
+    function musicSocket(path: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Mpd.setSocket(path)
+      return true
+    }
+
+    function musicCmd(cmd: string): string {
+      if (!TestDriver.active) {
+        return "inactive"
+      }
+      if (cmd === "toggle") {
+        Mpd.toggle()
+      } else if (cmd === "play") {
+        if (Mpd.state !== "play") {
+          Mpd.toggle()
+        }
+      } else if (cmd === "pause") {
+        if (Mpd.state === "play") {
+          Mpd.toggle()
+        }
+      } else if (cmd === "next") {
+        Mpd.next()
+      } else if (cmd === "prev") {
+        Mpd.prev()
+      } else if (cmd === "refresh") {
+        Mpd.refresh()
+      } else if (cmd.startsWith("play ")) {
+        Mpd.playIndex(parseInt(cmd.slice(5)))
+      } else if (cmd.startsWith("seek ")) {
+        Mpd.seek(parseFloat(cmd.slice(5)))
+      } else if (cmd.startsWith("volume ")) {
+        Mpd.setVolume(parseFloat(cmd.slice(7)))
+      } else if (cmd.startsWith("repeat ")) {
+        Mpd.setRepeat(cmd.slice(7) === "on")
+      } else if (cmd.startsWith("random ")) {
+        Mpd.setRandom(cmd.slice(7) === "on")
+      } else if (cmd.startsWith("single ")) {
+        Mpd.setSingle(cmd.slice(7) === "on")
+      } else {
+        return "unknown"
+      }
+      return "ok"
+    }
+
+    function musicTab(index: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return false
+      }
+      panel.switchTab(index)
+      return true
+    }
+
+    function folderState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testFolderState()
+      state.enabled = true
+      return JSON.stringify(state)
+    }
+
+    function folderNavigate(path: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testFolderNavigate(path)
+    }
+
+    function folderSearch(query: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testFolderSearch(query)
+    }
+
+    function folderRowRect(index: int): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("music")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const rect = panel.testFolderRowRect(index)
+      if (!rect) {
+        return "{\"enabled\":true,\"open\":true,\"found\":false}"
+      }
+      rect.enabled = true
+      rect.open = true
+      rect.found = true
+      return JSON.stringify(rect)
     }
 
     function toggleSection(section: string): bool {
@@ -1415,6 +1752,13 @@ ShellRoot {
     model: Quickshell.screens
     delegate: Component {
       BatteryPanel {}
+    }
+  }
+
+  Variants {
+    model: Quickshell.screens
+    delegate: Component {
+      MusicPanel {}
     }
   }
 

@@ -485,10 +485,17 @@ PanelBase {
     }
   }
 
+  function hiddenStream(stream) {
+    return streamProps(stream)["node.name"] === Mpd.streamName
+  }
+
   function computeActiveSig() {
     const parts = []
     for (let i = 0; i < streams.length; i++) {
       const stream = streams[i]
+      if (hiddenStream(stream)) {
+        continue
+      }
       const key = streamKey(stream)
       parts.push(key + "=" + (Audio.streamActive(stream) ? "1" : "0") + (Pins.isStreamPinned(key) ? "p" : "") + streamIcon(stream) + "|" + streamName(stream))
     }
@@ -638,7 +645,7 @@ PanelBase {
     const names = {}
     for (let i = 0; i < streams.length; i++) {
       const stream = streams[i]
-      if (streamProps(stream)["application.name"] === "Quickshell Peak Detect") {
+      if (streamProps(stream)["application.name"] === "Quickshell Peak Detect" || hiddenStream(stream)) {
         continue
       }
       const name = appName(stream)

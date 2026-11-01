@@ -13,6 +13,7 @@ PanelWindow {
 
   property string panelName: ""
   property string align: "right"
+  property int horizontalOffset: 0
   property string vertical: "top"
   property bool attached: true
   property int topMargin: Theme.barThickness
@@ -99,7 +100,7 @@ PanelWindow {
       easing.type: Easing.OutCubic
     }
   }
-  readonly property int cardX: align === "center" ? Math.round((width - cardWidth) / 2) : align === "left" ? edge : width - cardWidth - edge
+  readonly property int cardX: align === "center" ? Math.round((width - cardWidth) / 2) + horizontalOffset : align === "left" ? edge + horizontalOffset : width - cardWidth - edge + horizontalOffset
   readonly property int restingY: vertical === "center" ? Math.round(((modelData ? modelData.height : 0) - cardHeight) / 2) : topMargin
   readonly property int contentWidth: cardWidth - contentPad * 2
   readonly property real contentHeight: bodyColumn.implicitHeight
@@ -360,6 +361,14 @@ PanelWindow {
           }
         }
 
+        MouseArea {
+          anchors.fill: parent
+          onPressed: mouse => {
+            root.contentClicked(mapToItem(null, mouse.x, mouse.y))
+            mouse.accepted = false
+          }
+        }
+
         Item {
           id: headerArea
 
@@ -436,15 +445,6 @@ PanelWindow {
 
           anchors.fill: parent
           z: 10
-        }
-
-        MouseArea {
-          anchors.fill: parent
-          z: 20
-          onPressed: mouse => {
-            root.contentClicked(mapToItem(null, mouse.x, mouse.y))
-            mouse.accepted = false
-          }
         }
 
         MouseArea {
