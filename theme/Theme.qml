@@ -19,6 +19,9 @@ Singleton {
   readonly property int panelWidth: Math.round(380 * scale)
   readonly property int rowRadius: Math.round(10 * scale)
   readonly property int shadowPad: Math.round(14 * scale)
+  readonly property int bannerMaxExpand: 360
+  readonly property int bannerRowHeight: Math.round(34 * scale)
+  readonly property int bannerIconSize: Math.round(28 * scale)
   readonly property real shadowBlur: 0.45
   readonly property real shadowOpacity: 0.5
   readonly property int shadowVerticalOffset: Math.round(2 * scale)

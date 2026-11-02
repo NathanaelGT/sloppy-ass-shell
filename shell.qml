@@ -6,7 +6,6 @@ import "services"
 import "bar"
 import "panels"
 import "osd"
-import "notifications"
 
 ShellRoot {
   id: root
@@ -17,7 +16,7 @@ ShellRoot {
   Component.onCompleted: Quickshell.watchFiles = false
 
   function workToast(urgency, title, body) {
-    Quickshell.execDetached(["dunstify", "-a", "opencode", "-u", urgency, title, body])
+    Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", urgency, title, body])
   }
 
   Connections {
@@ -37,6 +36,14 @@ ShellRoot {
 
   IpcHandler {
     target: "shell"
+
+    function setIdle(state: bool): void {
+      Notifs.idle = state
+    }
+
+    function setLocked(state: bool): void {
+      Notifs.locked = state
+    }
 
     function launcher(): void {
       Panels.toggle("launcher", Hypr.focusedScreenName)
@@ -1804,6 +1811,218 @@ ShellRoot {
         monitor: mon.name
       })
     }
+
+    function notifState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const model = Notifs.active
+      const vals = model && model.values ? model.values : []
+      const act = []
+      for (let i = 0; i < vals.length; i++) {
+        const n = vals[i]
+        act.push({
+          id: n.id,
+          app: n.appName,
+          summary: n.summary,
+          body: n.body,
+          urgency: n.urgency,
+          sticky: Notifs.isSticky(n),
+          remaining: Notifs.remainingFor(n),
+          hoverPause: Notifs.hoverPaused(n)
+        })
+      }
+      const recs = []
+      for (let i = 0; i < Notifs.records.length; i++) {
+        recs.push({
+          body: Notifs.records[i].snap.body,
+          remaining: Math.round(Notifs.records[i].remaining),
+          sticky: Notifs.records[i].sticky
+        })
+      }
+      return JSON.stringify({
+        enabled: true,
+        dnd: Notifs.dnd,
+        idle: Notifs.idle,
+        locked: Notifs.locked,
+        lastError: Notifs.lastError,
+        recordCount: Notifs.records.length,
+        records: recs,
+        activeCount: act.length,
+        active: act,
+        unread: NotifStore.unreadCount,
+        lastSeen: NotifStore.lastSeen,
+        ready: NotifStore.ready,
+        exhausted: NotifStore.exhausted,
+        historyCount: NotifStore.history.length
+      })
+    }
+
+    function bannerState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const b = Notifs.bannerSelected
+      const rows = []
+      for (let i = 0; i < Notifs.bannerRows.length; i++) {
+        const r = Notifs.bannerRows[i]
+        rows.push({
+          app: r.snap.appName,
+          summary: r.snap.summary,
+          urgency: r.snap.urgency
+        })
+      }
+      const base = {
+        enabled: true,
+        present: Notifs.bannerVisible,
+        phase: Notifs.bannerPhase,
+        count: Notifs.bannerCount,
+        more: Notifs.bannerMore,
+        rows: rows,
+        selectedIndex: Notifs.selectedIndex(),
+        critical: Notifs.bannerCritical,
+        criticalRemaining: Math.round(Notifs.bannerCriticalRemaining),
+        remaining: Math.round(Notifs.bannerRemaining),
+        suppressed: Notifs.bannerSuppressed(),
+        deferred: Notifs.bannerDeferred,
+        acknowledged: Notifs.bannerAcknowledged,
+        hover: Notifs.bannerHover,
+        unread: NotifStore.unreadCount
+      }
+      const panel = TestDriver.panel("banner", "eDP-1")
+      if (panel) {
+        base.metrics = panel.testMetrics()
+      }
+      if (!b) {
+        return JSON.stringify(base)
+      }
+      const acts = []
+      for (let j = 0; j < b.snap.actions.length; j++) {
+        acts.push(b.snap.actions[j])
+      }
+      base.app = b.snap.appName
+      base.summary = b.snap.summary
+      base.body = b.snap.body
+      base.urgency = b.snap.urgency
+      base.actions = acts
+      base.hasImage = String(b.snap.image || "").length > 0
+      return JSON.stringify(base)
+    }
+
+    function bannerShot(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const rect = TestDriver.panelRect("banner", "eDP-1")
+      if (!rect) {
+        return JSON.stringify({
+          enabled: true,
+          found: false
+        })
+      }
+      const shot = TestDriver.runShot(rect)
+      shot.enabled = true
+      shot.found = true
+      return JSON.stringify(shot)
+    }
+
+    function bannerDismiss(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      return Notifs.dismissBannerSelected()
+    }
+
+    function bannerSelect(index: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      return Notifs.selectBannerIndex(index)
+    }
+
+    function bannerSelectRow(index: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      return Notifs.selectBannerRow(index)
+    }
+
+    function bannerDismissRow(index: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      return Notifs.dismissBannerRow(index)
+    }
+
+    function bannerInvoke(zone: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("banner", "eDP-1")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testInvoke(zone)
+    }
+
+    function bannerHold(enabled: bool): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Notifs.setBannerHold(enabled)
+      return Notifs.bannerHold
+    }
+
+    function bannerHover(enabled: bool): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Notifs.setBannerHover(enabled)
+      return Notifs.bannerHover
+    }
+
+    function bannerAdvance(ms: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Notifs.advanceBanner(ms)
+      return true
+    }
+
+    function bannerDismissAll(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Notifs.dismissAll()
+      return true
+    }
+
+    function notifQuery(sql: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      NotifStore.runRaw(sql)
+      return true
+    }
+
+    function notifDnd(enabled: bool): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Notifs.dnd = enabled
+      return Notifs.dnd
+    }
+
+    function notifRaw(): string {
+      if (!TestDriver.active) {
+        return "{}"
+      }
+      return JSON.stringify({
+        seq: NotifStore.rawSeq,
+        code: NotifStore.rawCode,
+        out: NotifStore.lastRaw
+      })
+    }
   }
 
   Variants {
@@ -1894,13 +2113,6 @@ ShellRoot {
     model: Quickshell.screens
     delegate: Component {
       OsdPopup {}
-    }
-  }
-
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      Toasts {}
     }
   }
 }

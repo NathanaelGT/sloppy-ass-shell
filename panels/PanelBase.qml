@@ -26,6 +26,17 @@ PanelWindow {
   property bool autoFocusKeyCatcher: true
   property var cancelItem: null
   property bool animateCardHeight: false
+  property bool animateCardWidth: false
+  property bool stemEnabled: false
+  property real stemX: 0
+  property real stemProgress: 0
+  readonly property real stemGap: (Theme.barThickness - Theme.capsuleThickness) / 2
+  readonly property int stemTop: Math.floor(Theme.barThickness - root.stemGap)
+  property bool slideUnlocked: true
+  property color contentColor: "transparent"
+  property int contentInset: 0
+  property int contentOuterPad: contentPad
+  property bool closePending: false
   default property alias cardData: bodyColumn.data
   property alias headerData: headerColumn.data
   property alias overlayData: overlayArea.data
@@ -92,7 +103,7 @@ PanelWindow {
   readonly property int contentPad: Math.round(14 * Theme.scale)
   readonly property int cornerRadius: attached ? Math.min(Theme.cardRadius, edge) : Theme.cardRadius
   readonly property int headerHeight: headerColumn.implicitHeight
-  property int cardHeight: Math.min(bodyColumn.implicitHeight + (root.headerHeight > 0 ? root.headerHeight + Theme.gap : 0) + contentPad * 2, maxCardHeight)
+  property int cardHeight: Math.min(bodyColumn.implicitHeight + (root.headerHeight > 0 ? root.headerHeight + Theme.gap : 0) + contentPad + contentOuterPad + contentInset, maxCardHeight)
 
   Behavior on cardHeight {
     enabled: root.animateCardHeight
@@ -101,9 +112,38 @@ PanelWindow {
       easing.type: Easing.OutCubic
     }
   }
+
+  Behavior on cardWidth {
+    enabled: root.animateCardWidth
+    NumberAnimation {
+      duration: 220
+      easing.type: Easing.OutCubic
+    }
+  }
+
+  NumberAnimation {
+    id: stemInAnim
+
+    target: root
+    property: "stemProgress"
+    to: 1
+    duration: 150
+    easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: stemOutAnim
+
+    target: root
+    property: "stemProgress"
+    to: 0
+    duration: 150
+    easing.type: Easing.OutCubic
+  }
   readonly property int cardX: align === "center" ? Math.round((width - cardWidth) / 2) + horizontalOffset : align === "left" ? edge + horizontalOffset : width - cardWidth - edge + horizontalOffset
   readonly property int restingY: vertical === "center" ? Math.round(((modelData ? modelData.height : 0) - cardHeight) / 2) : topMargin
-  readonly property int contentWidth: cardWidth - contentPad * 2
+  readonly property int contentWidth: cardWidth - contentOuterPad * 2
+  readonly property int contentInnerWidth: contentWidth - contentInset * 2
   readonly property real contentHeight: bodyColumn.implicitHeight
   readonly property real viewportHeight: scroller.height
   readonly property real scrollY: scroller.contentY
@@ -184,16 +224,32 @@ PanelWindow {
       if (Panels.closingScreen === root.screenId) {
         Panels.closingScreen = ""
       }
+      stemOutAnim.stop()
+      stemInAnim.restart()
+      if (root.stemEnabled) {
+        root.slideUnlocked = false
+        stemSlideDelay.restart()
+      } else {
+        root.slideUnlocked = true
+      }
     } else {
       open = false
       if (root.attached && root.panelName !== "") {
         Panels.closingScreen = root.screenId
       }
       closeDelay.restart()
+      if (root.stemEnabled && !root.slideUnlocked) {
+        root.slideUnlocked = true
+        stemSlideDelay.stop()
+        stemOutAnim.restart()
+        root.closePending = false
+        Panels.closeCleared(root.panelName, root.screenId)
+      }
     }
   }
 
   onOpenChanged: {
+    root.closePending = !root.open
     if (root.panelName !== "") {
       if (root.open) {
         TestDriver.register(root.panelName, root.screenId, root)
@@ -256,11 +312,19 @@ PanelWindow {
   Timer {
     id: closeDelay
 
-    interval: 260
+    interval: root.stemEnabled ? 420 : 260
     running: false
     onTriggered: if (Panels.closingScreen === root.screenId) {
       Panels.closingScreen = ""
     }
+  }
+
+  Timer {
+    id: stemSlideDelay
+
+    interval: 150
+    running: false
+    onTriggered: root.slideUnlocked = true
   }
 
   MouseArea {
@@ -289,11 +353,25 @@ PanelWindow {
       id: visual
 
       x: root.cardX - root.shadowPad
-      y: root.open ? (root.attached ? -root.shadowPad : root.restingY - root.shadowPad) : -height
+      y: root.open && root.slideUnlocked ? (root.attached ? -root.shadowPad : root.restingY - root.shadowPad) : -height
       width: root.cardWidth + root.shadowPad * 2
       height: root.cardHeight + root.shadowPad * 2
       layer.enabled: true
       layer.samples: 4
+
+      onYChanged: {
+        if (!root.closePending || !root.attached) {
+          return
+        }
+        if (visual.y > -visual.height + 0.5) {
+          return
+        }
+        root.closePending = false
+        Panels.closeCleared(root.panelName, root.screenId)
+        if (root.stemEnabled) {
+          stemOutAnim.restart()
+        }
+      }
 
       Behavior on y {
         NumberAnimation {
@@ -354,6 +432,18 @@ PanelWindow {
         height: root.cardHeight
         clip: true
 
+        Rectangle {
+          visible: root.contentColor.a > 0
+          x: root.contentOuterPad
+          y: 0
+          width: root.contentWidth
+          height: Math.max(0, root.cardHeight - root.contentOuterPad)
+          radius: Theme.rowRadius
+          topLeftRadius: 0
+          color: root.contentColor
+          antialiasing: true
+        }
+
         MouseArea {
           anchors.fill: parent
           onWheel: event => {
@@ -377,8 +467,8 @@ PanelWindow {
           anchors.left: contentClip.left
           anchors.right: contentClip.right
           anchors.topMargin: root.contentPad
-          anchors.leftMargin: root.contentPad
-          anchors.rightMargin: root.contentPad
+          anchors.leftMargin: root.contentOuterPad + root.contentInset
+          anchors.rightMargin: root.contentOuterPad + root.contentInset
           height: root.headerHeight
           visible: root.headerHeight > 0
           clip: true
@@ -397,9 +487,9 @@ PanelWindow {
           anchors.left: contentClip.left
           anchors.right: contentClip.right
           anchors.bottom: contentClip.bottom
-          anchors.leftMargin: root.contentPad
-          anchors.rightMargin: root.contentPad
-          anchors.bottomMargin: root.contentPad
+          anchors.leftMargin: root.contentOuterPad + root.contentInset
+          anchors.rightMargin: root.contentOuterPad + root.contentInset
+          anchors.bottomMargin: root.contentOuterPad + root.contentInset
           anchors.top: headerArea.visible ? headerArea.bottom : contentClip.top
           anchors.topMargin: headerArea.visible ? Theme.gap : root.contentPad
           contentWidth: width
@@ -423,12 +513,21 @@ PanelWindow {
           }
         }
 
+        TopCutCorners {
+          visible: root.contentColor.a > 0 && root.scrollY > 0
+          x: scroller.x
+          y: scroller.y
+          width: scroller.width
+          color: root.contentColor
+          z: 100
+        }
+
         Item {
           id: scrollerMask
 
-          x: contentClip.x
+          x: scroller.x
           y: scroller.y
-          width: contentClip.width
+          width: scroller.width
           height: scroller.height
           visible: false
           layer.enabled: true
@@ -468,6 +567,38 @@ PanelWindow {
           }
         }
       }
+    }
+  }
+
+  Item {
+    id: stem
+
+    visible: root.stemEnabled && root.stemProgress > 0
+    x: root.stemX
+    y: root.stemTop
+    width: Theme.capsuleThickness
+    height: (Theme.barThickness - root.stemTop) * root.stemProgress
+
+    property color fill: root.requested ? Theme.capsuleHover : Theme.capsuleFill
+
+    Behavior on fill {
+      ColorAnimation {
+        duration: 120
+      }
+    }
+
+    Rectangle {
+      anchors.fill: parent
+      color: stem.fill
+      antialiasing: true
+    }
+
+    InnerFillet {
+      x: stem.width - 1
+      y: stem.height - radius
+      mirror: true
+      radius: Theme.barThickness / 2 * root.stemProgress
+      color: stem.fill
     }
   }
 

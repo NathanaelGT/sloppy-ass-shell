@@ -40,4 +40,11 @@ Singleton {
     }
     return cls
   }
+
+  function forNotification(appIcon, desktopEntry, appName) {
+    if (appIcon) {
+      return appIcon
+    }
+    return resolve(desktopEntry || appName)
+  }
 }

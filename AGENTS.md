@@ -56,6 +56,23 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   the pill's right-click toggles (system zone with its own abbreviation vs WITA: +1 hour,
   labelled `WITA`). Verify with `test shotBar`; the flag is global across screens and resets
   on reload or restart.
+  Notification flows: `test notifState` dumps dnd/idle/locked, tracked notifications (urgency,
+  sticky, ticking remaining ms, hoverPause) and store state (unread, lastSeen, loaded history
+  count, exhausted); `test bannerState` dumps the banner (present, app/summary/body/urgency/
+  actions, hasImage, ticking banner remaining ms, suppressed) — the eDP-1 clock/bell pill
+  morph is driven by the same arrival. Senders drive the live paths: `notify-send -u critical`
+  (sticky, red border), `-h string:sound-name:bell` (chime override), transient/resident via
+  `notify-send -h` hints. `quickshell ipc call shell setIdle <bool>` / `setLocked <bool>`
+  drive the countdown gate and the lock suppression (the real sources are the user's hypridle
+  listeners). `test bannerShot` captures the morphed pill (poll `shotPoll`);
+  `test bannerDismiss` mirrors the banner right-click (dismiss early — real,
+  announces first), `bannerDismissAll` mirrors middle-click.
+  `test notifQuery <sql>` / `test notifRaw` run read-only sqlite against
+  `~/.local/state/quickshell/notifications.db` and poll the result — use for retention,
+  soft-delete and lastSeen assertions, never for writes (the mirror would desync).
+  History row delete and panel action buttons have no driver seam
+  (clicks are real); the countdown only advances while not idle, so idle pause is asserted
+  via `remaining` freezing in `notifState`/`bannerState`, not wall-clock.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no
@@ -65,15 +82,14 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   (`routeStream`, `defaultDevice`, `wpctl`); restore after.
 - Fall back to input injection (`ydotool`, `wtype`, `dotool`; `/dev/uinput` is writable) only for
   interactions the driver does not cover, and only after notifying the user 2 s beforehand
-  through quickshell's own notification server (`dunstify` is only the sender CLI — dunst itself
-  is not used; it is not on PATH, use
-  `/nix/store/4s17jbdfs1jfapwsg9mp68xai83dblxr-dunst-1.13.2/bin/dunstify`, `notify-send` is
-  broken here): `dunstify -a opencode -u normal "opencode" "about to move the cursor"` then
+  through quickshell's own notification server (`notify-send`, from libnotify, is the sender
+  CLI — the shell's `NotificationServer` is the D-Bus server, dunst is gone):
+  `notify-send -a opencode -u normal "opencode" "about to move the cursor"` then
   sleep 2, since the user is active on HDMI-A-1. The toast itself closes the focused panel
   (focus steal, 5 s lifetime), so wait it out and reopen the panel before interacting.
   `test beginWork` / `test endWork` already toast
   session start/end the same way, so a separate done notice is only needed for sessions that
-  never armed test mode: `dunstify -a opencode -u low "opencode" "testing done — all yours". Run `ydotoold` once for `ydotool`, or pipe commands
+  never armed test mode: `notify-send -a opencode -u low "opencode" "testing done — all yours". Run `ydotoold` once for `ydotool`, or pipe commands
   straight to `dotool` — but `mousemove X Y` is RELATIVE (deltas); aim with
   `mouseto X Y` (0.0–1.0 fractions of the whole 3840x1080 layout, e.g.
   `mouseto 0.23724 0.48611` for (911,525)) and verify with `hyprctl cursorpos`.
@@ -102,7 +118,10 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `error`/`Expected` lines matter); `test reloadNow false` to apply, then re-arm since every
   reload disarms; `test endWork` disarms and toasts. Read `test reloadError` after every reload
   instead of hunting the popup; `test workState` shows armed/watch flags when diagnosing
-  a stuck session (stuck watch-off recovers with `endWork`).
+  a stuck session (stuck watch-off recovers with `endWork`). `reloadNow false` is a SOFT
+  reload: it re-reads child files but NOT the root `shell.qml` — after editing shell.qml use
+  `test reloadNow true` (hard), and probe liveness (e.g. a version key in an ipc reply) when
+  behavior contradicts the files.
 - Toggle once: `quickshell ipc call shell close` then `volumePanel`. Two calls in a row cancel out.
 - Cursor shape is invisible to the driver: move the pointer, then `grim -c` with a tight `-g`
   crop. A hover highlight proves delivery, never the cursor. Every `MouseArea` claims
@@ -135,6 +154,13 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   an input hole; `VolumePanel` feeds it `activeNameEditor`, `testDispatch(x, y)` emulates a press
   for tests). Scroll the menu with `MouseArea.onWheel`, not a
   `WheelHandler` child (a `MouseArea` consumes the wheel, so the handler never fires).
+- `Behavior` animation properties (`duration`, `easing.type`) freeze after the Behavior's first
+  trigger in this Quickshell build: `duration: root.merged ? 140 : 450` inside a Behavior runs
+  with whichever branch the FIRST trigger evaluated, forever — state-dependent timing silently
+  never applies (this is why banner fades "appeared suddenly" for a whole session). Drive
+  phase-dependent fades with explicit `NumberAnimation`/`SequentialAnimation` objects restarted
+  from the state change (Banner's `splitAnim`/`lobeHideAnim`, Clock's `clockShowAnim`), and keep
+  PauseAnimation holds out of Behaviors for the same reason.
 - Cursor ownership: Qt takes the cursor from the topmost item that has one, not from the item
   under the pointer, and a bare `MouseArea` has `Qt.ArrowCursor`. So nothing full-surface may sit
   above interactive content — in `panels/PanelBase.qml` the press catcher and the wheel catcher
@@ -143,7 +169,29 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   rows set `cursorShape: Qt.PointingHandCursor`; plain `Item` overlays (`overlayArea`,
   `keyCatcher`, `layer.effect`) claim nothing and are safe.
 - Anything that must outlive a restart lives in `~/.local/state/quickshell/*.json`;
-  `PersistentProperties` only survives reloads.
+  `PersistentProperties` only survives reloads. Exception: notification history is
+  `~/.local/state/quickshell/notifications.db`, SQLite driven through the `sqlite3` CLI
+  (docs/adr/0004) — the one state file that is not JSON.
+- Arrivals display as the Banner (docs/adr/0005), pinned to eDP-1 on purpose: the user works
+  on HDMI-A-1 and does not want interruption there — they hear the chime and glance at eDP-1
+  if they care. The banner is an overlay pill (`bar/widgets/Banner.qml`) that emerges from
+  the bell and covers the clock widget — the underlying widgets keep their geometry, hover
+  handlers and the cluster metrics the notifications panel attaches to (the bell's badge,
+  DND and dismiss-all stay live throughout; the pill's travel is one `travel` scalar so the
+  geometry stays bound to the clock's live, proportional-font width). The bar window is constant-height
+  (`Theme.bannerMaxExpand` headroom) and `aboveWindows: true` — layer windows never re-render
+  below their initial height, and the old below-toplevels layer hid the expansion behind
+  tiled windows (docs/adr/0005). Banner state (latest active
+  notification only, 15 s sticky cap, center-panel suppression, panel-open collapse) lives in
+  `services/Notifs.qml`; expiry is owned by its 250 ms tick, not the widget: DND and locked
+  arrivals still expire into history, and the countdown pauses while idle, hovered, or for
+  sticky notifications (Critical, `resident`, `expireTimeout: 0`). The bar badge is the
+  unread count (arrivals since the panel last opened), not the live count. The chime plays on
+  every arrival not gated by DND/Locked (`pw-play`, sender sound hints first) — even when a
+  center panel suppresses the banner. History deletion is a soft delete
+  until the 90-day age prune, which runs once at shell startup. The history list is the one
+  `ListView` exception to the Column/Flickable preference (virtualization for hundreds of
+  rows; keep the Active section a Column).
 - PipeWire stream facts: `properties["pulse.corked"]` means paused, `object.serial` is the
   per-instance identity, `application.icon-name` carries a `-symbolic` suffix to strip, and the app
   icon resolves from the toplevel appId/`class` through `services/AppIcons.qml` (desktop entry icon).

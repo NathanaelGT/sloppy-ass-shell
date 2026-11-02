@@ -6,6 +6,7 @@ Rectangle {
 
   property bool checked: false
   property color accent: Theme.primary
+  property color track: Theme.surfaceHigh
 
   signal toggled
 
@@ -14,7 +15,7 @@ Rectangle {
   width: implicitWidth
   height: implicitHeight
   radius: height / 2
-  color: checked ? accent : Theme.surfaceHigh
+  color: checked ? accent : track
   antialiasing: true
 
   Behavior on color {

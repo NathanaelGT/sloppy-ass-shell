@@ -78,6 +78,7 @@ Singleton {
       "repeat": "\ueb72",
       "repeat-once": "\ueb71",
       "arrows-shuffle": "\uf000",
+      "arrow-back-up": "\ueb77",
       "screenshot": "\uf201",
       "cut": "\uea86",
       "crop": "\uea85",

@@ -334,7 +334,69 @@ or a decision worth knowing. LOW: cosmetic, edge case, or note.
   `printf` writers interleaved and the file came back as concatenated JSON fragments. Same
   `bash -lc` write pattern as `Pins`/`Aliases` (S1).
 
-## 7. Pre-existing / not ours (untouched)
+## 7. Notification Banner rework
+
+- **N1 — Banner rework: grouped, two-state blob. MEDIUM, BY REQUEST (verified).** The Banner now
+  merges Clock and Bell into a left-anchored blob (`bar/Bar.qml:130-168`), shows a time-only clock
+  while merged (`bar/widgets/Clock.qml:11-35`), and runs Compact → Expanded → retreat sessions
+  with a live-active group (`services/Notifs.qml:19-100`, `bar/widgets/Banner.qml`). Expanded shows
+  the Selected notification plus up to three rows and a "+N more" row. Verified on eDP-1 with
+  `test bannerState`/`bannerAdvance`/`bannerHold`/`bannerShot` and `grim`: compact width 560 px with
+  the left edge at the resting clock x=802, a single body 104 px tall, a five-notification group
+  321 px tall with three rows and "+1 more", the body clamped to three lines when rows exist,
+  Critical red border and row dot, action invocation dismissing the notification, an image
+  notification rendered, and the resting three-pill bar restored after retreat. The session timer,
+  absolute Critical cap, hover/Idle pause, DND/locked handling, side-panel non-suppression,
+  unrelated-panel replay and acknowledgment (clock lobe, bell/detail/more) were driven through the
+  state seams.
+- **N2 — The Banner input mask is a static target rectangle, not the animated blob. MEDIUM, BY
+  DESIGN (fixed).** A per-frame mask (`width: bannerWidget.blobWidth`, `height:
+  bannerWidget.expand`) in `bar/Bar.qml` made `quickshell ipc` answer "Not ready to accept queries
+  yet" after a reload while the Banner was visible; only a process restart recovered. A zero mask
+  reloaded cleanly, and the static target mask at `bar/Bar.qml:57-62` reloads cleanly with the
+  Banner expanded. Trade-off: while Expanded the mask covers the blob's target bounding box
+  (rounded corners and the spring transient included), so clicks in those slivers are swallowed;
+  clicks outside the target rectangle still pass through. The mask is zero while Compact or
+  retreating, so compact clicks rely on the bar-strip mask.
+- **N3 — Reloading with active notifications leaves them untracked. MEDIUM, PRE-EXISTING
+  (OPEN).** `NotificationServer` keeps `keepOnReload: true` (`services/Notifs.qml:685`) but
+  `records` is in-memory. After a reload with three active notifications, `notifState` reported
+  `activeCount: 3`, `recordCount: 0`, `remaining: -1`; those entries stayed in the panel without
+  expiry or archive until dismissed. The old service had the same in-memory `records` structure;
+  this is not introduced by the rework. Avoid reloading with live notifications, or restart the
+  shell.
+- **N4 — `dismissAll` skipped notifications; fixed.** The loop iterated the live
+  `trackedNotifications.values` while each `dismiss()` removed an element, skipping every other
+  entry. `services/Notifs.qml:170-177` now snapshots with `Array.from`. Verified: four active test
+  notifications → one `test bannerDismissAll` → `activeCount: 0`.
+- **N5 — Parent visibility binding read a child's visibility; fixed. LOW, QUIRK.** `mediaRow.visible:
+  thumb.visible || bodyLabel.visible` together with `bodyLabel.visible: root.hasBody` left the body
+  hidden even when `hasBody` was true: a parent's visibility affects children's effective
+  visibility, so the parent/child bindings formed a visibility cycle. The row now uses root-level
+  `hasBody`/`hasImage` (`bar/widgets/Banner.qml:39-40,423-465`), and the body renders.
+- **N6 — Remaining unverified interactions. LOW, OPEN.** Real pointer hover and real mouse clicks
+  were not injected; the `bannerHover`/`bannerInvoke`/`bannerSelect`/`bannerDismissRow` seams call
+  the same handlers but do not exercise the bar window's hit-test or input mask. The HDMI bar was
+  not captured while revealed because it auto-hides (the HDMI shot showed the window behind it);
+  HDMI gating is code-level (`bar/Bar.qml:60-61,136,151,154`). Music's title reveal was not
+  re-triggered (no playback change) and is untouched.
+- **N7 — Test data side effects. LOW, NOTE.** Test notifications entered History (`historyCount`
+  grew from ~201 to 209) and the notifications panel was opened once to clear the test unread
+  badge; all active test notifications were dismissed, including the pre-existing "critical probe"
+  notification. The history entries remain in the soft archive; no history rows were deleted.
+- **N8 — New test seams. LOW, TOOLING.** `bannerSelect`, `bannerSelectRow`, `bannerDismissRow`,
+  `bannerInvoke`, `bannerHold`, `bannerHover`, `bannerAdvance`, and richer `bannerState`
+  (`shell.qml:1861-1989`); `Banner.testInvoke`/`testMetrics` (`bar/widgets/Banner.qml:108-184`).
+  All are no-ops unless `TestDriver.active`. `AGENTS.md` still describes the old Banner seams; it
+  was not edited per the "do not edit AGENTS.md" constraint.
+- **N9 — Closing a side panel stopped the Banner; fixed. LOW, BUG (fixed).**
+  `bannerSuppressed()` treated `Panels.closingScreen === "eDP-1"` as suppression, so closing Volume
+  while a Banner was up hid it even though side panels must not suppress. The check was removed;
+  the Banner now survives a side-panel close (`bannerState`: `present: true` after close).
+  `handlePanelClosed()` now clears `bannerAcknowledged` after the close animation, so a
+  Notifications open still cancels replay without leaving a stale acknowledgment.
+
+## 8. Pre-existing / not ours (untouched)
 
 - **D5 — Tray entry renders a checkerboard. NOT OURS.** The OpenChamber SNI pixmap is broken app-side;
   its `IconName` update failures also spam the log every few seconds.
@@ -368,6 +430,7 @@ or a decision worth knowing. LOW: cosmetic, edge case, or note.
 | Device priority (P26) | `test priorityOrder`/`priorityMove` + `wpctl inspect @DEFAULT_SINK@`/`@DEFAULT_SOURCE@` for flips both ways and restore; `pactl load-module module-null-sink` probe for set-change append (last, default untouched, then dragged to top and destroyed: unpinned entry pruned from menu and file, pinned entry kept dimmed); real `dotool` drag reorder; `grim` of ordered list and dimmed pinned ghost row |
 | Master/per-app collapse (P7, P21) | `test setSectionExpanded`/`setAppExpanded` + `appRows` state, plus `grim` crops; active vs inactive staged with a paused `mpv --ao=pulse` (corks the stream) and a throwaway app pin, all reverted |
 | Pinned app reorder (P28) | Real `dotool` grip drag (fraction `0.4695, 0.237→0.170` on eDP-1) moved a pinned app below the next one and a device below its neighbour (top kept, default unchanged); `test appOrder`/`appNames`/`priorityOrder` before/after; `audio-pins.json` byte-identical to backup once restored; dragged-card mute confirmed by a 4× `magick` crop of the knob: card is see-through and the wave ends at the knob edge with no bleed |
+| Notification Banner rework (N1-N5) | `test bannerState`/`bannerAdvance`/`bannerHold`/`bannerHover`/`bannerInvoke`/`bannerSelect`/`bannerDismissRow` plus `bannerShot` and `grim` crops; `notifState` for active/expiry; `openPanel`/`closePanel` for suppression and replay; reload matrix with the Banner compact, expanded and hidden, with a dynamic vs static mask; width/height sampled 50-120 ms apart to see the spring and 4% width overshoot |
 
 ## Appendix — reusable test recipes
 
