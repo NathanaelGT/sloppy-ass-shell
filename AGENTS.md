@@ -38,11 +38,10 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `test folderSearch <query>` runs the subtree search immediately (poll `folderState` until
   `pending:false`); `test folderRowRect <index>` aims at a row. None of these move the
   cursor or touch playback — row play and double-click have no driver seam and are audible.
-  Power menu flows: `test powerState` dumps open/focusRow/holds/suppressed (no cursor or focus
-  effects); `powerBeginHold <row>`/`powerEndHold <row>` drive the hold gesture;
-  `powerSuppressFire <bool>` arms dry-run so a completed hold closes the menu without executing —
-  arm it before any hold test (rows 2-4 are lock&suspend/reboot/shutdown; unsuppressed completion
-  is real, announce first). Lock fires instantly on click, F1, or Return when focused.
+  Power menu: NO testing, NO driver seams. Do not test any power menu functionality and do not
+  add test ipc for it — rows 2-4 are lock&suspend/reboot/shutdown and a completed hold executes
+  for real. The user tests the power menu manually. Lock fires instantly on click, F1, or Return
+  when focused.
   Dashboard flows: `test dashState` dumps players (identity/playing), the manual pick (-1 =
   auto), and the shown target with its playing flag and ticking local position;
   `test dashPick <index>` sets the

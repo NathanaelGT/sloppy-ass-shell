@@ -13,7 +13,7 @@ PanelBase {
   exclusiveFocus: true
 
   readonly property int rowHeight: Math.round(48 * Theme.scale)
-  readonly property int holdMs: 2000
+  readonly property int holdMs: 750
   readonly property int drainMs: 150
   readonly property int iconInset: Math.round(12 * Theme.scale)
   readonly property int iconSlotSize: Math.round(24 * Theme.scale)
@@ -54,9 +54,6 @@ PanelBase {
       return
     }
     Panels.close()
-    if (TestDriver.fireSuppressed()) {
-      return
-    }
     Quickshell.execDetached(action.command)
   }
 
@@ -72,43 +69,6 @@ PanelBase {
         row.cancelHold()
       }
     }
-  }
-
-  function testPowerState() {
-    const holds = []
-    for (let i = 0; i < root.actions.length; i++) {
-      const row = rowRepeater.itemAt(i)
-      holds.push({
-        row: i,
-        holding: row ? row.holding : false,
-        progress: row ? Math.round(row.progress * 1000) / 1000 : 0
-      })
-    }
-    return {
-      enabled: true,
-      open: root.open,
-      focusRow: root.focusRow,
-      suppressed: TestDriver.fireSuppressed(),
-      holds: holds
-    }
-  }
-
-  function testBeginHold(row) {
-    const item = rowRepeater.itemAt(row)
-    if (!item) {
-      return false
-    }
-    item.beginHold()
-    return true
-  }
-
-  function testEndHold(row) {
-    const item = rowRepeater.itemAt(row)
-    if (!item) {
-      return false
-    }
-    item.endHold()
-    return true
   }
 
   onOpened: {
@@ -153,6 +113,9 @@ PanelBase {
   }
 
   onKeyReleased: event => {
+    if (event.isAutoRepeat) {
+      return
+    }
     if (event.key >= Qt.Key_F2 && event.key <= Qt.Key_F4) {
       const row = rowRepeater.itemAt(event.key - Qt.Key_F2 + 1)
       if (row) {

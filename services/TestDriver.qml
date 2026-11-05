@@ -8,7 +8,6 @@ Singleton {
   id: root
 
   property bool active: false
-  property bool suppressFire: false
 
   property var panels: ({})
 
@@ -22,10 +21,6 @@ Singleton {
 
   function key(name, screen) {
     return name + "|" + screen
-  }
-
-  function fireSuppressed() {
-    return root.active && root.suppressFire
   }
 
   function register(name, screen, item) {
