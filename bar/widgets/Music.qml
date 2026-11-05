@@ -7,8 +7,12 @@ BarButton {
   id: root
 
   property var screen
+  property bool merged: false
+  property real mergedSpan: 0
 
-  implicitWidth: root.showingTitle ? titleLabel.implicitWidth + icon.implicitWidth + Math.round(23 * Theme.scale) : icon.implicitWidth + Math.round(16 * Theme.scale)
+  readonly property real iconOnlyWidth: icon.implicitWidth + Math.round(16 * Theme.scale)
+
+  implicitWidth: root.merged ? Math.round(root.mergedSpan) + root.iconOnlyWidth : root.showingTitle ? titleLabel.implicitWidth + icon.implicitWidth + Math.round(26 * Theme.scale) : root.iconOnlyWidth
   active: Panels.openOn("music", root.screen.name)
   onClicked: Panels.toggle("music", root.screen.name)
   onRightClicked: Mpd.toggle()
@@ -17,6 +21,13 @@ BarButton {
   visible: Mpd.connected
 
   Behavior on implicitWidth {
+    NumberAnimation {
+      duration: 200
+      easing.type: Easing.OutCubic
+    }
+  }
+
+  Behavior on x {
     NumberAnimation {
       duration: 200
       easing.type: Easing.OutCubic
@@ -40,7 +51,7 @@ BarButton {
   Timer {
     id: titleTimer
 
-    interval: 10000
+    interval: 5000
     repeat: false
     onTriggered: root.showTitle = false
   }
@@ -108,6 +119,9 @@ BarButton {
     anchors.verticalCenter: parent.verticalCenter
     anchors.left: parent.left
     anchors.leftMargin: Math.round(10 * Theme.scale)
+    anchors.right: icon.left
+    anchors.rightMargin: Math.round(8 * Theme.scale)
+    horizontalAlignment: root.merged ? Text.AlignHCenter : Text.AlignLeft
     visible: root.showingTitle && root.song !== null && root.song.title.length > 0
     opacity: root.titleOpacity
     text: root.song ? (root.song.title + (root.song.artist && root.song.artist.length > 0 ? " · " + root.song.artist : "")) : ""
