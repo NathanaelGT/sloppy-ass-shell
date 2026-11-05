@@ -8,6 +8,7 @@ Item {
   property real value: 0
   property real fullMark: -1
   property color fillColor: Theme.primary
+  property color trackColor: Theme.trackFill
   property var node: null
   property bool wave: true
   readonly property alias pressed: slideMouse.pressed
@@ -63,7 +64,7 @@ Item {
     width: parent.width
     height: Math.round(2 * Theme.scale)
     radius: height / 2
-    color: Theme.trackFill
+    color: root.trackColor
     antialiasing: true
   }
 
@@ -74,7 +75,7 @@ Item {
     width: track.height
     height: knob.height
     radius: width / 2
-    color: Theme.trackFill
+    color: root.trackColor
     antialiasing: true
   }
 

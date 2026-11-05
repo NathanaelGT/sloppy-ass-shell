@@ -19,7 +19,7 @@ Rectangle {
   width: parent ? parent.width : 0
   height: s(31)
   radius: s(8)
-  color: root.activeSource ? Qt.rgba(Theme.mauve.r, Theme.mauve.g, Theme.mauve.b, 0.18) : rowHover.containsMouse ? Theme.surface : "transparent"
+  color: root.activeSource ? Qt.rgba(Theme.mauve.r, Theme.mauve.g, Theme.mauve.b, 0.18) : rowHover.containsMouse ? Theme.surface : Theme.base
 
   function s(n) {
     return Math.round(n * Theme.scale)

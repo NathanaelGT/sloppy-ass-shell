@@ -28,6 +28,7 @@ PanelWindow {
   property bool animateCardHeight: false
   property bool animateCardWidth: false
   property bool stemEnabled: false
+  property bool stemRight: false
   property real stemX: 0
   property real stemProgress: 0
   readonly property real stemGap: (Theme.barThickness - Theme.capsuleThickness) / 2
@@ -439,7 +440,8 @@ PanelWindow {
           width: root.contentWidth
           height: Math.max(0, root.cardHeight - root.contentOuterPad)
           radius: Theme.rowRadius
-          topLeftRadius: 0
+          topLeftRadius: root.stemRight ? Theme.rowRadius : 0
+          topRightRadius: root.stemRight ? 0 : Theme.rowRadius
           color: root.contentColor
           antialiasing: true
         }
@@ -594,9 +596,9 @@ PanelWindow {
     }
 
     InnerFillet {
-      x: stem.width - 1
+      x: root.stemRight ? -radius + 1 : stem.width - 1
       y: stem.height - radius
-      mirror: true
+      mirror: !root.stemRight
       radius: Theme.barThickness / 2 * root.stemProgress
       color: stem.fill
     }

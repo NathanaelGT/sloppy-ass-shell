@@ -75,6 +75,6 @@ Item {
     color: "transparent"
     antialiasing: true
     border.width: root.hairline()
-    border.color: Qt.rgba(1, 1, 1, 0.2)
+    border.color: Theme.surfaceHigher
   }
 }

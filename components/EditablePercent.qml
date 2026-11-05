@@ -7,8 +7,9 @@ Item {
   property real percent: 0
   property real maximum: 150
   property bool editing: false
+  property color textColor: Theme.subtext
 
-  readonly property color valueColor: Math.round(root.percent) >= 101 ? Theme.red : Theme.subtext
+  readonly property color valueColor: Math.round(root.percent) >= 101 ? Theme.red : root.textColor
 
   signal edited(real percent)
   signal wheeled(real angleDelta)

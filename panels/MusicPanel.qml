@@ -11,7 +11,16 @@ PanelBase {
 
   panelName: "music"
   align: "center"
-  horizontalOffset: -Math.round(40 * Theme.scale)
+  animateCardWidth: true
+  animateCardHeight: true
+  cardWidth: Panels.clusterWidth(root.screenId) + root.contentOuterPad * 2
+  horizontalOffset: Panels.clusterRight(root.screenId) - Math.round((root.width - root.cardWidth) / 2) - root.cardWidth + root.contentOuterPad
+  contentOuterPad: 8
+  contentInset: 18
+  contentColor: Theme.capsuleHover
+  stemEnabled: true
+  stemRight: true
+  stemX: Panels.clusterRight(root.screenId) - Theme.capsuleThickness
   popupOpen: routePopup.opened
   cancelItem: root.activeEditor
   onCancelRequested: {
@@ -19,8 +28,6 @@ PanelBase {
       root.activeEditor.cancel()
     }
   }
-
-  cardHeight: Math.min(s(563), maxCardHeight)
 
   readonly property var song: Mpd.song
   readonly property bool playing: Mpd.state === "play"
@@ -801,6 +808,8 @@ PanelBase {
   }
 
   Item {
+    id: coverHeader
+
     width: parent.width
     height: coverArt.height
 
@@ -812,10 +821,10 @@ PanelBase {
       width: s(92)
       height: width
       radius: s(10)
-      color: Theme.surfaceHigh
+      color: Theme.base
       antialiasing: true
       border.width: hairline()
-      border.color: Qt.rgba(1, 1, 1, 0.2)
+      border.color: Theme.surfaceHigher
       clip: true
 
       Item {
@@ -946,7 +955,7 @@ PanelBase {
         height: s(12)
         verticalAlignment: Text.AlignVCenter
         text: Mpd.song ? ((Mpd.song.artist.length > 0 ? Mpd.song.artist : "Unknown artist") + (Mpd.song.album.length > 0 ? " · " + Mpd.song.album : "")) : ""
-        color: Mpd.song && Mpd.song.artist.length > 0 ? Theme.subtext : Theme.overlay
+        color: Theme.subtext
         font.family: Theme.fontFamily
         font.pixelSize: s(10)
         font.weight: Font.Medium
@@ -989,7 +998,7 @@ PanelBase {
           }
           return parts.join(" · ")
         }
-        color: Theme.overlay
+        color: Theme.subtext
         font.family: "monospace"
         font.pixelSize: s(9)
         elide: Text.ElideRight
@@ -1012,7 +1021,7 @@ PanelBase {
         height: s(26)
         radius: s(13)
         anchors.left: parent.left
-        color: favHover.containsMouse ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.08)
+        color: favHover.containsMouse ? Theme.surfaceHigher : Theme.base
 
         Text {
           anchors.centerIn: parent
@@ -1044,7 +1053,7 @@ PanelBase {
         height: s(26)
         radius: s(13)
         anchors.right: parent.right
-        color: pinHover.containsMouse ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.08)
+        color: pinHover.containsMouse ? Theme.surfaceHigher : Theme.base
 
         Text {
           anchors.centerIn: parent
@@ -1081,6 +1090,8 @@ PanelBase {
   }
 
   Item {
+    id: seekRow
+
     width: parent.width
     height: s(10) + seekTrack.height + s(4) + elapsedText.implicitHeight
     implicitHeight: visible ? height : 0
@@ -1117,7 +1128,7 @@ PanelBase {
       anchors.topMargin: s(10)
       height: s(5)
       radius: height / 2
-      color: Theme.surfaceHigh
+      color: Theme.base
 
       Rectangle {
         width: Math.round((seekTrack.width - seekKnob.width) * (root.seeking ? root.seekPreview : root.seekFraction) + seekKnob.width / 2)
@@ -1174,6 +1185,8 @@ PanelBase {
   }
 
   Item {
+    id: transportRow
+
     width: parent.width
     height: s(45)
     implicitHeight: visible ? height : 0
@@ -1185,7 +1198,7 @@ PanelBase {
       radius: s(17.5)
       x: 0
       anchors.verticalCenter: parent.verticalCenter
-      color: Mpd.weightedRandom ? Theme.mauve : (shuffleHover.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
+      color: Mpd.weightedRandom ? Theme.mauve : (shuffleHover.containsMouse ? Theme.surface : "transparent")
 
       Text {
         anchors.centerIn: parent
@@ -1211,7 +1224,7 @@ PanelBase {
       radius: s(17.5)
       x: parent.width * 3 / 10 - width / 2
       anchors.verticalCenter: parent.verticalCenter
-      color: prevHover.containsMouse ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.08)
+      color: prevHover.containsMouse ? Theme.surfaceHigher : Theme.base
 
       Text {
         anchors.centerIn: parent
@@ -1263,7 +1276,7 @@ PanelBase {
       radius: s(17.5)
       x: parent.width * 7 / 10 - width / 2
       anchors.verticalCenter: parent.verticalCenter
-      color: nextHover.containsMouse ? Qt.rgba(1, 1, 1, 0.14) : Qt.rgba(1, 1, 1, 0.08)
+      color: nextHover.containsMouse ? Theme.surfaceHigher : Theme.base
 
       Text {
         anchors.centerIn: parent
@@ -1289,7 +1302,7 @@ PanelBase {
       radius: s(17.5)
       x: parent.width - width
       anchors.verticalCenter: parent.verticalCenter
-      color: Mpd.repeat ? Theme.mauve : (repeatHover.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent")
+      color: Mpd.repeat ? Theme.mauve : (repeatHover.containsMouse ? Theme.surface : "transparent")
 
       Text {
         anchors.centerIn: parent
@@ -1311,6 +1324,8 @@ PanelBase {
   }
 
   Item {
+    id: volumeRow
+
     width: parent.width
     height: s(34)
     implicitHeight: visible ? height : 0
@@ -1337,14 +1352,14 @@ PanelBase {
           radius: width / 2
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          color: volIconHover.containsMouse ? Qt.rgba(1, 1, 1, 0.14) : "transparent"
+          color: volIconHover.containsMouse ? Theme.surfaceHigher : "transparent"
 
           Text {
             anchors.centerIn: parent
             text: Mpd.displayVolume === 0 || !Mpd.streamStable ? Icons.get("volume-off") : Icons.get("volume")
             font.family: Theme.iconFamily
             font.pixelSize: s(14)
-            color: Theme.subtext
+            color: Theme.text
           }
 
           MouseArea {
@@ -1378,6 +1393,7 @@ PanelBase {
           node: Mpd.streamNode
           value: Mpd.displayVolume / 100
           fillColor: Theme.mauve
+          trackColor: Theme.base
           onMoved: v => Mpd.setVolume(v * 100)
           onWheeled: delta => root.wheelVolume(delta)
         }
@@ -1394,7 +1410,7 @@ PanelBase {
           Rectangle {
             anchors.fill: parent
             radius: height / 2
-            color: volValueHover.containsMouse || volEditor.editing ? Qt.rgba(1, 1, 1, 0.14) : "transparent"
+            color: volValueHover.containsMouse || volEditor.editing ? Theme.surfaceHigher : "transparent"
           }
 
           MouseArea {
@@ -1412,6 +1428,7 @@ PanelBase {
             anchors.centerIn: parent
             percent: Mpd.displayVolume
             maximum: 100
+            textColor: Theme.text
             onEdited: value => Mpd.setVolume(value)
             onWheeled: delta => root.wheelVolume(delta)
             onEditingChanged: {
@@ -1432,7 +1449,7 @@ PanelBase {
           radius: width / 2
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
-          color: routeHover.containsMouse || routePopup.opened ? Qt.rgba(1, 1, 1, 0.14) : "transparent"
+          color: routeHover.containsMouse || routePopup.opened ? Theme.surfaceHigher : "transparent"
           opacity: Mpd.streamStable ? 1 : 0.45
 
           Text {
@@ -1440,7 +1457,7 @@ PanelBase {
             text: Icons.get("devices")
             font.family: Theme.iconFamily
             font.pixelSize: s(12)
-            color: root.routeTargetName() !== "" ? Theme.mauve : Theme.subtext
+            color: root.routeTargetName() !== "" ? Theme.mauve : Theme.text
           }
 
           MouseArea {
@@ -1458,6 +1475,8 @@ PanelBase {
   }
 
   Rectangle {
+    id: hairlineRect
+
     width: parent.width
     height: hairline()
     implicitHeight: height
@@ -1465,6 +1484,8 @@ PanelBase {
   }
 
   Row {
+    id: tabsRow
+
     width: parent.width
     height: s(30)
     spacing: s(8)
@@ -1478,7 +1499,7 @@ PanelBase {
       height: s(30)
       implicitHeight: height
       radius: s(8)
-      color: Theme.mantle
+      color: Theme.base
       clip: true
 
       Rectangle {
@@ -1511,7 +1532,7 @@ PanelBase {
             width: (parent.width - s(4)) / 2
             height: parent.height
             radius: s(6)
-            color: tabHover.containsMouse && root.currentTab !== index ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+            color: tabHover.containsMouse && root.currentTab !== index ? Theme.surface : "transparent"
 
             Text {
               anchors.centerIn: parent
@@ -1541,7 +1562,7 @@ PanelBase {
       width: parent.width - tabBar.width - s(8)
       height: s(30)
       radius: s(8)
-      color: Theme.mantle
+      color: Theme.base
       border.width: searchInput.activeFocus ? 1 : 0
       border.color: Theme.primary
 
@@ -1644,7 +1665,7 @@ PanelBase {
               radius: s(6)
               anchors.verticalCenter: parent.verticalCenter
               visible: root.browsePath.length > 0
-              color: backHover.containsMouse ? Theme.surfaceHigh : "transparent"
+              color: backHover.containsMouse ? Theme.surface : "transparent"
 
               Text {
                 anchors.centerIn: parent
@@ -1797,7 +1818,7 @@ PanelBase {
               width: foldersColumn.width
               height: s(44)
               radius: s(8)
-              color: trackRow.isCurrent || trackRow.rowHovered ? Theme.surfaceHigh : Theme.surface
+              color: trackRow.isCurrent || trackRow.rowHovered ? Theme.surface : Theme.base
 
               MouseArea {
                 id: trackHover
@@ -1862,7 +1883,7 @@ PanelBase {
                 Text {
                   width: parent.width
                   text: trackRow.entry.artist.length > 0 ? trackRow.entry.artist : "Unknown artist"
-                  color: trackRow.entry.artist.length > 0 ? Theme.subtext : Theme.overlay
+                  color: Theme.subtext
                   font.family: Theme.fontFamily
                   font.pixelSize: s(9)
                   elide: Text.ElideRight
@@ -2199,7 +2220,7 @@ PanelBase {
                   width: parent.width
                   height: s(44)
                   radius: s(8)
-                  color: (Mpd.song && Mpd.song.id === qid) || rowHover ? Theme.surfaceHigh : Theme.surface
+                  color: (Mpd.song && Mpd.song.id === qid) || rowHover ? Theme.surface : Theme.base
                   opacity: queueRow.dragging || queueRow.settling ? 0.5 : 1
                   layer.enabled: queueRow.dragging || queueRow.settling
                   antialiasing: true
@@ -2294,7 +2315,7 @@ PanelBase {
                       Text {
                         width: parent.width
                         text: artist.length > 0 ? artist : "Unknown artist"
-                        color: artist.length > 0 ? Theme.subtext : Theme.overlay
+                        color: Theme.subtext
                         font.family: Theme.fontFamily
                         font.pixelSize: s(9)
                         elide: Text.ElideRight
@@ -2426,7 +2447,7 @@ PanelBase {
     }
 
     background: Rectangle {
-      color: Theme.surfaceHigh
+      color: Theme.surface
       radius: Theme.rowRadius
       border.width: 1
       border.color: Theme.surfaceHigher

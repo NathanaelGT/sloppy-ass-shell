@@ -816,7 +816,12 @@ ShellRoot {
       return JSON.stringify({
         enabled: true,
         open: true,
-        screen: panel.screenId
+        screen: panel.screenId,
+        stemEnabled: panel.stemEnabled,
+        stemX: panel.stemX,
+        stemProgress: panel.stemProgress,
+        cardX: panel.cardX,
+        cardWidth: panel.cardWidth
       })
     }
 

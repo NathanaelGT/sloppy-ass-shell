@@ -12,6 +12,43 @@ BarButton {
 
   readonly property real iconOnlyWidth: icon.implicitWidth + Math.round(16 * Theme.scale)
 
+  property real seal: 1
+
+  bottomLeftRadius: root.seal * root.radius
+  bottomRightRadius: root.seal * root.radius
+
+  Component.onCompleted: root.seal = root.active ? 0 : 1
+
+  onActiveChanged: {
+    if (!root.active) {
+      return
+    }
+    sealAnim.stop()
+    sealAnim.to = 0
+    sealAnim.start()
+  }
+
+  Connections {
+    target: Panels
+
+    function onCloseCleared(name, screen) {
+      if (name === "music" && screen === root.screen.name) {
+        sealAnim.stop()
+        sealAnim.to = 1
+        sealAnim.start()
+      }
+    }
+  }
+
+  NumberAnimation {
+    id: sealAnim
+
+    target: root
+    property: "seal"
+    duration: 150
+    easing.type: Easing.OutCubic
+  }
+
   implicitWidth: root.merged ? Math.round(root.mergedSpan) + root.iconOnlyWidth : root.showingTitle ? titleLabel.implicitWidth + icon.implicitWidth + Math.round(26 * Theme.scale) : root.iconOnlyWidth
   active: Panels.openOn("music", root.screen.name)
   onClicked: Panels.toggle("music", root.screen.name)
