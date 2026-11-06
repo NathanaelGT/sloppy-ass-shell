@@ -9,7 +9,9 @@ BarButton {
 
   property var screen
 
-  implicitWidth: timeLabel.visible ? icon.implicitWidth + Math.round(5 * Theme.scale) + timeLabel.implicitWidth + Math.round(16 * Theme.scale) : icon.implicitWidth + Math.round(16 * Theme.scale)
+  readonly property int edgePad: Math.round(10 * Theme.scale)
+
+  implicitWidth: timeLabel.visible ? edgePad + icon.implicitWidth + Math.round(5 * Theme.scale) + timeLabel.implicitWidth + edgePad : edgePad + icon.implicitWidth + edgePad
   active: Panels.openOn("battery", root.screen.name)
   onClicked: Panels.toggle("battery", root.screen.name)
 
@@ -36,7 +38,7 @@ BarButton {
     id: icon
     anchors.verticalCenter: parent.verticalCenter
     anchors.left: parent.left
-    anchors.leftMargin: Math.round(10 * Theme.scale)
+    anchors.leftMargin: root.edgePad
     level: root.pct
     color: root.tint
   }
