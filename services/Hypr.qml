@@ -1,4 +1,5 @@
 pragma Singleton
+import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 
@@ -64,5 +65,20 @@ Singleton {
 
   function focusWorkspace(id) {
     Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ workspace = " + id + " })"])
+  }
+
+  function toggleSpecial(name) {
+    const bare = name.indexOf("special:") === 0 ? name.slice("special:".length) : name
+    Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.workspace.toggle_special(\"" + bare + "\")"])
+  }
+
+  Connections {
+    target: Hyprland
+
+    function onRawEvent(event) {
+      if (event.name === "activespecialv2") {
+        Hyprland.refreshMonitors()
+      }
+    }
   }
 }

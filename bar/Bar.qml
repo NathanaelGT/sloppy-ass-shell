@@ -123,7 +123,7 @@ PanelWindow {
       width: screen.width
       height: Theme.barThickness
 
-      Taskbar {
+      Workspaces {
         x: root.edgeMargin + Math.round(6 * Theme.scale)
         anchors.verticalCenter: parent.verticalCenter
         screen: root.screen

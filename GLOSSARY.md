@@ -6,6 +6,14 @@ concepts, not general QML/programming vocabulary.
 
 ## Bar
 
+**Workspaces**:
+The bar widget showing one group per workspace on the widget's screen: the
+workspace number and every window icon, hairline-separated inside one
+capsule. Clicking a group focuses the workspace, an icon focuses its window,
+wheeling over a group cycles its windows, right-click opens the window
+switcher. A sliding underline marks the focused window.
+_Avoid_: taskbar, workspace bar
+
 **Alt time**:
 The bar clock's right-click display mode: WITA — one hour ahead, labelled
 `WITA` — instead of the system zone with its own abbreviation. Display-only:
