@@ -34,7 +34,7 @@ BarButton {
 
   function displayMenu(item, host) {
     const point = host.mapToItem(null, host.width / 2, host.height)
-    item.display(Window.window, Math.round(point.x), Math.round(point.y))
+    item.display(QsWindow.window, Math.round(point.x), Math.round(point.y))
   }
 
   Row {

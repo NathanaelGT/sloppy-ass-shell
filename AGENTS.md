@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Hand-written Quickshell 0.3.1 config replacing a Noctalia 5.2.1 setup. NixOS, Hyprland,
+Hand-written Quickshell 0.3.2 config replacing a Noctalia 5.2.1 setup. NixOS, Hyprland,
 Catppuccin Mocha, `Theme.scale = 1.25`.
 
 ## Testing with me
@@ -251,7 +251,7 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
 - 2-space indent, no comments, `id: root`, functions before the markup.
 - `panels/` screens, `components/` reusable items, `services/` singletons, `providers/` launcher
   providers, `theme/` tokens.
-- Prefer `Column`/`Flickable` over `ListView`; Quickshell 0.3.1 models are `ObjectModel` — read `.values`.
+- Prefer `Column`/`Flickable` over `ListView`; Quickshell 0.3.2 models are `ObjectModel` — read `.values`.
 - Format as the last step of the task, after the behavior checks: `find . -name '*.qml' | sort >
   /tmp/opencode/qmlformat-files.txt` then the `qmlformat` binary under `/nix/store/*qtdeclarative-6*/bin`
   with `-F /tmp/opencode/qmlformat-files.txt` (in-place, whole tree, idempotent; the root
