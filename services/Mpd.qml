@@ -39,6 +39,7 @@ Singleton {
   property var awaiting: null
   property var sendQueue: []
   property bool clearingQueue: false
+  property bool localQueuePending: false
 
   property var favorites: ({})
   property var pinned: ({})
@@ -297,6 +298,7 @@ Singleton {
     root.random = false
     root.single = false
     root.queue = []
+    root.localQueuePending = false
     root.musicDir = ""
     root.artIndex = 0
     root.favorites = ({})
@@ -412,7 +414,11 @@ Singleton {
       root.send("currentsong", l => root.applySong(root.parseSongs(l)[0] || null))
     }
     if (needQueue) {
-      root.send("playlistinfo", l => root.applyQueue(root.parseSongs(l)))
+      if (root.localQueuePending) {
+        root.localQueuePending = false
+      } else {
+        root.send("playlistinfo", l => root.applyQueue(root.parseSongs(l)))
+      }
     }
     if (needSticker) {
       root.refreshStickers()
@@ -1096,18 +1102,67 @@ Singleton {
           key: root.weightedKey(root.weightOf(q.file))
         }))
     scored.sort((a, b) => b.key - a.key)
-    // rebuild queue via move? simpler: clear and re-add all keeping current first
     const cur = root.queue.find(q => q.id === curId)
-    root.beginClear()
-    root.send("clear", null)
-    if (cur) {
-      root.send("add \"" + root.esc(cur.file) + "\"", null)
+    const ordered = cur ? [cur].concat(scored.map(s => s.q)) : scored.map(s => s.q)
+    const atPos = {}
+    for (let i = 0; i < root.queue.length; i++) {
+      atPos[root.queue[i].id] = i
     }
-    for (let i = 0; i < scored.length; i++) {
-      root.send("add \"" + root.esc(scored[i].q.file) + "\"", null)
+    const moves = []
+    for (let i = 0; i < ordered.length; i++) {
+      const id = ordered[i].id
+      if (atPos[id] === i) {
+        continue
+      }
+      const from = atPos[id]
+      for (const k in atPos) {
+        const p = atPos[k]
+        if (p === from) {
+          continue
+        }
+        if (from < i && p > from && p <= i) {
+          atPos[k] = p - 1
+        } else if (from > i && p < from && p >= i) {
+          atPos[k] = p + 1
+        }
+      }
+      atPos[id] = i
+      moves.push("moveid " + id + " " + i)
     }
-    root.send("play 0", null)
-    root.syncAll()
+    if (root.state !== "play") {
+      moves.push("play 0")
+    }
+    if (moves.length === 0) {
+      return
+    }
+    const chunks = []
+    for (let i = 0; i < moves.length; i += 400) {
+      chunks.push(moves.slice(i, i + 400))
+    }
+    let ci = 0
+    const runChunk = () => {
+      if (ci >= chunks.length) {
+        root.applyLocalOrder(ordered)
+        return
+      }
+      const batch = chunks[ci]
+      ci += 1
+      root.send("command_list_begin\n" + batch.join("\n") + "\ncommand_list_end", runChunk)
+    }
+    runChunk()
+  }
+
+  function applyLocalOrder(ordered) {
+    root.queue = ordered.map((q, i) => Object.assign({}, q, {
+        pos: i
+      }))
+    if (root.song) {
+      root.song = Object.assign({}, root.song, {
+        pos: 0
+      })
+    }
+    root.localQueuePending = true
+    root.send("status", l => root.applyStatus(root.parsePairs(l)))
   }
 
   function clearAndPlayWeighted(dir) {

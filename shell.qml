@@ -855,6 +855,8 @@ ShellRoot {
         Mpd.next()
       } else if (cmd === "prev") {
         Mpd.prev()
+      } else if (cmd === "shuffle") {
+        Mpd.setRandomWeighted(!Mpd.weightedRandom)
       } else if (cmd === "refresh") {
         Mpd.refresh()
       } else if (cmd.startsWith("play ")) {

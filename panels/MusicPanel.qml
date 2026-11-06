@@ -42,6 +42,7 @@ PanelBase {
   property string searchText: ""
   property int navDirection: 1
   property var activeEditor: null
+  readonly property bool bulkQueueSync: queueModel.count > 150
 
   onSearchTextChanged: {
     searchTimer.stop()
@@ -63,6 +64,14 @@ PanelBase {
       return true
     }
     return (title || "").toLowerCase().indexOf(q) >= 0 || (artist || "").toLowerCase().indexOf(q) >= 0
+  }
+
+  function queueRowHeight(i) {
+    const row = queueModel.get(i)
+    if (!row || !root.matchesSearch(row.title, row.artist)) {
+      return 0
+    }
+    return s(44) + s(4)
   }
   function hairline() {
     return Math.max(1, Math.round(Theme.scale))
@@ -122,10 +131,10 @@ PanelBase {
     return {
       open: root.open,
       currentId: Mpd.song ? Mpd.song.id : -1,
-      scrollY: Math.round(queueFlick.contentY),
-      maxScrollY: Math.round(Math.max(0, queueFlick.contentHeight - queueFlick.height)),
-      viewportY: Math.round(queueFlick.mapToItem(null, 0, 0).y),
-      viewportHeight: Math.round(queueFlick.height),
+      scrollY: Math.round(queueList.contentY),
+      maxScrollY: Math.round(Math.max(0, queueList.contentHeight - queueList.height)),
+      viewportY: Math.round(queueList.mapToItem(null, 0, 0).y),
+      viewportHeight: Math.round(queueList.height),
       rows: rows
     }
   }
@@ -171,11 +180,11 @@ PanelBase {
   }
 
   function testQueueDragEdge(edge) {
-    const top = queueFlick.mapToItem(null, 0, 0).y
+    const top = queueList.mapToItem(null, 0, 0).y
     if (edge === "top") {
       queueDragger.update(top + 5)
     } else {
-      queueDragger.update(top + queueFlick.height - 5)
+      queueDragger.update(top + queueList.height - 5)
     }
   }
 
@@ -185,7 +194,7 @@ PanelBase {
 
   function testQueueCancel() {
     queueDragger.cancel()
-    queueFlick.contentY = 0
+    queueList.contentY = 0
   }
 
   function testControlRects(index) {
@@ -2017,405 +2026,389 @@ PanelBase {
         }
       }
 
-      Flickable {
-        id: queueFlick
+      DragReorder {
+        id: queueDragger
+
+        listView: queueList
+        model: queueModel
+        keyRole: "qid"
+        rowObjectName: "queueRow"
+        rowHeightAt: root.queueRowHeight
+        flickable: queueList
+        edgeZone: s(48)
+        scrollSpeed: s(12)
+        onMoved: (qid, target) => Mpd.moveQueueId(qid, target)
+      }
+
+      ListView {
+        id: queueList
 
         anchors.fill: parent
-        contentHeight: queueColumn.implicitHeight
+        interactive: true
+        focus: false
         clip: true
+        model: queueModel
+        spacing: 0
+        cacheBuffer: s(600)
+        boundsBehavior: Flickable.StopAtBounds
+        move: Transition {
+          enabled: !queueDragger.suppressMove && !root.bulkQueueSync
+          NumberAnimation {
+            property: "y"
+            duration: 220
+            easing.type: Easing.OutCubic
+          }
+        }
+        displaced: Transition {
+          enabled: !queueDragger.suppressMove && !root.bulkQueueSync
+          NumberAnimation {
+            property: "y"
+            duration: 220
+            easing.type: Easing.OutCubic
+          }
+        }
 
-        Column {
-          id: queueColumn
+        delegate: Item {
+          id: queueDelegate
 
-          width: parent.width
-          spacing: s(4)
+          objectName: "queueRow"
 
-          Item {
-            width: parent.width
-            height: queueList.contentHeight
+          readonly property string dragKey: qid
+          readonly property alias rowCard: queueRow
 
-            DragReorder {
-              id: queueDragger
+          width: queueList.width
+          height: root.matchesSearch(title, artist) ? (queueRow.height + s(4)) : 0
+          visible: root.matchesSearch(title, artist)
+          z: queueRow.dragging || queueRow.settling ? 2 : 0
 
-              listView: queueList
-              model: queueModel
-              keyRole: "qid"
-              rowObjectName: "queueRow"
-              flickable: queueFlick
-              edgeZone: s(48)
-              scrollSpeed: s(12)
-              onMoved: (qid, target) => Mpd.moveQueueId(qid, target)
+          Behavior on height {
+            NumberAnimation {
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
+          Behavior on opacity {
+            NumberAnimation {
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          Rectangle {
+            id: deleteReveal
+
+            readonly property real openAmount: Math.max(0, -queueRow.swipeX)
+
+            x: parent.width - width
+            width: queueRow.height + s(12)
+            height: queueRow.height
+            radius: s(8)
+            color: Theme.red
+            visible: deleteReveal.openAmount > 0.5
+            antialiasing: true
+
+            Rectangle {
+              id: deleteButton
+
+              width: s(28)
+              height: s(28)
+              radius: width / 2
+              color: Theme.base
+              anchors.right: parent.right
+              anchors.rightMargin: (parent.height - width) / 2
+              anchors.verticalCenter: parent.verticalCenter
+              opacity: Math.max(0, Math.min(1, (deleteReveal.openAmount - s(8)) / s(16)))
+              visible: opacity > 0
+              antialiasing: true
+
+              Behavior on opacity {
+                NumberAnimation {
+                  duration: 150
+                  easing.type: Easing.OutCubic
+                }
+              }
+
+              Text {
+                anchors.centerIn: parent
+                text: Icons.get("trash")
+                font.family: Theme.iconFamily
+                font.pixelSize: s(13)
+                color: Theme.red
+              }
+
+              MouseArea {
+                id: removeMouse
+
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Mpd.deleteQueueId(qid)
+              }
+            }
+          }
+
+          Rectangle {
+            id: queueRow
+
+            property bool dragging: queueDragger.dragging && queueDragger.dragKey === queueDelegate.dragKey
+            property bool settling: queueDragger.settling && queueDragger.settleKey === queueDelegate.dragKey
+            property real dragDelta: queueDragger.dragDelta
+            property real dropShift: queueDragger.dropShift
+            property real previewShift: queueDragger.previewForKey(queueDelegate.dragKey)
+            property bool snapPreview: queueDragger.snapPreview
+            readonly property bool rowHover: qHover.containsMouse || gripMouse.containsMouse
+            property bool revealed: false
+            property bool gestureActive: false
+            property bool wasGesture: false
+            property real revealWidth: height
+            property real swipeX: revealed ? -revealWidth : 0
+            property real gesturePressX: 0
+            property real gestureLastX: 0
+            property real gesturePrevX: 0
+            property real gestureLastT: 0
+            property real gesturePrevT: 0
+
+            function gesturePress(x) {
+              gestureActive = false
+              wasGesture = false
+              gesturePressX = gestureLastX = gesturePrevX = x
+              gestureLastT = gesturePrevT = Date.now()
             }
 
-            ListView {
-              id: queueList
+            function gestureMove(x) {
+              const now = Date.now()
+              gesturePrevX = gestureLastX
+              gesturePrevT = gestureLastT
+              gestureLastX = x
+              gestureLastT = now
+              const dx = x - gesturePressX
+              if (!gestureActive && Math.abs(dx) > s(6)) {
+                gestureActive = true
+                wasGesture = true
+              }
+              if (gestureActive) {
+                swipeX = Math.max(-revealWidth, Math.min(0, (revealed ? -revealWidth : 0) + dx))
+              }
+            }
+
+            function gestureRelease() {
+              if (!gestureActive) {
+                return
+              }
+              const still = Date.now() - gestureLastT > 80
+              const dt = Math.max(1, gestureLastT - gesturePrevT)
+              const velocity = (gestureLastX - gesturePrevX) / dt
+              const open = !still && velocity < 0
+              gestureActive = false
+              revealed = open
+              swipeX = open ? -revealWidth : 0
+            }
+
+            Behavior on swipeX {
+              enabled: !queueRow.gestureActive
+              NumberAnimation {
+                duration: 200
+                easing.type: Easing.OutCubic
+              }
+            }
+
+            width: parent.width
+            height: s(44)
+            radius: s(8)
+            color: (Mpd.song && Mpd.song.id === qid) || rowHover ? Theme.surface : Theme.base
+            opacity: queueRow.dragging || queueRow.settling ? 0.5 : 1
+            layer.enabled: queueRow.dragging || queueRow.settling
+            antialiasing: true
+            clip: true
+
+            transform: [
+              Translate {
+                y: queueRow.settling ? queueRow.dropShift : (queueRow.dragging ? queueRow.dragDelta : 0)
+              },
+              Translate {
+                y: queueRow.dragging ? 0 : queueRow.previewShift
+
+                Behavior on y {
+                  enabled: !queueRow.snapPreview
+                  NumberAnimation {
+                    duration: 180
+                    easing.type: Easing.OutCubic
+                  }
+                }
+              },
+              Translate {
+                x: queueRow.swipeX
+              }
+            ]
+
+            MouseArea {
+              id: qHover
 
               anchors.fill: parent
-              interactive: false
-              focus: false
-              clip: !queueDragger.dragging
-              model: queueModel
-              spacing: 0
-              cacheBuffer: 100000
-              move: Transition {
-                enabled: !queueDragger.suppressMove
-                NumberAnimation {
-                  property: "y"
-                  duration: 220
-                  easing.type: Easing.OutCubic
+              hoverEnabled: true
+              preventStealing: true
+              onPressed: mouse => queueRow.gesturePress(qHover.mapToItem(null, mouse.x, mouse.y).x)
+              onPositionChanged: mouse => {
+                if (pressed) {
+                  queueRow.gestureMove(qHover.mapToItem(null, mouse.x, mouse.y).x)
                 }
               }
-              displaced: Transition {
-                enabled: !queueDragger.suppressMove
-                NumberAnimation {
-                  property: "y"
-                  duration: 220
-                  easing.type: Easing.OutCubic
+              onReleased: queueRow.gestureRelease()
+              onClicked: {
+                if (queueRow.wasGesture || queueRow.revealed) {
+                  return
+                }
+                if (Mpd.song && pos < Mpd.song.pos) {
+                  return
+                }
+                Mpd.playQueueId(qid)
+              }
+            }
+
+            Row {
+              anchors.fill: parent
+              anchors.leftMargin: s(8)
+              anchors.rightMargin: s(3)
+              spacing: s(8)
+
+              Row {
+                id: numGroup
+
+                spacing: s(4)
+                anchors.verticalCenter: parent.verticalCenter
+
+                Text {
+                  text: Mpd.song && Mpd.song.id === qid ? Icons.get("player-play") : String(pos + 1)
+                  font.family: Mpd.song && Mpd.song.id === qid ? Theme.iconFamily : "monospace"
+                  font.pixelSize: s(10)
+                  color: Mpd.song && Mpd.song.id === qid ? Theme.mauve : Theme.subtext
+                  width: s(18)
+                  horizontalAlignment: Text.AlignHCenter
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+
+                TrackThumb {
+                  file: model.file
+                  anchors.verticalCenter: parent.verticalCenter
                 }
               }
 
-              delegate: Item {
-                id: queueDelegate
+              Column {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width - numGroup.width - trailing.width - s(19)
 
-                objectName: "queueRow"
-
-                readonly property string dragKey: qid
-                readonly property alias rowCard: queueRow
-
-                width: queueList.width
-                height: root.matchesSearch(title, artist) ? (queueRow.height + s(4)) : 0
-                visible: root.matchesSearch(title, artist)
-                z: queueRow.dragging || queueRow.settling ? 2 : 0
-
-                Behavior on height {
-                  NumberAnimation {
-                    duration: 150
-                    easing.type: Easing.OutCubic
-                  }
-                }
-                Behavior on opacity {
-                  NumberAnimation {
-                    duration: 150
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                Rectangle {
-                  id: deleteReveal
-
-                  readonly property real openAmount: Math.max(0, -queueRow.swipeX)
-
-                  x: parent.width - width
-                  width: queueRow.height + s(12)
-                  height: queueRow.height
-                  radius: s(8)
-                  color: Theme.red
-                  visible: deleteReveal.openAmount > 0.5
-                  antialiasing: true
-
-                  Rectangle {
-                    id: deleteButton
-
-                    width: s(28)
-                    height: s(28)
-                    radius: width / 2
-                    color: Theme.base
-                    anchors.right: parent.right
-                    anchors.rightMargin: (parent.height - width) / 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    opacity: Math.max(0, Math.min(1, (deleteReveal.openAmount - s(8)) / s(16)))
-                    visible: opacity > 0
-                    antialiasing: true
-
-                    Behavior on opacity {
-                      NumberAnimation {
-                        duration: 150
-                        easing.type: Easing.OutCubic
-                      }
-                    }
-
-                    Text {
-                      anchors.centerIn: parent
-                      text: Icons.get("trash")
-                      font.family: Theme.iconFamily
-                      font.pixelSize: s(13)
-                      color: Theme.red
-                    }
-
-                    MouseArea {
-                      id: removeMouse
-
-                      anchors.fill: parent
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: Mpd.deleteQueueId(qid)
-                    }
-                  }
-                }
-
-                Rectangle {
-                  id: queueRow
-
-                  property bool dragging: queueDragger.dragging && queueDragger.dragKey === queueDelegate.dragKey
-                  property bool settling: queueDragger.settling && queueDragger.settleKey === queueDelegate.dragKey
-                  property real dragDelta: queueDragger.dragDelta
-                  property real dropShift: queueDragger.dropShift
-                  property real previewShift: queueDragger.previewForKey(queueDelegate.dragKey)
-                  property bool snapPreview: queueDragger.snapPreview
-                  readonly property bool rowHover: qHover.containsMouse || gripMouse.containsMouse
-                  property bool revealed: false
-                  property bool gestureActive: false
-                  property bool wasGesture: false
-                  property real revealWidth: height
-                  property real swipeX: revealed ? -revealWidth : 0
-                  property real gesturePressX: 0
-                  property real gestureLastX: 0
-                  property real gesturePrevX: 0
-                  property real gestureLastT: 0
-                  property real gesturePrevT: 0
-
-                  function gesturePress(x) {
-                    gestureActive = false
-                    wasGesture = false
-                    gesturePressX = gestureLastX = gesturePrevX = x
-                    gestureLastT = gesturePrevT = Date.now()
-                  }
-
-                  function gestureMove(x) {
-                    const now = Date.now()
-                    gesturePrevX = gestureLastX
-                    gesturePrevT = gestureLastT
-                    gestureLastX = x
-                    gestureLastT = now
-                    const dx = x - gesturePressX
-                    if (!gestureActive && Math.abs(dx) > s(6)) {
-                      gestureActive = true
-                      wasGesture = true
-                    }
-                    if (gestureActive) {
-                      swipeX = Math.max(-revealWidth, Math.min(0, (revealed ? -revealWidth : 0) + dx))
-                    }
-                  }
-
-                  function gestureRelease() {
-                    if (!gestureActive) {
-                      return
-                    }
-                    const still = Date.now() - gestureLastT > 80
-                    const dt = Math.max(1, gestureLastT - gesturePrevT)
-                    const velocity = (gestureLastX - gesturePrevX) / dt
-                    const open = !still && velocity < 0
-                    gestureActive = false
-                    revealed = open
-                    swipeX = open ? -revealWidth : 0
-                  }
-
-                  Behavior on swipeX {
-                    enabled: !queueRow.gestureActive
-                    NumberAnimation {
-                      duration: 200
-                      easing.type: Easing.OutCubic
-                    }
-                  }
-
+                Text {
                   width: parent.width
-                  height: s(44)
-                  radius: s(8)
-                  color: (Mpd.song && Mpd.song.id === qid) || rowHover ? Theme.surface : Theme.base
-                  opacity: queueRow.dragging || queueRow.settling ? 0.5 : 1
-                  layer.enabled: queueRow.dragging || queueRow.settling
+                  text: title
+                  color: Mpd.song && Mpd.song.id === qid ? Theme.mauve : Theme.text
+                  font.family: Theme.fontFamily
+                  font.pixelSize: s(10)
+                  font.bold: Mpd.song && Mpd.song.id === qid
+                  elide: Text.ElideRight
+                }
+
+                Text {
+                  width: parent.width
+                  text: artist.length > 0 ? artist : "Unknown artist"
+                  color: Theme.subtext
+                  font.family: Theme.fontFamily
+                  font.pixelSize: s(9)
+                  elide: Text.ElideRight
+                }
+              }
+
+              Item {
+                id: trailing
+
+                width: timeText.width + s(4) + grip.width
+                height: s(24)
+                anchors.verticalCenter: parent.verticalCenter
+
+                Text {
+                  id: timeText
+
+                  anchors.right: grip.left
+                  anchors.rightMargin: s(4)
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: Mpd.fmtTime(duration)
+                  font.family: "monospace"
+                  font.pixelSize: s(9)
+                  color: Theme.subtext
+                }
+
+                Rectangle {
+                  id: grip
+
+                  objectName: "queueGrip"
+
+                  width: s(24)
+                  height: s(24)
+                  radius: width / 2
+                  color: gripMouse.containsMouse ? Theme.surfaceHigher : "transparent"
                   antialiasing: true
-                  clip: true
+                  anchors.right: parent.right
+                  anchors.rightMargin: 0
+                  anchors.verticalCenter: parent.verticalCenter
 
-                  transform: [
-                    Translate {
-                      y: queueRow.settling ? queueRow.dropShift : (queueRow.dragging ? queueRow.dragDelta : 0)
-                    },
-                    Translate {
-                      y: queueRow.dragging ? 0 : queueRow.previewShift
-
-                      Behavior on y {
-                        enabled: !queueRow.snapPreview
-                        NumberAnimation {
-                          duration: 180
-                          easing.type: Easing.OutCubic
-                        }
-                      }
-                    },
-                    Translate {
-                      x: queueRow.swipeX
-                    }
-                  ]
+                  Icon {
+                    anchors.centerIn: parent
+                    name: "grip-vertical"
+                    color: queueRow.dragging ? Theme.primary : Theme.subtext
+                    font.pixelSize: s(13)
+                  }
 
                   MouseArea {
-                    id: qHover
+                    id: gripMouse
 
                     anchors.fill: parent
                     hoverEnabled: true
+                    cursorShape: Qt.DragMoveCursor
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                     preventStealing: true
-                    onPressed: mouse => queueRow.gesturePress(qHover.mapToItem(null, mouse.x, mouse.y).x)
-                    onPositionChanged: mouse => {
-                      if (pressed) {
-                        queueRow.gestureMove(qHover.mapToItem(null, mouse.x, mouse.y).x)
-                      }
-                    }
-                    onReleased: queueRow.gestureRelease()
-                    onClicked: {
-                      if (queueRow.wasGesture || queueRow.revealed) {
+                    onPressed: mouse => {
+                      if (mouse.button === Qt.RightButton) {
+                        queueDragger.cancel()
                         return
                       }
-                      if (Mpd.song && pos < Mpd.song.pos) {
-                        return
-                      }
-                      Mpd.playQueueId(qid)
+                      queueDragger.begin(qid, gripMouse.mapToItem(null, mouse.x, mouse.y).y)
                     }
-                  }
-
-                  Row {
-                    anchors.fill: parent
-                    anchors.leftMargin: s(8)
-                    anchors.rightMargin: s(3)
-                    spacing: s(8)
-
-                    Row {
-                      id: numGroup
-
-                      spacing: s(4)
-                      anchors.verticalCenter: parent.verticalCenter
-
-                      Text {
-                        text: Mpd.song && Mpd.song.id === qid ? Icons.get("player-play") : String(pos + 1)
-                        font.family: Mpd.song && Mpd.song.id === qid ? Theme.iconFamily : "monospace"
-                        font.pixelSize: s(10)
-                        color: Mpd.song && Mpd.song.id === qid ? Theme.mauve : Theme.subtext
-                        width: s(18)
-                        horizontalAlignment: Text.AlignHCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                      }
-
-                      TrackThumb {
-                        file: model.file
-                        anchors.verticalCenter: parent.verticalCenter
+                    onPositionChanged: mouse => queueDragger.update(gripMouse.mapToItem(null, mouse.x, mouse.y).y)
+                    onReleased: mouse => {
+                      if (mouse.button === Qt.LeftButton) {
+                        queueDragger.end()
                       }
                     }
-
-                    Column {
-                      anchors.verticalCenter: parent.verticalCenter
-                      width: parent.width - numGroup.width - trailing.width - s(19)
-
-                      Text {
-                        width: parent.width
-                        text: title
-                        color: Mpd.song && Mpd.song.id === qid ? Theme.mauve : Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: s(10)
-                        font.bold: Mpd.song && Mpd.song.id === qid
-                        elide: Text.ElideRight
-                      }
-
-                      Text {
-                        width: parent.width
-                        text: artist.length > 0 ? artist : "Unknown artist"
-                        color: Theme.subtext
-                        font.family: Theme.fontFamily
-                        font.pixelSize: s(9)
-                        elide: Text.ElideRight
-                      }
-                    }
-
-                    Item {
-                      id: trailing
-
-                      width: timeText.width + s(4) + grip.width
-                      height: s(24)
-                      anchors.verticalCenter: parent.verticalCenter
-
-                      Text {
-                        id: timeText
-
-                        anchors.right: grip.left
-                        anchors.rightMargin: s(4)
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Mpd.fmtTime(duration)
-                        font.family: "monospace"
-                        font.pixelSize: s(9)
-                        color: Theme.subtext
-                      }
-
-                      Rectangle {
-                        id: grip
-
-                        objectName: "queueGrip"
-
-                        width: s(24)
-                        height: s(24)
-                        radius: width / 2
-                        color: gripMouse.containsMouse ? Theme.surfaceHigher : "transparent"
-                        antialiasing: true
-                        anchors.right: parent.right
-                        anchors.rightMargin: 0
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        Icon {
-                          anchors.centerIn: parent
-                          name: "grip-vertical"
-                          color: queueRow.dragging ? Theme.primary : Theme.subtext
-                          font.pixelSize: s(13)
-                        }
-
-                        MouseArea {
-                          id: gripMouse
-
-                          anchors.fill: parent
-                          hoverEnabled: true
-                          cursorShape: Qt.DragMoveCursor
-                          acceptedButtons: Qt.LeftButton | Qt.RightButton
-                          preventStealing: true
-                          onPressed: mouse => {
-                            if (mouse.button === Qt.RightButton) {
-                              queueDragger.cancel()
-                              return
-                            }
-                            queueDragger.begin(qid, gripMouse.mapToItem(null, mouse.x, mouse.y).y)
-                          }
-                          onPositionChanged: mouse => queueDragger.update(gripMouse.mapToItem(null, mouse.x, mouse.y).y)
-                          onReleased: mouse => {
-                            if (mouse.button === Qt.LeftButton) {
-                              queueDragger.end()
-                            }
-                          }
-                          onCanceled: queueDragger.cancel()
-                        }
-                      }
-                    }
+                    onCanceled: queueDragger.cancel()
                   }
                 }
               }
             }
-
-            MouseArea {
-              anchors.fill: parent
-              visible: queueDragger.dragging
-              enabled: queueDragger.dragging
-              acceptedButtons: Qt.RightButton
-              cursorShape: Qt.DragMoveCursor
-              z: 10
-              onPressed: mouse => {
-                if (mouse.button === Qt.RightButton) {
-                  queueDragger.cancel()
-                }
-              }
-            }
-          }
-
-          Text {
-            visible: Mpd.queue.length === 0
-            text: "Queue is empty"
-            color: Theme.subtext
-            font.family: Theme.fontFamily
-            font.pixelSize: s(10)
-            anchors.horizontalCenter: parent.horizontalCenter
           }
         }
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        visible: queueDragger.dragging
+        enabled: queueDragger.dragging
+        acceptedButtons: Qt.RightButton
+        cursorShape: Qt.DragMoveCursor
+        z: 10
+        onPressed: mouse => {
+          if (mouse.button === Qt.RightButton) {
+            queueDragger.cancel()
+          }
+        }
+      }
+
+      Text {
+        visible: Mpd.queue.length === 0
+        text: "Queue is empty"
+        color: Theme.subtext
+        font.family: Theme.fontFamily
+        font.pixelSize: s(10)
+        anchors.top: parent.top
+        anchors.topMargin: s(4)
+        anchors.horizontalCenter: parent.horizontalCenter
       }
     }
   }

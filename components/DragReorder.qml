@@ -12,6 +12,7 @@ Item {
   property var flickable: null
   property real edgeZone: 48
   property real scrollSpeed: 6
+  property var rowHeightAt: null
 
   property string dragKey: ""
   property int dragFrom: -1
@@ -175,6 +176,10 @@ Item {
   function movedTop(from, target) {
     const heights = []
     for (let i = 0; i < root.model.count; i++) {
+      if (root.rowHeightAt) {
+        heights.push(root.rowHeightAt(i))
+        continue
+      }
       const item = root.listView.itemAtIndex(i)
       heights.push(item ? item.height : 0)
     }
