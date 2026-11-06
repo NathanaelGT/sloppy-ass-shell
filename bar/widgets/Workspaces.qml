@@ -8,7 +8,6 @@ BarButton {
   id: root
 
   property var screen
-  property int hoverCount: 0
 
   readonly property var spaces: {
     const all = Hypr.workspaces
@@ -47,7 +46,8 @@ BarButton {
   width: implicitWidth
   borderWidth: Math.round(1 * Theme.scale)
   borderColor: Theme.capsuleBorder
-  fill: hoverCount > 0 ? Theme.capsuleHover : Theme.capsuleFill
+  fill: Theme.capsuleFill
+  hoverFill: Theme.capsuleFill
 
   onActiveWsIdChanged: Qt.callLater(placeUnderline)
   onShownSpecialChanged: Qt.callLater(placeUnderline)
@@ -186,8 +186,29 @@ BarButton {
             }
           }
           onWheel: e => root.cycleWindows(group.space, e.angleDelta.y)
-          onEntered: root.hoverCount++
-          onExited: root.hoverCount--
+        }
+
+        Rectangle {
+          id: numPill
+
+          property real pad: Math.round(3 * Theme.scale)
+
+          x: inner.x + numText.x - pad
+          y: (parent.height - height) / 2
+          width: numText.width + pad * 2
+          height: Math.round(25 * Theme.scale)
+          radius: height / 2
+          color: numHover.hovered ? Theme.capsuleHover : "transparent"
+
+          HoverHandler {
+            id: numHover
+          }
+
+          Behavior on color {
+            ColorAnimation {
+              duration: 120
+            }
+          }
         }
 
         Row {
@@ -197,6 +218,8 @@ BarButton {
           spacing: Math.round(3 * Theme.scale)
 
           Text {
+            id: numText
+
             anchors.verticalCenter: parent.verticalCenter
             text: root.labelOf(group.space)
             color: root.isShown(group.space) ? Theme.primary : Theme.subtext
@@ -221,6 +244,27 @@ BarButton {
               width: Math.round(18 * Theme.scale)
               height: width
 
+              Rectangle {
+                id: iconPill
+
+                x: -Math.round(3 * Theme.scale)
+                y: -Math.round(3 * Theme.scale)
+                width: parent.width + Math.round(6 * Theme.scale)
+                height: parent.height + Math.round(6 * Theme.scale)
+                radius: width / 2
+                color: iconHover.hovered || iconArea.containsMouse ? Theme.capsuleHover : "transparent"
+
+                HoverHandler {
+                  id: iconHover
+                }
+
+                Behavior on color {
+                  ColorAnimation {
+                    duration: 120
+                  }
+                }
+              }
+
               Image {
                 anchors.fill: parent
                 sourceSize: Qt.size(width, height)
@@ -228,6 +272,8 @@ BarButton {
               }
 
               MouseArea {
+                id: iconArea
+
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
