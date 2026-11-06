@@ -1648,15 +1648,6 @@ PanelBase {
         }
       }
 
-      MouseArea {
-        anchors.fill: parent
-        acceptedButtons: Qt.NoButton
-        onWheel: event => {
-          foldersScroll.wheel(event)
-          event.accepted = true
-        }
-      }
-
       Flickable {
         id: foldersFlick
 
@@ -2029,6 +2020,15 @@ PanelBase {
         target: foldersFlick
         anchors.fill: foldersFlick
       }
+
+      MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: event => {
+          foldersScroll.wheel(event)
+          event.accepted = true
+        }
+      }
     }
 
     Item {
@@ -2057,17 +2057,6 @@ PanelBase {
         edgeZone: s(48)
         scrollSpeed: s(12)
         onMoved: (qid, target) => Mpd.moveQueueId(qid, target)
-      }
-
-      MouseArea {
-        anchors.fill: parent
-        acceptedButtons: Qt.NoButton
-        onWheel: event => {
-          if (!queueDragger.dragging) {
-            queueScroll.wheel(event)
-          }
-          event.accepted = true
-        }
       }
 
       ListView {
@@ -2446,6 +2435,17 @@ PanelBase {
 
         target: queueList
         anchors.fill: queueList
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: event => {
+          if (!queueDragger.dragging) {
+            queueScroll.wheel(event)
+          }
+          event.accepted = true
+        }
       }
     }
   }

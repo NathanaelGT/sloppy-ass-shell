@@ -149,10 +149,6 @@ PanelWindow {
   readonly property real viewportHeight: scroller.height
   readonly property real scrollY: scroller.contentY
 
-  function scrollBy(delta) {
-    scrollerScroll.notch(delta)
-  }
-
   function ensureVisible(y, height, margin) {
     scrollerScroll.snap()
     const viewH = scroller.height
@@ -499,7 +495,7 @@ PanelWindow {
           contentHeight: bodyColumn.implicitHeight
           flickableDirection: Flickable.VerticalFlick
           boundsBehavior: Flickable.StopAtBounds
-          interactive: contentHeight > height
+          interactive: false
           clip: true
           layer.enabled: true
           layer.effect: MultiEffect {

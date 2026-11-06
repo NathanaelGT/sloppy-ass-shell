@@ -188,26 +188,17 @@ BarButton {
           onWheel: e => root.cycleWindows(group.space, e.angleDelta.y)
         }
 
-        Rectangle {
+        HoverPill {
           id: numPill
 
-          property real pad: Math.round(3 * Theme.scale)
-
+          hovered: numHover.hovered
           x: inner.x + numText.x - pad
           y: (parent.height - height) / 2
           width: numText.width + pad * 2
           height: Math.round(25 * Theme.scale)
-          radius: height / 2
-          color: numHover.hovered ? Theme.capsuleHover : "transparent"
 
           HoverHandler {
             id: numHover
-          }
-
-          Behavior on color {
-            ColorAnimation {
-              duration: 120
-            }
           }
         }
 
@@ -244,24 +235,13 @@ BarButton {
               width: Math.round(18 * Theme.scale)
               height: width
 
-              Rectangle {
+              HoverPill {
                 id: iconPill
 
-                x: -Math.round(3 * Theme.scale)
-                y: -Math.round(3 * Theme.scale)
-                width: parent.width + Math.round(6 * Theme.scale)
-                height: parent.height + Math.round(6 * Theme.scale)
-                radius: width / 2
-                color: iconHover.hovered || iconArea.containsMouse ? Theme.capsuleHover : "transparent"
+                hovered: iconHover.hovered || iconArea.containsMouse
 
                 HoverHandler {
                   id: iconHover
-                }
-
-                Behavior on color {
-                  ColorAnimation {
-                    duration: 120
-                  }
                 }
               }
 

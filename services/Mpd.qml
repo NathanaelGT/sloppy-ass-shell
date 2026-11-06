@@ -40,6 +40,7 @@ Singleton {
   property var sendQueue: []
   property bool clearingQueue: false
   property bool localQueuePending: false
+  property bool localOrderApplied: false
 
   property var favorites: ({})
   property var pinned: ({})
@@ -299,6 +300,7 @@ Singleton {
     root.single = false
     root.queue = []
     root.localQueuePending = false
+    root.localOrderApplied = false
     root.musicDir = ""
     root.artIndex = 0
     root.favorites = ({})
@@ -348,6 +350,10 @@ Singleton {
       root.awaiting = null
       if (failed.command === "idle") {
         root.idleInFlight = false
+      }
+      if (failed.command.indexOf("command_list_begin") === 0) {
+        root.localQueuePending = false
+        root.localOrderApplied = false
       }
       console.warn("mpd:" + (failed.command || "") + " failed:" + line)
       root.pump()
@@ -415,7 +421,10 @@ Singleton {
     }
     if (needQueue) {
       if (root.localQueuePending) {
-        root.localQueuePending = false
+        if (root.localOrderApplied) {
+          root.localQueuePending = false
+          root.localOrderApplied = false
+        }
       } else {
         root.send("playlistinfo", l => root.applyQueue(root.parseSongs(l)))
       }
@@ -1135,6 +1144,7 @@ Singleton {
     if (moves.length === 0) {
       return
     }
+    root.localQueuePending = true
     const chunks = []
     for (let i = 0; i < moves.length; i += 400) {
       chunks.push(moves.slice(i, i + 400))
@@ -1161,7 +1171,7 @@ Singleton {
         pos: 0
       })
     }
-    root.localQueuePending = true
+    root.localOrderApplied = true
     root.send("status", l => root.applyStatus(root.parsePairs(l)))
   }
 

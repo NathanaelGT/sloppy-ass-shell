@@ -256,15 +256,6 @@ PanelBase {
     width: root.contentInnerWidth
     height: root.listHeight
 
-    MouseArea {
-      anchors.fill: parent
-      acceptedButtons: Qt.NoButton
-      onWheel: event => {
-        notifScroll.wheel(event)
-        event.accepted = true
-      }
-    }
-
     ListView {
       id: notificationList
       visible: root.items.length > 0
@@ -691,6 +682,15 @@ PanelBase {
 
       target: notificationList
       anchors.fill: notificationList
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.NoButton
+      onWheel: event => {
+        notifScroll.wheel(event)
+        event.accepted = true
+      }
     }
   }
 }

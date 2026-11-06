@@ -64,21 +64,10 @@ BarButton {
           width: Math.round(18 * Theme.scale)
           height: width
 
-          Rectangle {
+          HoverPill {
             id: iconPill
 
-            x: -Math.round(3 * Theme.scale)
-            y: -Math.round(3 * Theme.scale)
-            width: parent.width + Math.round(6 * Theme.scale)
-            height: parent.height + Math.round(6 * Theme.scale)
-            radius: width / 2
-            color: trayArea.containsMouse ? Theme.capsuleHover : "transparent"
-
-            Behavior on color {
-              ColorAnimation {
-                duration: 120
-              }
-            }
+            hovered: trayArea.containsMouse
           }
 
           Image {
@@ -106,7 +95,7 @@ BarButton {
                 if (trayItem.modelData.hasMenu) {
                   root.displayMenu(trayItem.modelData, trayIcon)
                 } else {
-                  trayItem.modelData.secondaryActivate()
+                  trayItem.modelData.activate()
                 }
               } else if (event.button === Qt.MiddleButton) {
                 trayItem.modelData.secondaryActivate()
