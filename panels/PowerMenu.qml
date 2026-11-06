@@ -26,13 +26,13 @@ PanelBase {
       icon: "lock",
       label: "Lock",
       tint: Theme.primary,
-      command: ["hyprlock"]
+      lock: true
     },
     {
       icon: "suspend",
       label: "Lock & Suspend",
       tint: Theme.mauve,
-      command: ["bash", "-lc", "loginctl lock-session; systemctl suspend"]
+      suspend: true
     },
     {
       icon: "restart",
@@ -54,6 +54,14 @@ PanelBase {
       return
     }
     Panels.close()
+    if (action.lock) {
+      LockState.requestLock()
+      return
+    }
+    if (action.suspend) {
+      LockState.lockAndSuspend()
+      return
+    }
     Quickshell.execDetached(action.command)
   }
 

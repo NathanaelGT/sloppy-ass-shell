@@ -72,6 +72,20 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   History row delete and panel action buttons have no driver seam
   (clicks are real); the countdown only advances while not idle, so idle pause is asserted
   via `remaining` freezing in `notifState`/`bannerState`, not wall-clock.
+  Lock flows: `test lockPreview <true|false>` opens/closes the eDP-1 preview
+  (no arg toggles); `test lockAttempt <password>` submits through the REAL PAM
+  stack — wrong passwords are safe and expected in tests, the correct password
+  closes the preview or unlocks for real; `test lockState` dumps preview/
+  locked/secure/attempts/error/capsLock/authenticating/passwordLength/capture —
+  never the password itself; capture with `test shotPanel lock eDP-1`. While
+  the session is locked, `shell reload` and `test reloadNow` are REFUSED; a
+  watched-file live reload cannot be refused and fail-opens the session, so
+  never leave watch reloads enabled around a lock test. hyprlock remains
+  installed as a manual fallback (its config is untouched) and the dormant
+  hypridle configs invoke `quickshell ipc call shell lock`. The real lock
+  (SUPER+L, power-menu rows) is user-tested manually: SUPER+L → wrong password
+  shows ✕ N → correct password unlocks; Lock & Suspend hold suspends and the
+  lock is up at resume.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no

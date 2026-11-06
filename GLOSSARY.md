@@ -85,6 +85,21 @@ _Avoid_: session menu, session shell
 The destructive-action gesture: press and hold an action until it fires;
 releasing early cancels. Lock is exempt and fires on press.
 
+## Lock
+
+**Locked**:
+The shell's session lock: the shell itself holds the lock on every screen,
+entered with SUPER+L or the power menu's Lock, exited only by the correct
+password at the Lock screen. While locked, no Banner is shown; arrivals go
+straight to History. _Avoid_: hyprlock — kept installed only as a manual
+fallback, never the shell's lock
+
+**Lock screen**:
+The full-screen surface the shell shows while Locked: the desktop as it
+looked when the lock was requested, blurred and dimmed, with the clock and
+the password field. Typing is accepted only once the compositor confirms
+the lock is secure. _Avoid_: login screen, greeter
+
 ## Notifications
 
 **Banner**:
@@ -149,10 +164,6 @@ bar badge count and clears when the panel opens.
 Five seconds without keyboard or pointer input. While idle, a banner's
 countdown is paused; the first input resumes it. Unrelated to the longer
 idle timeouts registered for power management.
-
-**Locked**:
-hyprlock holding the session. While locked, no Banner is shown;
-arrivals go straight to History.
 
 **Chime**:
 The arrival sound. Plays on every arrival not muted by DND (Critical

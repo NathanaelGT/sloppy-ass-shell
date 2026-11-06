@@ -1,11 +1,13 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import "theme"
 import "services"
 import "bar"
 import "panels"
 import "osd"
+import "lock"
 
 ShellRoot {
   id: root
@@ -43,6 +45,14 @@ ShellRoot {
 
     function setLocked(state: bool): void {
       Notifs.locked = state
+    }
+
+    function lock(): void {
+      LockState.requestLock()
+    }
+
+    function locked(): bool {
+      return LockState.sessionLocked
     }
 
     function launcher(): void {
@@ -89,8 +99,12 @@ ShellRoot {
       Panels.close()
     }
 
-    function reload(): void {
+    function reload(): bool {
+      if (LockState.sessionLocked) {
+        return false
+      }
       Quickshell.reload(false)
+      return true
     }
 
     function volumeUp(): void {
@@ -210,6 +224,9 @@ ShellRoot {
 
     function reloadNow(hard: bool): bool {
       if (!TestDriver.active) {
+        return false
+      }
+      if (LockState.sessionLocked) {
         return false
       }
       root.lastReloadError = ""
@@ -1987,6 +2004,52 @@ ShellRoot {
         out: NotifStore.lastRaw
       })
     }
+
+    function lockPreview(open: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      if (open === "true") {
+        LockState.openPreview()
+      } else if (open === "false") {
+        LockState.closePreview()
+      } else {
+        LockState.togglePreview()
+      }
+      return LockState.previewActive
+    }
+
+    function lockAttempt(password: string): string {
+      if (!TestDriver.active) {
+        return "disabled"
+      }
+      return LockState.testAttempt(password)
+    }
+
+    function lockState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      return LockState.testState()
+    }
+  }
+
+  WlSessionLock {
+    id: sessionLock
+
+    locked: LockState.sessionLocked
+
+    onSecureChanged: LockState.secure = sessionLock.secure
+
+    onLockStateChanged: {
+      if (!sessionLock.locked && LockState.sessionLocked) {
+        LockState.unlock()
+      }
+    }
+
+    surface: Component {
+      LockSurface {}
+    }
   }
 
   Variants {
@@ -2077,6 +2140,13 @@ ShellRoot {
     model: Quickshell.screens
     delegate: Component {
       OsdPopup {}
+    }
+  }
+
+  Variants {
+    model: Quickshell.screens
+    delegate: Component {
+      LockPreview {}
     }
   }
 }
