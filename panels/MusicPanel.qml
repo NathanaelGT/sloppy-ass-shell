@@ -193,6 +193,7 @@ PanelBase {
   }
 
   function testQueueCancel() {
+    queueScroll.snap()
     queueDragger.cancel()
     queueList.contentY = 0
   }
@@ -359,6 +360,7 @@ PanelBase {
     if (root.searching) {
       root.runSearch()
     }
+    foldersScroll.snap()
     foldersFlick.contentY = 0
     foldersColumn.x = root.navDirection > 0 ? foldersFlick.width : -foldersFlick.width
     navAnim.to = 0
@@ -1646,11 +1648,21 @@ PanelBase {
         }
       }
 
+      MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: event => {
+          foldersScroll.wheel(event)
+          event.accepted = true
+        }
+      }
+
       Flickable {
         id: foldersFlick
 
         anchors.fill: parent
         contentHeight: foldersColumn.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
         clip: true
 
         Column {
@@ -2010,6 +2022,13 @@ PanelBase {
           }
         }
       }
+
+      SmoothScroll {
+        id: foldersScroll
+
+        target: foldersFlick
+        anchors.fill: foldersFlick
+      }
     }
 
     Item {
@@ -2038,6 +2057,17 @@ PanelBase {
         edgeZone: s(48)
         scrollSpeed: s(12)
         onMoved: (qid, target) => Mpd.moveQueueId(qid, target)
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: event => {
+          if (!queueDragger.dragging) {
+            queueScroll.wheel(event)
+          }
+          event.accepted = true
+        }
       }
 
       ListView {
@@ -2409,6 +2439,13 @@ PanelBase {
         anchors.top: parent.top
         anchors.topMargin: s(4)
         anchors.horizontalCenter: parent.horizontalCenter
+      }
+
+      SmoothScroll {
+        id: queueScroll
+
+        target: queueList
+        anchors.fill: queueList
       }
     }
   }

@@ -252,425 +252,445 @@ PanelBase {
     font.bold: true
   }
 
-  ListView {
-    id: notificationList
-    visible: root.items.length > 0
+  Item {
     width: root.contentInnerWidth
     height: root.listHeight
-    model: root.items
-    spacing: Theme.gap
-    reuseItems: true
-    clip: true
-    cacheBuffer: Math.round(600 * Theme.scale)
-    interactive: contentHeight > height
-    boundsBehavior: Flickable.StopAtBounds
 
-    onCountChanged: Qt.callLater(() => root.measureRevision += 1)
-
-    onAtYEndChanged: {
-      if (atYEnd && NotifStore.ready && !NotifStore.exhausted && !NotifStore.loadingMore && root.closingCount === 0) {
-        NotifStore.loadMore()
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.NoButton
+      onWheel: event => {
+        notifScroll.wheel(event)
+        event.accepted = true
       }
     }
 
-    delegate: Column {
-      id: notificationRow
+    ListView {
+      id: notificationList
+      visible: root.items.length > 0
+      anchors.fill: parent
+      model: root.items
+      spacing: Theme.gap
+      reuseItems: true
+      clip: true
+      cacheBuffer: Math.round(600 * Theme.scale)
+      interactive: contentHeight > height
+      boundsBehavior: Flickable.StopAtBounds
 
-      required property var modelData
+      onCountChanged: Qt.callLater(() => root.measureRevision += 1)
 
-      property bool closing: false
-      property bool keepHeader: false
-      property real collapse: 1
-      property int clearDelay: 0
-      property var closeTarget: null
-      property bool closeDone: false
-      property string itemKey: ""
-
-      readonly property bool active: notificationRow.modelData.active
-      readonly property bool thumbVisible: active ? String(modelData.imageSource || "").length > 0 : modelData.hasImage
-      readonly property real headerSpace: dayHeader.visible ? dayHeader.height + spacing : 0
-
-      function runCloseTarget() {
-        if (closeDone || !closeTarget) {
-          return
-        }
-        closeDone = true
-        if (closeTarget.active) {
-          closeTarget.notification.dismiss()
-        } else {
-          NotifStore.removeEntry(closeTarget.id)
+      onAtYEndChanged: {
+        if (atYEnd && NotifStore.ready && !NotifStore.exhausted && !NotifStore.loadingMore && root.closingCount === 0) {
+          NotifStore.loadMore()
         }
       }
 
-      function resetRow() {
-        closeAnim.stop()
-        rowClearAnim.stop()
-        notificationRow.runCloseTarget()
-        if (closing) {
-          root.closingCount -= 1
-        }
-        closing = false
-        closeDone = false
-        keepHeader = false
-        collapse = 1
-        closeTarget = null
-        opacity = 1
-        rowContent.opacity = 1
-        notificationSlide.x = 0
-        dayHeader.opacity = 1
-        itemKey = modelData.key
-        notificationRow.syncImage()
-      }
+      delegate: Column {
+        id: notificationRow
 
-      function beginClose(actionIndex) {
-        if (closing || root.closingCount > 0 || root.clearing) {
-          return
-        }
-        closing = true
-        closeDone = false
-        closeTarget = modelData
-        keepHeader = modelData.firstInDay && !modelData.lastInDay
-        root.closingCount += 1
-        closeAnim.start()
-        if (actionIndex >= 0 && active) {
-          modelData.notification.actions[actionIndex].invoke()
-        }
-      }
+        required property var modelData
 
-      function beginClear(delay) {
-        if (closing) {
-          return
-        }
-        clearDelay = delay
-        rowClearAnim.start()
-      }
+        property bool closing: false
+        property bool keepHeader: false
+        property real collapse: 1
+        property int clearDelay: 0
+        property var closeTarget: null
+        property bool closeDone: false
+        property string itemKey: ""
 
-      function syncImage() {
-        if (!modelData.active && modelData.hasImage) {
-          NotifStore.requestImage(modelData.id)
-        }
-      }
+        readonly property bool active: notificationRow.modelData.active
+        readonly property bool thumbVisible: active ? String(modelData.imageSource || "").length > 0 : modelData.hasImage
+        readonly property real headerSpace: dayHeader.visible ? dayHeader.height + spacing : 0
 
-      Component.onDestruction: {
-        if (closing) {
-          root.closingCount -= 1
+        function runCloseTarget() {
+          if (closeDone || !closeTarget) {
+            return
+          }
+          closeDone = true
+          if (closeTarget.active) {
+            closeTarget.notification.dismiss()
+          } else {
+            NotifStore.removeEntry(closeTarget.id)
+          }
         }
-      }
 
-      ListView.onPooled: {
-        if (closing) {
+        function resetRow() {
+          closeAnim.stop()
+          rowClearAnim.stop()
           notificationRow.runCloseTarget()
+          if (closing) {
+            root.closingCount -= 1
+          }
           closing = false
-          root.closingCount -= 1
-        }
-      }
-
-      ListView.onReused: {
-        notificationRow.resetRow()
-        root.measureRevision += 1
-      }
-
-      Component.onCompleted: {
-        notificationRow.itemKey = modelData.key
-        notificationRow.syncImage()
-        root.measureRevision += 1
-      }
-
-      onModelDataChanged: {
-        if (notificationRow.itemKey === "" || notificationRow.itemKey === notificationRow.modelData.key) {
+          closeDone = false
+          keepHeader = false
+          collapse = 1
+          closeTarget = null
+          opacity = 1
+          rowContent.opacity = 1
+          notificationSlide.x = 0
+          dayHeader.opacity = 1
+          itemKey = modelData.key
           notificationRow.syncImage()
-          return
-        }
-        notificationRow.resetRow()
-      }
-      onImplicitHeightChanged: root.measureRevision += 1
-
-      SequentialAnimation {
-        id: rowClearAnim
-
-        PauseAnimation {
-          duration: notificationRow.clearDelay
         }
 
-        ParallelAnimation {
-          NumberAnimation {
-            target: notificationSlide
-            property: "x"
-            to: notificationRow.width
-            duration: root.clearSlideMs
-            easing.type: Easing.InCubic
+        function beginClose(actionIndex) {
+          if (closing || root.closingCount > 0 || root.clearing) {
+            return
+          }
+          closing = true
+          closeDone = false
+          closeTarget = modelData
+          keepHeader = modelData.firstInDay && !modelData.lastInDay
+          root.closingCount += 1
+          closeAnim.start()
+          if (actionIndex >= 0 && active) {
+            modelData.notification.actions[actionIndex].invoke()
+          }
+        }
+
+        function beginClear(delay) {
+          if (closing) {
+            return
+          }
+          clearDelay = delay
+          rowClearAnim.start()
+        }
+
+        function syncImage() {
+          if (!modelData.active && modelData.hasImage) {
+            NotifStore.requestImage(modelData.id)
+          }
+        }
+
+        Component.onDestruction: {
+          if (closing) {
+            root.closingCount -= 1
+          }
+        }
+
+        ListView.onPooled: {
+          if (closing) {
+            notificationRow.runCloseTarget()
+            closing = false
+            root.closingCount -= 1
+          }
+        }
+
+        ListView.onReused: {
+          notificationRow.resetRow()
+          root.measureRevision += 1
+        }
+
+        Component.onCompleted: {
+          notificationRow.itemKey = modelData.key
+          notificationRow.syncImage()
+          root.measureRevision += 1
+        }
+
+        onModelDataChanged: {
+          if (notificationRow.itemKey === "" || notificationRow.itemKey === notificationRow.modelData.key) {
+            notificationRow.syncImage()
+            return
+          }
+          notificationRow.resetRow()
+        }
+        onImplicitHeightChanged: root.measureRevision += 1
+
+        SequentialAnimation {
+          id: rowClearAnim
+
+          PauseAnimation {
+            duration: notificationRow.clearDelay
+          }
+
+          ParallelAnimation {
+            NumberAnimation {
+              target: notificationSlide
+              property: "x"
+              to: notificationRow.width
+              duration: root.clearSlideMs
+              easing.type: Easing.InCubic
+            }
+
+            NumberAnimation {
+              target: notificationRow
+              property: "opacity"
+              to: 0
+              duration: root.clearSlideMs
+              easing.type: Easing.InCubic
+            }
+          }
+        }
+
+        SequentialAnimation {
+          id: closeAnim
+
+          ParallelAnimation {
+            NumberAnimation {
+              target: notificationSlide
+              property: "x"
+              to: notificationRow.width
+              duration: 180
+              easing.type: Easing.InCubic
+            }
+
+            NumberAnimation {
+              target: rowContent
+              property: "opacity"
+              to: 0
+              duration: 180
+              easing.type: Easing.InCubic
+            }
+
+            NumberAnimation {
+              target: dayHeader
+              property: "opacity"
+              to: notificationRow.keepHeader ? 1 : 0
+              duration: 180
+              easing.type: Easing.InCubic
+            }
           }
 
           NumberAnimation {
             target: notificationRow
-            property: "opacity"
+            property: "collapse"
             to: 0
-            duration: root.clearSlideMs
-            easing.type: Easing.InCubic
-          }
-        }
-      }
-
-      SequentialAnimation {
-        id: closeAnim
-
-        ParallelAnimation {
-          NumberAnimation {
-            target: notificationSlide
-            property: "x"
-            to: notificationRow.width
-            duration: 180
-            easing.type: Easing.InCubic
+            duration: 200
+            easing.type: Easing.OutCubic
           }
 
-          NumberAnimation {
-            target: rowContent
-            property: "opacity"
-            to: 0
-            duration: 180
-            easing.type: Easing.InCubic
-          }
-
-          NumberAnimation {
-            target: dayHeader
-            property: "opacity"
-            to: notificationRow.keepHeader ? 1 : 0
-            duration: 180
-            easing.type: Easing.InCubic
+          ScriptAction {
+            script: notificationRow.runCloseTarget()
           }
         }
 
-        NumberAnimation {
-          target: notificationRow
-          property: "collapse"
-          to: 0
-          duration: 200
-          easing.type: Easing.OutCubic
-        }
-
-        ScriptAction {
-          script: notificationRow.runCloseTarget()
-        }
-      }
-
-      width: notificationList.width
-      height: closing ? (keepHeader ? headerSpace + collapse * (implicitHeight - headerSpace + notificationList.spacing) - notificationList.spacing : collapse * (implicitHeight + notificationList.spacing) - notificationList.spacing) : implicitHeight
-      spacing: Math.round(8 * Theme.scale)
-
-      SectionHeader {
-        id: dayHeader
-
-        visible: notificationRow.modelData ? notificationRow.modelData.firstInDay : false
-        label: notificationRow.modelData ? notificationRow.modelData.day : ""
-      }
-
-      Column {
-        id: rowContent
-
-        transform: Translate {
-          id: notificationSlide
-        }
-
-        width: parent.width
+        width: notificationList.width
+        height: closing ? (keepHeader ? headerSpace + collapse * (implicitHeight - headerSpace + notificationList.spacing) - notificationList.spacing : collapse * (implicitHeight + notificationList.spacing) - notificationList.spacing) : implicitHeight
         spacing: Math.round(8 * Theme.scale)
 
-        Item {
-          width: parent.width
-          height: Math.round(16 * Theme.scale)
+        SectionHeader {
+          id: dayHeader
 
-          Image {
-            id: appIcon
-
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.round(16 * Theme.scale)
-            height: width
-            sourceSize: Qt.size(width, height)
-            source: Quickshell.iconPath(AppIcons.forNotification(notificationRow.modelData.appIcon, notificationRow.modelData.desktopEntry, notificationRow.modelData.appName), "dialog-information")
-          }
-
-          Text {
-            id: appName
-
-            anchors.left: appIcon.right
-            anchors.leftMargin: Math.round(6 * Theme.scale)
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, parent.width - appIcon.width - Math.round(6 * Theme.scale) - appTime.width - Math.round(10 * Theme.scale))
-            text: notificationRow.modelData.appName
-            color: Theme.subtext
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall
-            elide: Text.ElideRight
-          }
-
-          Text {
-            id: appTime
-
-            anchors.left: appName.right
-            anchors.leftMargin: Math.round(10 * Theme.scale)
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.timeLabel(notificationRow.modelData.ts)
-            color: Theme.subtext
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSmall
-          }
+          visible: notificationRow.modelData ? notificationRow.modelData.firstInDay : false
+          label: notificationRow.modelData ? notificationRow.modelData.day : ""
         }
 
-        Rectangle {
-          width: parent.width
-          height: innerCol.implicitHeight + Math.round(20 * Theme.scale)
-          radius: Math.round(12 * Theme.scale)
-          color: Theme.base
-          antialiasing: true
+        Column {
+          id: rowContent
 
-          HoverHandler {
-            id: rowHover
+          transform: Translate {
+            id: notificationSlide
           }
 
-          Column {
-            id: innerCol
+          width: parent.width
+          spacing: Math.round(8 * Theme.scale)
 
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.margins: Math.round(10 * Theme.scale)
-            spacing: Math.round(6 * Theme.scale)
+          Item {
+            width: parent.width
+            height: Math.round(16 * Theme.scale)
 
-            Item {
-              width: parent.width
-              height: Math.max(thumb.visible ? thumb.height : 0, bodyText.implicitHeight, closeButton.height)
+            Image {
+              id: appIcon
 
-              Rectangle {
-                id: thumb
-
-                visible: notificationRow.thumbVisible
-                anchors.left: parent.left
-                anchors.top: parent.top
-                width: Math.round(44 * Theme.scale)
-                height: width
-                radius: Math.round(10 * Theme.scale)
-                color: Theme.surfaceHigh
-                clip: true
-
-                Item {
-                  anchors.fill: parent
-                  layer.enabled: true
-                  layer.effect: MultiEffect {
-                    maskEnabled: true
-                    maskSource: thumbMask
-                    maskSpreadAtMin: 1.0
-                    maskThresholdMin: 0.5
-                  }
-
-                  Image {
-                    anchors.fill: parent
-                    fillMode: Image.PreserveAspectCrop
-                    source: notificationRow.active ? notificationRow.modelData.imageSource : NotifStore.imageUrlFor(notificationRow.modelData.id)
-                    visible: notificationRow.active || source !== ""
-                  }
-                }
-
-                Rectangle {
-                  id: thumbMask
-
-                  anchors.fill: parent
-                  visible: false
-                  radius: thumb.radius
-                  color: "white"
-                  antialiasing: true
-                  layer.enabled: true
-                }
-
-                Spinner {
-                  anchors.centerIn: parent
-                  visible: !notificationRow.active && NotifStore.imageUrlFor(notificationRow.modelData.id) === ""
-                  running: visible
-                }
-              }
-
-              Column {
-                id: bodyText
-
-                anchors.left: thumb.visible ? thumb.right : parent.left
-                anchors.leftMargin: thumb.visible ? Math.round(10 * Theme.scale) : 0
-                anchors.right: closeButton.left
-                anchors.rightMargin: Math.round(4 * Theme.scale)
-                anchors.top: parent.top
-                spacing: Math.round(2 * Theme.scale)
-
-                Text {
-                  width: parent.width
-                  text: notificationRow.modelData.summary
-                  color: Theme.text
-                  font.family: Theme.fontFamily
-                  font.pixelSize: Theme.fontSize
-                  font.bold: true
-                  elide: Text.ElideRight
-                }
-
-                Text {
-                  width: parent.width
-                  visible: text.length > 0
-                  text: notificationRow.modelData.body
-                  color: Theme.subtext
-                  font.family: Theme.fontFamily
-                  font.pixelSize: Theme.fontSizeSmall
-                  wrapMode: Text.WordWrap
-                  maximumLineCount: notificationRow.active ? 3 : 2
-                  elide: Text.ElideRight
-                }
-              }
-
-              IconButton {
-                id: closeButton
-
-                anchors.right: parent.right
-                anchors.top: parent.top
-                size: Math.round(16 * Theme.scale)
-                glyphSize: Theme.fontSizeSmall
-                name: "x"
-                iconColor: Theme.overlay
-                opacity: notificationRow.active ? 1 : (rowHover.hovered ? 1 : 0)
-                onClicked: notificationRow.beginClose(-1)
-              }
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: Math.round(16 * Theme.scale)
+              height: width
+              sourceSize: Qt.size(width, height)
+              source: Quickshell.iconPath(AppIcons.forNotification(notificationRow.modelData.appIcon, notificationRow.modelData.desktopEntry, notificationRow.modelData.appName), "dialog-information")
             }
 
-            Row {
-              visible: notificationRow.active && notificationRow.modelData.actionTexts.length > 0
+            Text {
+              id: appName
+
+              anchors.left: appIcon.right
+              anchors.leftMargin: Math.round(6 * Theme.scale)
+              anchors.verticalCenter: parent.verticalCenter
+              width: Math.min(implicitWidth, parent.width - appIcon.width - Math.round(6 * Theme.scale) - appTime.width - Math.round(10 * Theme.scale))
+              text: notificationRow.modelData.appName
+              color: Theme.subtext
+              font.family: Theme.fontFamily
+              font.pixelSize: Theme.fontSizeSmall
+              elide: Text.ElideRight
+            }
+
+            Text {
+              id: appTime
+
+              anchors.left: appName.right
+              anchors.leftMargin: Math.round(10 * Theme.scale)
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.timeLabel(notificationRow.modelData.ts)
+              color: Theme.subtext
+              font.family: Theme.fontFamily
+              font.pixelSize: Theme.fontSizeSmall
+            }
+          }
+
+          Rectangle {
+            width: parent.width
+            height: innerCol.implicitHeight + Math.round(20 * Theme.scale)
+            radius: Math.round(12 * Theme.scale)
+            color: Theme.base
+            antialiasing: true
+
+            HoverHandler {
+              id: rowHover
+            }
+
+            Column {
+              id: innerCol
+
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              anchors.margins: Math.round(10 * Theme.scale)
               spacing: Math.round(6 * Theme.scale)
 
-              Repeater {
-                model: Math.min(3, notificationRow.modelData.actionTexts.length)
+              Item {
+                width: parent.width
+                height: Math.max(thumb.visible ? thumb.height : 0, bodyText.implicitHeight, closeButton.height)
 
-                delegate: BarButton {
-                  required property int modelData
+                Rectangle {
+                  id: thumb
 
-                  implicitWidth: actionLabel.implicitWidth + Math.round(16 * Theme.scale)
-                  onClicked: notificationRow.beginClose(modelData)
-                  Text {
-                    id: actionLabel
+                  visible: notificationRow.thumbVisible
+                  anchors.left: parent.left
+                  anchors.top: parent.top
+                  width: Math.round(44 * Theme.scale)
+                  height: width
+                  radius: Math.round(10 * Theme.scale)
+                  color: Theme.surfaceHigh
+                  clip: true
 
+                  Item {
+                    anchors.fill: parent
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                      maskEnabled: true
+                      maskSource: thumbMask
+                      maskSpreadAtMin: 1.0
+                      maskThresholdMin: 0.5
+                    }
+
+                    Image {
+                      anchors.fill: parent
+                      fillMode: Image.PreserveAspectCrop
+                      source: notificationRow.active ? notificationRow.modelData.imageSource : NotifStore.imageUrlFor(notificationRow.modelData.id)
+                      visible: notificationRow.active || source !== ""
+                    }
+                  }
+
+                  Rectangle {
+                    id: thumbMask
+
+                    anchors.fill: parent
+                    visible: false
+                    radius: thumb.radius
+                    color: "white"
+                    antialiasing: true
+                    layer.enabled: true
+                  }
+
+                  Spinner {
                     anchors.centerIn: parent
-                    text: notificationRow.modelData.actionTexts[modelData]
+                    visible: !notificationRow.active && NotifStore.imageUrlFor(notificationRow.modelData.id) === ""
+                    running: visible
+                  }
+                }
+
+                Column {
+                  id: bodyText
+
+                  anchors.left: thumb.visible ? thumb.right : parent.left
+                  anchors.leftMargin: thumb.visible ? Math.round(10 * Theme.scale) : 0
+                  anchors.right: closeButton.left
+                  anchors.rightMargin: Math.round(4 * Theme.scale)
+                  anchors.top: parent.top
+                  spacing: Math.round(2 * Theme.scale)
+
+                  Text {
+                    width: parent.width
+                    text: notificationRow.modelData.summary
                     color: Theme.text
                     font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize
+                    font.bold: true
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    width: parent.width
+                    visible: text.length > 0
+                    text: notificationRow.modelData.body
+                    color: Theme.subtext
+                    font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSmall
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: notificationRow.active ? 3 : 2
+                    elide: Text.ElideRight
+                  }
+                }
+
+                IconButton {
+                  id: closeButton
+
+                  anchors.right: parent.right
+                  anchors.top: parent.top
+                  size: Math.round(16 * Theme.scale)
+                  glyphSize: Theme.fontSizeSmall
+                  name: "x"
+                  iconColor: Theme.overlay
+                  opacity: notificationRow.active ? 1 : (rowHover.hovered ? 1 : 0)
+                  onClicked: notificationRow.beginClose(-1)
+                }
+              }
+
+              Row {
+                visible: notificationRow.active && notificationRow.modelData.actionTexts.length > 0
+                spacing: Math.round(6 * Theme.scale)
+
+                Repeater {
+                  model: Math.min(3, notificationRow.modelData.actionTexts.length)
+
+                  delegate: BarButton {
+                    required property int modelData
+
+                    implicitWidth: actionLabel.implicitWidth + Math.round(16 * Theme.scale)
+                    onClicked: notificationRow.beginClose(modelData)
+                    Text {
+                      id: actionLabel
+
+                      anchors.centerIn: parent
+                      text: notificationRow.modelData.actionTexts[modelData]
+                      color: Theme.text
+                      font.family: Theme.fontFamily
+                      font.pixelSize: Theme.fontSizeSmall
+                    }
                   }
                 }
               }
             }
           }
         }
+      }
+
+      TopCutCorners {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        visible: notificationList.contentY > 0
+        color: root.contentColor
+        z: 100
       }
     }
 
-    TopCutCorners {
-      anchors.top: parent.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      visible: notificationList.contentY > 0
-      color: root.contentColor
-      z: 100
+    SmoothScroll {
+      id: notifScroll
+
+      target: notificationList
+      anchors.fill: notificationList
     }
   }
 }

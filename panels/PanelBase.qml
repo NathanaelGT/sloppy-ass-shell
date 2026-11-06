@@ -150,11 +150,11 @@ PanelWindow {
   readonly property real scrollY: scroller.contentY
 
   function scrollBy(delta) {
-    const limit = Math.max(0, scroller.contentHeight - scroller.height)
-    scroller.contentY = Math.max(0, Math.min(limit, scroller.contentY - delta / 2))
+    scrollerScroll.notch(delta)
   }
 
   function ensureVisible(y, height, margin) {
+    scrollerScroll.snap()
     const viewH = scroller.height
     const maxY = Math.max(0, scroller.contentHeight - viewH)
     const pad = margin === undefined ? Math.round(8 * Theme.scale) : margin
@@ -168,6 +168,7 @@ PanelWindow {
   }
 
   function scrollToTop() {
+    scrollerScroll.snap()
     scroller.contentY = 0
   }
 
@@ -336,7 +337,7 @@ PanelWindow {
       Panels.close()
     }
     onWheel: event => {
-      root.scrollBy(event.angleDelta.y)
+      scrollerScroll.wheel(event)
       event.accepted = true
     }
   }
@@ -449,7 +450,7 @@ PanelWindow {
         MouseArea {
           anchors.fill: parent
           onWheel: event => {
-            root.scrollBy(event.angleDelta.y)
+            scrollerScroll.wheel(event)
             event.accepted = true
           }
         }
@@ -540,6 +541,13 @@ PanelWindow {
             color: "white"
             antialiasing: true
           }
+        }
+
+        SmoothScroll {
+          id: scrollerScroll
+
+          target: scroller
+          anchors.fill: scroller
         }
 
         Item {
