@@ -261,3 +261,17 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `else if` chains stay chained. The whole tree is converted already, so this is about new code.
 - Report every finding with severity and a `file:line` proof; ask before assuming; keep edits
   surgical; propose extra features instead of adding them; never commit.
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown: issues live as files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Defaults: the five canonical roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
