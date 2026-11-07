@@ -9,6 +9,8 @@ Singleton {
   signal closeCleared(string name, string screen)
   property var clusterWidths: ({})
   property var clusterRights: ({})
+  property var trayItem: null
+  property int trayAnchorX: -1
 
   function setMapValue(map, screen, value) {
     const next = Object.assign({}, map)
@@ -53,6 +55,12 @@ Singleton {
   function close() {
     panel = ""
     screenName = ""
+  }
+
+  function openTray(item, anchorX, screen) {
+    trayItem = item
+    trayAnchorX = anchorX
+    open("tray", screen)
   }
 
   function openOn(name, screen) {

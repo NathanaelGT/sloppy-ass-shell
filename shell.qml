@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Services.SystemTray
 import "theme"
 import "services"
 import "bar"
@@ -1796,6 +1797,111 @@ ShellRoot {
       })
     }
 
+    function trayItems(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const all = SystemTray.items
+      const values = all ? all.values : []
+      const items = []
+      for (let i = 0; i < values.length; i++) {
+        if (values[i].status !== Status.Passive) {
+          items.push({
+            index: items.length,
+            id: values[i].id,
+            title: values[i].title,
+            hasMenu: values[i].hasMenu
+          })
+        }
+      }
+      return JSON.stringify({
+        enabled: true,
+        items: items
+      })
+    }
+
+    function trayOpen(index: int, screen: string, anchorX: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const all = SystemTray.items
+      const values = all ? all.values : []
+      const items = []
+      for (let i = 0; i < values.length; i++) {
+        if (values[i].status !== Status.Passive) {
+          items.push(values[i])
+        }
+      }
+      const item = items[index]
+      if (!item || !item.hasMenu) {
+        return false
+      }
+      Panels.openTray(item, anchorX === undefined ? -1 : anchorX, screen ? screen : "eDP-1")
+      return true
+    }
+
+    function trayState(screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("tray", screen ? screen : "eDP-1")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify(panel.testTrayState())
+    }
+
+    function trayExpand(index: int, screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("tray", screen ? screen : "eDP-1")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      return JSON.stringify({
+        enabled: true,
+        open: true,
+        expanded: panel.testTrayExpand(index)
+      })
+    }
+
+    function trayInvoke(index: int, screen: string): string {
+      if (!TestDriver.active) {
+        return "disabled"
+      }
+      const panel = TestDriver.panel("tray", screen ? screen : "eDP-1")
+      if (!panel || !panel.open) {
+        return "no-panel"
+      }
+      return panel.testTrayInvoke(index)
+    }
+
+    function trayRowRect(index: int, screen: string): string {
+      if (!TestDriver.active) {
+        return "{}"
+      }
+      const panel = TestDriver.panel("tray", screen ? screen : "eDP-1")
+      if (!panel || !panel.open) {
+        return "{}"
+      }
+      const local = panel.testTrayRowRect(index)
+      if (!local) {
+        return "{}"
+      }
+      const mon = TestDriver.monitorRect(screen ? screen : "eDP-1")
+      if (!mon) {
+        return "{}"
+      }
+      return JSON.stringify({
+        x: mon.x + Math.round(local.x),
+        y: mon.y + Math.round(local.y),
+        width: Math.round(local.width),
+        height: Math.round(local.height),
+        monitor: mon.name
+      })
+    }
+
     function notifState(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
@@ -2129,6 +2235,13 @@ ShellRoot {
     model: Quickshell.screens
     delegate: Component {
       WindowSwitcher {}
+    }
+  }
+
+  Variants {
+    model: Quickshell.screens
+    delegate: Component {
+      TrayMenu {}
     }
   }
 

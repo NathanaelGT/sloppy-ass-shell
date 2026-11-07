@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import "../../theme"
 import "../../components"
+import "../../services"
 
 BarButton {
   id: root
@@ -32,9 +33,9 @@ BarButton {
   hoverFill: Theme.capsuleFill
   visible: content.implicitWidth > 0
 
-  function displayMenu(item, host) {
+  function openMenu(item, host) {
     const point = host.mapToItem(null, host.width / 2, host.height)
-    item.display(QsWindow.window, Math.round(point.x), Math.round(point.y))
+    Panels.openTray(item, Math.round(point.x), root.screen.name)
   }
 
   Row {
@@ -93,14 +94,14 @@ BarButton {
             onClicked: event => {
               if (event.button === Qt.RightButton) {
                 if (trayItem.modelData.hasMenu) {
-                  root.displayMenu(trayItem.modelData, trayIcon)
+                  root.openMenu(trayItem.modelData, trayIcon)
                 } else {
                   trayItem.modelData.activate()
                 }
               } else if (event.button === Qt.MiddleButton) {
                 trayItem.modelData.secondaryActivate()
               } else if (trayItem.modelData.onlyMenu && trayItem.modelData.hasMenu) {
-                root.displayMenu(trayItem.modelData, trayIcon)
+                root.openMenu(trayItem.modelData, trayIcon)
               } else {
                 trayItem.modelData.activate()
               }
