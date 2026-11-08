@@ -362,7 +362,7 @@ PanelBase {
     }
     foldersScroll.snap()
     foldersFlick.contentY = 0
-    foldersColumn.x = root.navDirection > 0 ? foldersFlick.width : -foldersFlick.width
+    rowsColumn.x = root.navDirection > 0 ? foldersFlick.width : -foldersFlick.width
     navAnim.to = 0
     navAnim.restart()
   }
@@ -403,6 +403,203 @@ PanelBase {
       })
     }
     return segs
+  }
+
+  property var crumbItems: ({})
+  property var sepItems: ({})
+  property var dyingCrumbs: ({})
+  property var dyingSeps: ({})
+
+  onBreadcrumbChanged: syncCrumbs()
+
+  function reviveItem(store, dying, key, comp, props) {
+    let it = store[key]
+    if (!it && dying[key]) {
+      it = dying[key]
+      delete dying[key]
+      store[key] = it
+      it.fadeIn()
+    } else if (!it) {
+      it = comp.createObject(crumbRow, props)
+      store[key] = it
+      it.opacity = 0
+      it.fadeIn()
+    }
+    return it
+  }
+
+  function syncCrumbs() {
+    const want = root.breadcrumb
+    const alive = {}
+    for (let i = 0; i < want.length; i++) {
+      alive[want[i].path] = true
+    }
+    for (const path in root.crumbItems) {
+      if (!alive[path]) {
+        const gone = root.crumbItems[path]
+        gone.fadeOut()
+        root.dyingCrumbs[path] = gone
+        delete root.crumbItems[path]
+      }
+    }
+    for (const path in root.sepItems) {
+      if (!alive[path]) {
+        const gone = root.sepItems[path]
+        gone.fadeOut()
+        root.dyingSeps[path] = gone
+        delete root.sepItems[path]
+      }
+    }
+    for (let i = 0; i < want.length; i++) {
+      const seg = want[i]
+      if (i > 0) {
+        reviveItem(root.sepItems, root.dyingSeps, seg.path, sepComp, {
+          path: seg.path
+        })
+      }
+      reviveItem(root.crumbItems, root.dyingCrumbs, seg.path, crumbComp, {
+        path: seg.path,
+        segLabel: seg.label
+      })
+    }
+    for (let i = 0; i < want.length; i++) {
+      if (i > 0) {
+        root.sepItems[want[i].path].parent = null
+      }
+      root.crumbItems[want[i].path].parent = null
+    }
+    for (let i = 0; i < want.length; i++) {
+      if (i > 0) {
+        root.sepItems[want[i].path].parent = crumbRow
+      }
+      root.crumbItems[want[i].path].parent = crumbRow
+    }
+    for (const path in root.dyingCrumbs) {
+      const sep = root.dyingSeps[path]
+      if (sep) {
+        sep.parent = null
+        sep.parent = crumbRow
+      }
+      const gone = root.dyingCrumbs[path]
+      gone.parent = null
+      gone.parent = crumbRow
+    }
+  }
+
+  Component {
+    id: crumbComp
+
+    Text {
+      id: crumbItem
+
+      property string path
+      property string segLabel
+      property bool removing: false
+      readonly property bool isLast: root.breadcrumb.length > 0 && root.breadcrumb[root.breadcrumb.length - 1].path === crumbItem.path
+
+      anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+      text: segLabel
+      color: isLast ? Theme.text : Theme.subtext
+      font.family: "monospace"
+      font.pixelSize: s(9)
+      font.bold: isLast
+
+      function fadeIn() {
+        removing = false
+        crumbOut.stop()
+        crumbIn.restart()
+      }
+
+      function fadeOut() {
+        removing = true
+        crumbIn.stop()
+        crumbOut.restart()
+      }
+
+      NumberAnimation {
+        id: crumbIn
+
+        target: crumbItem
+        property: "opacity"
+        to: 1
+        duration: 160
+        easing.type: Easing.OutCubic
+      }
+
+      NumberAnimation {
+        id: crumbOut
+
+        target: crumbItem
+        property: "opacity"
+        to: 0
+        duration: 160
+        easing.type: Easing.OutCubic
+        onStopped: if (crumbItem.removing) {
+          delete root.dyingCrumbs[crumbItem.path]
+          crumbItem.destroy()
+        }
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        enabled: !crumbItem.isLast
+        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+        onClicked: root.goTo(crumbItem.path)
+      }
+    }
+  }
+
+  Component {
+    id: sepComp
+
+    Text {
+      id: crumbSep
+
+      property string path
+      property bool removing: false
+
+      anchors.verticalCenter: parent ? parent.verticalCenter : undefined
+      text: " / "
+      color: Theme.subtext
+      font.family: "monospace"
+      font.pixelSize: s(9)
+
+      function fadeIn() {
+        removing = false
+        sepOut.stop()
+        sepIn.restart()
+      }
+
+      function fadeOut() {
+        removing = true
+        sepIn.stop()
+        sepOut.restart()
+      }
+
+      NumberAnimation {
+        id: sepIn
+
+        target: crumbSep
+        property: "opacity"
+        to: 1
+        duration: 160
+        easing.type: Easing.OutCubic
+      }
+
+      NumberAnimation {
+        id: sepOut
+
+        target: crumbSep
+        property: "opacity"
+        to: 0
+        duration: 160
+        easing.type: Easing.OutCubic
+        onStopped: if (crumbSep.removing) {
+          delete root.dyingSeps[crumbSep.path]
+          crumbSep.destroy()
+        }
+      }
+    }
   }
 
   function playRowPath(path) {
@@ -454,12 +651,12 @@ PanelBase {
       return "Play results"
     }
     if (root.browsePath.length === 0) {
-      return "Play all"
+      return "Play"
     }
     if (root.inCollection) {
       return root.browsePath === "pinned" ? "Play Pinned" : "Play Favorites"
     }
-    return "Play folder"
+    return "Play"
   }
 
   function runSearch() {
@@ -702,7 +899,10 @@ PanelBase {
 
   onScrolled: root.closeRoute()
 
-  Component.onCompleted: root.syncQueueModel()
+  Component.onCompleted: {
+    root.syncQueueModel()
+    syncCrumbs()
+  }
 
   function testSwipe(index, offset, release) {
     const del = queueList.itemAtIndex(index)
@@ -790,7 +990,7 @@ PanelBase {
   NumberAnimation {
     id: navAnim
 
-    target: foldersColumn
+    target: rowsColumn
     property: "x"
     duration: 200
     easing.type: Easing.OutCubic
@@ -1648,143 +1848,139 @@ PanelBase {
         }
       }
 
+      Column {
+        id: headArea
+
+        width: parent.width
+        spacing: s(4)
+
+        Row {
+          id: listHead
+
+          width: foldersPage.width
+          height: s(32)
+          spacing: s(6)
+
+          Rectangle {
+            id: backButton
+
+            readonly property bool canGoBack: root.browsePath.length > 0
+
+            width: s(29)
+            height: s(29)
+            radius: s(6)
+            anchors.verticalCenter: parent.verticalCenter
+            color: backButton.canGoBack && backHover.containsMouse ? Theme.surface : "transparent"
+
+            CrossfadeSwapText {
+              anchors.centerIn: parent
+              want: Icons.get(backButton.canGoBack ? "chevron-left" : "music")
+              font.family: Theme.iconFamily
+              font.pixelSize: s(14)
+              color: Theme.text
+            }
+
+            MouseArea {
+              id: backHover
+
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: backButton.canGoBack ? Qt.PointingHandCursor : Qt.ArrowCursor
+              onClicked: if (backButton.canGoBack) {
+                root.goTo(root.backPath())
+              }
+            }
+          }
+
+          Item {
+            id: crumbWrap
+
+            width: parent.width - playBtn.width - s(6) - backButton.width - s(6)
+            height: parent.height
+            clip: true
+
+            Row {
+              id: crumbRow
+
+              anchors.verticalCenter: parent.verticalCenter
+              x: Math.min(0, crumbWrap.width - crumbRow.width)
+              spacing: s(2)
+            }
+          }
+
+          Rectangle {
+            id: playBtn
+
+            width: playRow.implicitWidth + s(18)
+            height: s(24)
+            radius: s(7)
+            anchors.verticalCenter: parent.verticalCenter
+            color: Theme.mauve
+
+            Row {
+              id: playRow
+
+              anchors.centerIn: parent
+              spacing: s(3)
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: Icons.get("player-play")
+                font.family: Theme.iconFamily
+                font.pixelSize: s(10)
+                color: Theme.onAccent
+              }
+
+              FadeSwapText {
+                anchors.verticalCenter: parent.verticalCenter
+                want: root.playLabel()
+                color: Theme.onAccent
+                font.family: Theme.fontFamily
+                font.pixelSize: s(9)
+                font.bold: true
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.playCurrent()
+            }
+          }
+        }
+
+        Text {
+          id: listMeta
+
+          width: foldersPage.width
+          height: visible ? s(16) : 0
+          visible: text.length > 0
+          text: root.metaText()
+          leftPadding: s(12)
+          verticalAlignment: Text.AlignVCenter
+          color: Theme.subtext
+          font.family: "monospace"
+          font.pixelSize: s(9)
+        }
+      }
+
       Flickable {
         id: foldersFlick
 
-        anchors.fill: parent
-        contentHeight: foldersColumn.implicitHeight
+        anchors.top: headArea.bottom
+        anchors.topMargin: s(4)
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        contentHeight: rowsColumn.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
         Column {
-          id: foldersColumn
+          id: rowsColumn
 
-          width: parent.width
+          width: foldersPage.width
           spacing: s(4)
-
-          Row {
-            id: listHead
-
-            width: parent.width
-            height: s(32)
-            spacing: s(6)
-
-            Rectangle {
-              id: backButton
-
-              width: s(29)
-              height: s(29)
-              radius: s(6)
-              anchors.verticalCenter: parent.verticalCenter
-              visible: root.browsePath.length > 0
-              color: backHover.containsMouse ? Theme.surface : "transparent"
-
-              Text {
-                anchors.centerIn: parent
-                text: Icons.get("chevron-left")
-                font.family: Theme.iconFamily
-                font.pixelSize: s(14)
-                color: Theme.text
-              }
-
-              MouseArea {
-                id: backHover
-
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.goTo(root.backPath())
-              }
-            }
-
-            Item {
-              id: crumbWrap
-
-              width: parent.width - playBtn.width - s(6) - (backButton.visible ? backButton.width + s(6) : 0)
-              height: parent.height
-              clip: true
-
-              Row {
-                id: crumbRow
-
-                anchors.verticalCenter: parent.verticalCenter
-                x: Math.min(0, crumbWrap.width - crumbRow.width)
-                spacing: s(2)
-
-                Repeater {
-                  model: root.breadcrumb
-
-                  delegate: Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: modelData.label + (index < root.breadcrumb.length - 1 ? " / " : "")
-                    color: index === root.breadcrumb.length - 1 ? Theme.text : Theme.subtext
-                    font.family: "monospace"
-                    font.pixelSize: s(9)
-                    font.bold: index === root.breadcrumb.length - 1
-
-                    MouseArea {
-                      anchors.fill: parent
-                      enabled: index < root.breadcrumb.length - 1
-                      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                      onClicked: root.goTo(modelData.path)
-                    }
-                  }
-                }
-              }
-            }
-
-            Rectangle {
-              id: playBtn
-
-              width: s(96)
-              height: s(29)
-              radius: s(8)
-              anchors.verticalCenter: parent.verticalCenter
-              color: Theme.mauve
-
-              Row {
-                anchors.centerIn: parent
-                spacing: s(4)
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: Icons.get("player-play")
-                  font.family: Theme.iconFamily
-                  font.pixelSize: s(12)
-                  color: Theme.onAccent
-                }
-
-                Text {
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: root.playLabel()
-                  color: Theme.onAccent
-                  font.family: Theme.fontFamily
-                  font.pixelSize: s(10)
-                  font.bold: true
-                }
-              }
-
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.playCurrent()
-              }
-            }
-          }
-
-          Text {
-            id: listMeta
-
-            width: parent.width
-            height: visible ? s(16) : 0
-            visible: text.length > 0
-            text: root.metaText()
-            leftPadding: s(12)
-            verticalAlignment: Text.AlignVCenter
-            color: Theme.subtext
-            font.family: "monospace"
-            font.pixelSize: s(9)
-          }
 
           Repeater {
             id: collectionRepeater
@@ -1827,7 +2023,7 @@ PanelBase {
               readonly property bool isCurrent: Mpd.song ? Mpd.song.file === trackRow.entry.path : false
               readonly property bool rowHovered: trackHover.containsMouse || trackFavHover.containsMouse || trackPinHover.containsMouse || trackAddHover.containsMouse
 
-              width: foldersColumn.width
+              width: rowsColumn.width
               height: s(44)
               radius: s(8)
               color: trackRow.isCurrent || trackRow.rowHovered ? Theme.surface : Theme.base
