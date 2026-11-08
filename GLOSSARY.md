@@ -213,9 +213,27 @@ History entries that arrived after the panel was last opened. Drives the
 bar badge count and clears when the panel opens.
 
 **Idle**:
-Five seconds without keyboard or pointer input. While idle, a banner's
-countdown is paused; the first input resumes it. Unrelated to the longer
-idle timeouts registered for power management.
+Five seconds without keyboard or pointer input, detected by the shell.
+While idle, a banner's countdown is paused; the first input resumes it. The
+same input absence the Idle chain measures; the chain's stages simply sit at
+longer timeouts.
+
+**Idle chain**:
+The staged response to absent input: Dim, then DPMS off, then Lock, then
+Suspend, each at its own timeout since the last input. Any input reverts
+every applied stage in place — monitors wake and brightness returns to its
+pre-Dim value — and waking from Suspend does the same immediately.
+
+**Dim**:
+The Idle chain's brightness stage: every monitor's brightness set to zero,
+external monitors first (DDC is the slow setter), internal last, so both
+appear to dim together. Reverting restores the pre-Dim value of each
+monitor.
+
+**Audio gate**:
+The Suspend stage's wait for silence: with audio still playing past the
+Suspend timeout, the suspend waits until no audio has played for thirty
+minutes. Only Suspend is gated — Dim and DPMS off still fire.
 
 **Chime**:
 The arrival sound. Plays on every arrival not muted by DND (Critical
