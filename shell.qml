@@ -520,6 +520,66 @@ ShellRoot {
       return ClockState.showAltTime
     }
 
+    function musicPillState(screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const pill = TestDriver.panel("musicPill", screen)
+      if (!pill) {
+        return "{\"enabled\":true,\"found\":false}"
+      }
+      return JSON.stringify({
+        enabled: true,
+        screen: screen,
+        showTitle: pill.showTitle,
+        showingTitle: pill.showingTitle,
+        merged: pill.merged,
+        x: pill.x,
+        width: pill.width,
+        playing: Mpd.state === "play"
+      })
+    }
+
+    function bellPillState(screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const pill = TestDriver.panel("bellPill", screen)
+      if (!pill) {
+        return "{\"enabled\":true,\"found\":false}"
+      }
+      return JSON.stringify({
+        enabled: true,
+        screen: screen,
+        glyph: pill.glyphName,
+        count: pill.count,
+        unread: pill.unread,
+        badgeOpacity: pill.badgeOpacity,
+        x: pill.x,
+        width: pill.width,
+        iconDock: pill.bannerIconDock,
+        bannerScreen: pill.bannerScreen,
+        phase: Notifs.bannerPhase
+      })
+    }
+
+    function clockPillState(screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const pill = TestDriver.panel("clockPill", screen)
+      if (!pill) {
+        return "{\"enabled\":true,\"found\":false}"
+      }
+      return JSON.stringify({
+        enabled: true,
+        screen: screen,
+        opacity: pill.clockOpacity,
+        x: pill.x,
+        merged: pill.merged
+      })
+    }
+
     function volumeState(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
@@ -842,36 +902,39 @@ ShellRoot {
       if (!TestDriver.active) {
         return "inactive"
       }
-      if (cmd === "toggle") {
-        Mpd.toggle()
-      } else if (cmd === "play") {
+      const at = cmd.indexOf("@")
+      const screen = at >= 0 ? cmd.slice(at + 1) : ""
+      const base = at >= 0 ? cmd.slice(0, at) : cmd
+      if (base === "toggle") {
+        Mpd.toggle(screen)
+      } else if (base === "play") {
         if (Mpd.state !== "play") {
-          Mpd.toggle()
+          Mpd.toggle(screen)
         }
-      } else if (cmd === "pause") {
+      } else if (base === "pause") {
         if (Mpd.state === "play") {
-          Mpd.toggle()
+          Mpd.toggle(screen)
         }
-      } else if (cmd === "next") {
-        Mpd.next()
-      } else if (cmd === "prev") {
-        Mpd.prev()
-      } else if (cmd === "shuffle") {
+      } else if (base === "next") {
+        Mpd.next(screen)
+      } else if (base === "prev") {
+        Mpd.prev(screen)
+      } else if (base === "shuffle") {
         Mpd.setRandomWeighted(!Mpd.weightedRandom)
-      } else if (cmd === "refresh") {
+      } else if (base === "refresh") {
         Mpd.refresh()
-      } else if (cmd.startsWith("play ")) {
-        Mpd.playIndex(parseInt(cmd.slice(5)))
-      } else if (cmd.startsWith("seek ")) {
-        Mpd.seek(parseFloat(cmd.slice(5)))
-      } else if (cmd.startsWith("volume ")) {
-        Mpd.setVolume(parseFloat(cmd.slice(7)))
-      } else if (cmd.startsWith("repeat ")) {
-        Mpd.setRepeat(cmd.slice(7) === "on")
-      } else if (cmd.startsWith("random ")) {
-        Mpd.setRandom(cmd.slice(7) === "on")
-      } else if (cmd.startsWith("single ")) {
-        Mpd.setSingle(cmd.slice(7) === "on")
+      } else if (base.startsWith("play ")) {
+        Mpd.playIndex(parseInt(base.slice(5)), screen)
+      } else if (base.startsWith("seek ")) {
+        Mpd.seek(parseFloat(base.slice(5)))
+      } else if (base.startsWith("volume ")) {
+        Mpd.setVolume(parseFloat(base.slice(7)))
+      } else if (base.startsWith("repeat ")) {
+        Mpd.setRepeat(base.slice(7) === "on")
+      } else if (base.startsWith("random ")) {
+        Mpd.setRandom(base.slice(7) === "on")
+      } else if (base.startsWith("single ")) {
+        Mpd.setSingle(base.slice(7) === "on")
       } else {
         return "unknown"
       }

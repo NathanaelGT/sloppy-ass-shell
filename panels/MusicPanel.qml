@@ -407,11 +407,11 @@ PanelBase {
 
   function playRowPath(path) {
     if (path === "pinned") {
-      Mpd.playPinned()
+      Mpd.playPinned("", root.screenId)
     } else if (path === "favorites") {
-      Mpd.playFavorites()
+      Mpd.playFavorites("", root.screenId)
     } else {
-      Mpd.playFolder(path)
+      Mpd.playFolder(path, root.screenId)
     }
   }
 
@@ -419,12 +419,12 @@ PanelBase {
     if (root.searching) {
       const uris = root.trackRows.map(e => e.path)
       if (uris.length > 0) {
-        Mpd.playTracks(uris, root.browsePath, "")
+        Mpd.playTracks(uris, root.browsePath, "", root.screenId)
       }
       return
     }
     if (root.browsePath.length === 0) {
-      Mpd.playAll()
+      Mpd.playAll(root.screenId)
       return
     }
     root.playRowPath(root.browsePath)
@@ -432,7 +432,7 @@ PanelBase {
 
   function playSearchFrom(entry) {
     const uris = root.trackRows.map(e => e.path)
-    Mpd.playTracks(uris, root.browsePath, entry.path)
+    Mpd.playTracks(uris, root.browsePath, entry.path, root.screenId)
   }
 
   function metaText() {
@@ -798,7 +798,7 @@ PanelBase {
 
   Keys.onPressed: event => {
     if (event.key === Qt.Key_Space) {
-      Mpd.toggle()
+      Mpd.toggle(root.screenId)
       event.accepted = true
     } else if (event.key === Qt.Key_Left) {
       Mpd.seek(Mpd.elapsed - 5)
@@ -1251,7 +1251,7 @@ PanelBase {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: Mpd.prev()
+        onClicked: Mpd.prev(root.screenId)
       }
     }
 
@@ -1277,7 +1277,7 @@ PanelBase {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: Mpd.toggle()
+        onClicked: Mpd.toggle(root.screenId)
       }
     }
 
@@ -1303,7 +1303,7 @@ PanelBase {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: Mpd.next()
+        onClicked: Mpd.next(root.screenId)
       }
     }
 
@@ -1811,7 +1811,7 @@ PanelBase {
               label: modelData.name
               activeSource: Mpd.playSource === modelData.path
               onOpen: p => root.goTo(p)
-              onPlayRow: p => Mpd.playFolder(p)
+              onPlayRow: p => Mpd.playFolder(p, root.screenId)
             }
           }
 
@@ -1842,12 +1842,12 @@ PanelBase {
                     root.playSearchFrom(trackRow.entry)
                   } else if (root.inCollection) {
                     if (root.browsePath === "pinned") {
-                      Mpd.playPinned(trackRow.entry.path)
+                      Mpd.playPinned(trackRow.entry.path, root.screenId)
                     } else {
-                      Mpd.playFavorites(trackRow.entry.path)
+                      Mpd.playFavorites(trackRow.entry.path, root.screenId)
                     }
                   } else {
-                    Mpd.playFolderTrack(root.browsePath === "" ? Mpd.musicDir : root.browsePath, trackRow.entry.path)
+                    Mpd.playFolderTrack(root.browsePath === "" ? Mpd.musicDir : root.browsePath, trackRow.entry.path, root.screenId)
                   }
                 }
               }
@@ -2279,7 +2279,7 @@ PanelBase {
                 if (Mpd.song && pos < Mpd.song.pos) {
                   return
                 }
-                Mpd.playQueueId(qid)
+                Mpd.playQueueId(qid, root.screenId)
               }
             }
 

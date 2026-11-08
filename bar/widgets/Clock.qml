@@ -17,6 +17,10 @@ BarButton {
   readonly property string zoneText: root.altTime ? "WITA" : root.displayDate.toLocaleString(Theme.locale, "t")
   readonly property int fullWidth: Math.round(dateMetrics.advanceWidth + spaceMetrics.advanceWidth * 3 + timeSlotWidth + witaMetrics.width + 26 * Theme.scale)
 
+  readonly property real clockOpacity: clockRow.opacity
+
+  Component.onCompleted: TestDriver.register("clockPill", root.screen.name, root)
+
   implicitWidth: root.fullWidth
   fill: root.merged ? Qt.rgba(Theme.capsuleFill.r, Theme.capsuleFill.g, Theme.capsuleFill.b, 0) : Theme.capsuleFill
   enabled: !root.merged
@@ -34,6 +38,9 @@ BarButton {
     target: Notifs
 
     function onBannerPhaseChanged() {
+      if (root.screen.name !== "eDP-1") {
+        return
+      }
       if (Notifs.bannerPhase === "compact" || Notifs.bannerPhase === "expanded") {
         clockTextShowAnim.stop()
         clockTextHideAnim.restart()

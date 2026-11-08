@@ -50,9 +50,18 @@ BarButton {
 
   readonly property int arrivals: Notifs.arrivals
 
+  readonly property bool bannerScreen: root.screen && root.screen.name === "eDP-1"
+
+  readonly property string glyphName: bell.name
+
+  readonly property real badgeOpacity: badgeRect.opacity
+
   onArrivalsChanged: shakeAnim.restart()
 
-  Component.onCompleted: root.merge = root.active ? 0 : 1
+  Component.onCompleted: {
+    root.merge = root.active ? 0 : 1
+    TestDriver.register("bellPill", root.screen.name, root)
+  }
 
   onActiveChanged: {
     if (!root.active) {
@@ -91,6 +100,9 @@ BarButton {
     target: Notifs
 
     function onBannerPhaseChanged() {
+      if (!root.bannerScreen) {
+        return
+      }
       const phase = Notifs.bannerPhase
       if (phase === "compact" || phase === "expanded") {
         glyphShowAnim.stop()
@@ -208,8 +220,8 @@ BarButton {
 
       anchors.centerIn: parent
       visible: opacity > 0
-      name: Notifs.dnd ? "bell-off" : root.count > 0 ? "bell-ringing" : "bell"
-      color: root.count > 0 ? Theme.primary : Theme.text
+      name: Notifs.dnd ? "bell-off" : root.bannerScreen && root.count > 0 ? "bell-ringing" : "bell"
+      color: root.bannerScreen && root.count > 0 ? Theme.primary : Theme.text
       font.pixelSize: Theme.iconSizeLarge
     }
 

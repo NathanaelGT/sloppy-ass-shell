@@ -6,6 +6,24 @@ concepts, not general QML/programming vocabulary.
 
 ## Bar
 
+**Pill**:
+One of the bar's three right-side cluster widgets: the bell, the clock, and
+the music widget. Pills rest side by side and can temporarily merge.
+_Avoid_: widget (for bell/clock/music specifically), button
+
+**Merge**:
+Two Pills briefly sharing one blob: the clock is covered or joined by the
+Banner on a notification arrival, or by the music widget's revealed title on
+a playback event. Every merge happens on exactly one screen; the others stay
+at rest.
+_Avoid_: combine, morph
+
+**Arrival**:
+An event that can trigger a Merge: a notification arriving, or music
+playback starting or advancing. Screen-scoped: a user-clicked arrival targets
+the screen the click happened on; automatic and external ones target eDP-1.
+_Avoid_: trigger, event (unqualified)
+
 **Workspaces**:
 The bar widget showing one group per workspace on the widget's screen: the
 workspace number and every window icon, hairline-separated inside one

@@ -7,6 +7,12 @@ import Quickshell.Services.Pipewire
 Singleton {
   id: root
 
+  signal titleArrival(string screen)
+
+  property string pendingTag: ""
+
+  property real pendingTagAt: 0
+
   property string host: Quickshell.env("MPD_HOST") || "127.0.0.1"
   property int port: {
     const p = parseInt(Quickshell.env("MPD_PORT"))
@@ -461,6 +467,9 @@ Singleton {
   function applyStatus(pairs, force) {
     const prevState = root.state
     root.state = pairs.state || "stop"
+    if (root.state === "play" && prevState !== "play") {
+      root.noteTitleEvent()
+    }
     root.repeat = pairs.repeat === "1"
     if (pairs.bitrate !== undefined) {
       root.bitrate = root.toInt(pairs.bitrate, 0)
@@ -499,6 +508,7 @@ Singleton {
     } : null
     if (id !== prevId) {
       root.songChangedAt = Date.now()
+      root.noteTitleEvent()
       root.fetchStatus(true)
       root.resolveCover()
     }
@@ -563,7 +573,20 @@ Singleton {
     root.fetchCount("", () => {})
   }
 
-  function toggle() {
+  function armMerge(screen) {
+    root.pendingTag = screen && screen.length > 0 ? screen : "eDP-1"
+    root.pendingTagAt = Date.now()
+  }
+
+  function noteTitleEvent() {
+    if (root.state !== "play") {
+      root.pendingTag = ""
+      return
+    }
+    mergeTimer.restart()
+  }
+
+  function toggle(screen) {
     if (!root.connected) {
       return
     }
@@ -577,6 +600,7 @@ Singleton {
     if (root.state === "play") {
       root.fadeOutPause()
     } else {
+      root.armMerge(screen)
       root.fadeInPlay()
     }
   }
@@ -624,17 +648,23 @@ Singleton {
     fadeTimer.restart()
   }
 
-  function next() {
+  function next(screen) {
     if (!root.connected) {
       return
+    }
+    if (root.state === "play") {
+      root.armMerge(screen)
     }
     root.send("next")
     root.syncPlayer()
   }
 
-  function prev() {
+  function prev(screen) {
     if (!root.connected) {
       return
+    }
+    if (root.state === "play") {
+      root.armMerge(screen)
     }
     root.send("previous")
     root.syncPlayer()
@@ -684,7 +714,8 @@ Singleton {
     root.reorderRemaining()
   }
 
-  function playFolder(dir) {
+  function playFolder(dir, screen) {
+    root.armMerge(screen)
     root.playSource = dir
     root.saveState()
     if (root.weightedRandom) {
@@ -698,7 +729,8 @@ Singleton {
     }
   }
 
-  function playTracks(uris, source, startUri) {
+  function playTracks(uris, source, startUri, screen) {
+    root.armMerge(screen)
     root.playSource = source
     root.saveState()
     root.beginClear()
@@ -725,15 +757,16 @@ Singleton {
     }
   }
 
-  function playPinned(startUri) {
-    root.playTracks(Object.keys(root.pinned), "pinned", startUri)
+  function playPinned(startUri, screen) {
+    root.playTracks(Object.keys(root.pinned), "pinned", startUri, screen)
   }
 
-  function playFavorites(startUri) {
-    root.playTracks(Object.keys(root.favorites), "favorites", startUri)
+  function playFavorites(startUri, screen) {
+    root.playTracks(Object.keys(root.favorites), "favorites", startUri, screen)
   }
 
-  function playAll() {
+  function playAll(screen) {
+    root.armMerge(screen)
     root.playSource = "all"
     root.saveState()
     if (root.weightedRandom) {
@@ -747,7 +780,8 @@ Singleton {
     }
   }
 
-  function playFolderTrack(folder, uri) {
+  function playFolderTrack(folder, uri, screen) {
+    root.armMerge(screen)
     const dir = folder === root.musicDir ? "" : folder
     root.playSource = folder
     root.saveState()
@@ -772,7 +806,8 @@ Singleton {
     root.send("add \"" + root.esc(uri) + "\"", null)
   }
 
-  function playQueueId(id) {
+  function playQueueId(id, screen) {
+    root.armMerge(screen)
     root.send("playid " + id, null)
     root.syncPlayer()
   }
@@ -1244,6 +1279,18 @@ Singleton {
         next = limit
       }
       root.elapsed = next
+    }
+  }
+
+  Timer {
+    id: mergeTimer
+
+    interval: 150
+    onTriggered: {
+      const tagged = root.pendingTag !== "" && Date.now() - root.pendingTagAt <= 2000
+      const screen = tagged ? root.pendingTag : "eDP-1"
+      root.pendingTag = ""
+      root.titleArrival(screen)
     }
   }
 

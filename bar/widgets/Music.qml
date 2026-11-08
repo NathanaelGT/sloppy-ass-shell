@@ -17,7 +17,10 @@ BarButton {
   bottomLeftRadius: root.seal * root.radius
   bottomRightRadius: root.seal * root.radius
 
-  Component.onCompleted: root.seal = root.active ? 0 : 1
+  Component.onCompleted: {
+    root.seal = root.active ? 0 : 1
+    TestDriver.register("musicPill", root.screen.name, root)
+  }
 
   onActiveChanged: {
     if (!root.active) {
@@ -52,7 +55,7 @@ BarButton {
   implicitWidth: root.merged ? Math.round(root.mergedSpan) + root.iconOnlyWidth : root.showingTitle ? titleLabel.implicitWidth + icon.implicitWidth + Math.round(26 * Theme.scale) : root.iconOnlyWidth
   active: Panels.openOn("music", root.screen.name)
   onClicked: Panels.toggle("music", root.screen.name)
-  onRightClicked: Mpd.toggle()
+  onRightClicked: Mpd.toggle(root.screen.name)
   onMiddleClicked: Quickshell.execDetached(["systemctl", "--user", "restart", "mpd"])
   onWheeled: delta => Mpd.setVolume(Mpd.volume + (delta > 0 ? 5 : -5))
   visible: Mpd.connected
@@ -135,16 +138,17 @@ BarButton {
         root.showTitle = false
       }
     }
+
+    function onTitleArrival(screen) {
+      if (screen === root.screen.name && !root.menuOpen) {
+        root.showTitle = true
+        titleTimer.restart()
+      }
+    }
   }
 
   onSongChanged: {
-    if (root.song && Mpd.state === "play" && !root.menuOpen) {
-      root.showTitle = true
-      titleTimer.restart()
-    } else if (root.song) {
-      root.showTitle = false
-      titleTimer.stop()
-    } else {
+    if (!root.song) {
       root.showTitle = false
       titleTimer.stop()
     }
