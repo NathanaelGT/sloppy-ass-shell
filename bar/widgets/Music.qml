@@ -56,7 +56,7 @@ BarButton {
   active: Panels.openOn("music", root.screen.name)
   onClicked: Panels.toggle("music", root.screen.name)
   onRightClicked: Mpd.toggle(root.screen.name)
-  onMiddleClicked: Quickshell.execDetached(["systemctl", "--user", "restart", "mpd"])
+  onMiddleClicked: Mpd.updateDb()
   onWheeled: delta => Mpd.setVolume(Mpd.volume + (delta > 0 ? 5 : -5))
   visible: Mpd.connected
 

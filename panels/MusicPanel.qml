@@ -331,6 +331,41 @@ PanelBase {
     return root.currentDirEntries.filter(e => e.type === "file")
   }
 
+  readonly property var folderListRows: {
+    const out = []
+    for (let i = 0; i < root.collectionRows.length; i++) {
+      const c = root.collectionRows[i]
+      out.push({
+        kind: c.kind,
+        path: c.path,
+        label: c.label,
+        num: 0,
+        entry: null
+      })
+    }
+    for (let i = 0; i < root.folderRows.length; i++) {
+      const d = root.folderRows[i]
+      out.push({
+        kind: "dir",
+        path: d.path,
+        label: d.name,
+        num: 0,
+        entry: null
+      })
+    }
+    const tracks = root.trackRows
+    for (let i = 0; i < tracks.length; i++) {
+      out.push({
+        kind: "file",
+        path: tracks[i].path,
+        label: "",
+        num: i + 1,
+        entry: tracks[i]
+      })
+    }
+    return out
+  }
+
   function matchesQuery(entry, q) {
     return (entry.title || "").toLowerCase().indexOf(q) >= 0 || (entry.artist || "").toLowerCase().indexOf(q) >= 0
   }
@@ -361,8 +396,8 @@ PanelBase {
       root.runSearch()
     }
     foldersScroll.snap()
-    foldersFlick.contentY = 0
-    rowsColumn.x = root.navDirection > 0 ? foldersFlick.width : -foldersFlick.width
+    foldersList.contentY = 0
+    foldersList.x = root.navDirection > 0 ? foldersList.width : -foldersList.width
     navAnim.to = 0
     navAnim.restart()
   }
@@ -732,16 +767,7 @@ PanelBase {
   }
 
   function testFolderRowRect(index) {
-    let del = null
-    const nCol = collectionRepeater.count
-    const nDir = folderRepeater.count
-    if (index < nCol) {
-      del = collectionRepeater.itemAt(index)
-    } else if (index < nCol + nDir) {
-      del = folderRepeater.itemAt(index - nCol)
-    } else {
-      del = trackRepeater.itemAt(index - nCol - nDir)
-    }
+    const del = foldersList.itemAtIndex(index)
     if (!del) {
       return null
     }
@@ -893,7 +919,6 @@ PanelBase {
   onOpened: {
     Mpd.refresh()
     Mpd.seedLibrary()
-    Mpd.updateDb()
     Audio.refreshStreamTargets()
   }
 
@@ -990,7 +1015,7 @@ PanelBase {
   NumberAnimation {
     id: navAnim
 
-    target: rowsColumn
+    target: foldersList
     property: "x"
     duration: 200
     easing.type: Easing.OutCubic
@@ -1964,66 +1989,35 @@ PanelBase {
         }
       }
 
-      Flickable {
-        id: foldersFlick
+      ListView {
+        id: foldersList
 
         anchors.top: headArea.bottom
         anchors.topMargin: s(4)
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        contentHeight: rowsColumn.implicitHeight
+        model: root.folderListRows
+        spacing: s(4)
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
-        Column {
-          id: rowsColumn
+        delegate: DelegateChooser {
+          role: "kind"
 
-          width: foldersPage.width
-          spacing: s(4)
+          DelegateChoice {
+            roleValue: "file"
 
-          Repeater {
-            id: collectionRepeater
-
-            model: root.collectionRows
-
-            delegate: MusicFolderRow {
-              kind: modelData.kind
-              path: modelData.path
-              label: modelData.label
-              activeSource: Mpd.playSource === modelData.path
-              onOpen: p => root.goTo(p)
-              onPlayRow: p => root.playRowPath(p)
-            }
-          }
-
-          Repeater {
-            id: folderRepeater
-
-            model: root.folderRows
-
-            delegate: MusicFolderRow {
-              path: modelData.path
-              label: modelData.name
-              activeSource: Mpd.playSource === modelData.path
-              onOpen: p => root.goTo(p)
-              onPlayRow: p => Mpd.playFolder(p, root.screenId)
-            }
-          }
-
-          Repeater {
-            id: trackRepeater
-
-            model: root.trackRows
-
-            delegate: Rectangle {
+            Rectangle {
               id: trackRow
 
-              property var entry: modelData
+              required property var modelData
+
+              property var entry: modelData.entry
               readonly property bool isCurrent: Mpd.song ? Mpd.song.file === trackRow.entry.path : false
               readonly property bool rowHovered: trackHover.containsMouse || trackFavHover.containsMouse || trackPinHover.containsMouse || trackAddHover.containsMouse
 
-              width: rowsColumn.width
+              width: foldersList.width
               height: s(44)
               radius: s(8)
               color: trackRow.isCurrent || trackRow.rowHovered ? Theme.surface : Theme.base
@@ -2056,7 +2050,7 @@ PanelBase {
                 spacing: s(4)
 
                 Text {
-                  text: trackRow.isCurrent ? Icons.get("player-play") : String(index + 1)
+                  text: trackRow.isCurrent ? Icons.get("player-play") : String(modelData.num)
                   font.family: trackRow.isCurrent ? Theme.iconFamily : "monospace"
                   font.pixelSize: s(10)
                   color: trackRow.isCurrent ? Theme.mauve : Theme.subtext
@@ -2196,29 +2190,44 @@ PanelBase {
             }
           }
 
-          Text {
-            width: parent.width
-            height: visible ? s(24) : 0
-            visible: root.collectionRows.length === 0 && root.folderRows.length === 0 && root.trackRows.length === 0 && !root.searchPending
-            text: root.searching ? "No matches" : "Empty folder"
-            horizontalAlignment: Text.AlignHCenter
-            color: Theme.subtext
-            font.family: Theme.fontFamily
-            font.pixelSize: s(10)
-            topPadding: s(6)
+          DelegateChoice {
+            MusicFolderRow {
+              required property var modelData
+
+              kind: modelData.kind
+              path: modelData.path
+              label: modelData.label
+              activeSource: Mpd.playSource === modelData.path
+              onOpen: p => root.goTo(p)
+              onPlayRow: p => modelData.kind === "dir" ? Mpd.playFolder(p, root.screenId) : root.playRowPath(p)
+            }
           }
         }
+      }
+
+      Text {
+        width: foldersPage.width
+        height: visible ? s(24) : 0
+        visible: root.collectionRows.length === 0 && root.folderRows.length === 0 && root.trackRows.length === 0 && !root.searchPending
+        text: root.searching ? "No matches" : "Empty folder"
+        horizontalAlignment: Text.AlignHCenter
+        color: Theme.subtext
+        font.family: Theme.fontFamily
+        font.pixelSize: s(10)
+        topPadding: s(6)
+        anchors.top: headArea.bottom
+        anchors.topMargin: s(10)
       }
 
       SmoothScroll {
         id: foldersScroll
 
-        target: foldersFlick
-        anchors.fill: foldersFlick
+        target: foldersList
+        anchors.fill: foldersList
       }
 
       MouseArea {
-        anchors.fill: parent
+        anchors.fill: foldersList
         acceptedButtons: Qt.NoButton
         onWheel: event => {
           foldersScroll.wheel(event)

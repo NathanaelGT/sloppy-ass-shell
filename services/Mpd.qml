@@ -454,6 +454,7 @@ Singleton {
     root.send("playlistinfo", l => root.applyQueue(root.parseSongs(l)))
     root.refreshStickers()
     root.loadState()
+    root.updateDb()
   }
 
   function applyConfig(pairs) {
