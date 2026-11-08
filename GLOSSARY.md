@@ -19,6 +19,40 @@ The bar clock's right-click display mode: WITA — one hour ahead, labelled
 `WITA` — instead of the system zone with its own abbreviation. Display-only:
 it changes what the clock shows, never the system timezone.
 
+**Auto-hide bar**:
+The bar's hidden-until-hover visibility mode: hidden until the cursor nears
+the top edge of its screen. HDMI-A-1 runs this mode; contrast the pinned bar.
+_Avoid_: hidden bar, collapsed bar
+
+**Pinned bar**:
+The bar's always-visible visibility mode with its screen space reserved.
+eDP-1 runs this mode; contrast the auto-hide bar.
+_Avoid_: fixed bar, static bar
+
+**Tileless workspace**:
+A screen's active workspace holding zero tiled windows — completely empty or
+floating-only. While a screen's workspace is tileless, its bar stays visible
+even in auto-hide mode; re-hides (deferred while the cursor is on the trigger
+area) once any tiled window is on it.
+
+**Attached menu**:
+A menu rendered fused to the bar's underside, sharing the bar's concave top
+corners. Most panels are attached.
+_Avoid_: docked menu, bar menu
+
+**Floating menu**:
+A menu rendered detached from the bar as a plain rounded card, e.g. the
+window switcher. Contrast the attached menu.
+_Avoid_: detached menu
+
+**Top-docked**:
+The attached menu's fullscreen override: when a fullscreen window covers the
+menu's screen, the menu docks flush to the screen's top edge on the overlay
+layer instead of under the bar, keeping the concave shape. Under fullscreen
+the compositor alpha-hides top-layer surfaces (the bar), so the bar gap would
+be blank and attached menus on the top layer would be invisible.
+_Avoid_: fullscreen mode, top mode
+
 ## Music
 
 **Music panel**:
