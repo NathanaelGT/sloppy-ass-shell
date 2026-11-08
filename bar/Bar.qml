@@ -71,6 +71,11 @@ PanelWindow {
     stdout: StdioCollector {
       onStreamFinished: {
         try {
+          if (LockState.sessionLocked) {
+            root.revealed = false
+            Panels.barHoverScreen = ""
+            return
+          }
           const pos = JSON.parse(text)
           const nearTop = pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y - Math.round(2 * Theme.scale) && pos.y < screen.y + Math.round(3 * Theme.scale)
           const overBar = root.shown && pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y && pos.y < screen.y + Theme.barThickness
@@ -203,5 +208,16 @@ PanelWindow {
     running: root.autoHide || root.menuOpen
     repeat: true
     onTriggered: cursorProc.running = true
+  }
+
+  Connections {
+    target: LockState
+
+    function onSessionLockedChanged() {
+      if (LockState.sessionLocked) {
+        root.revealed = false
+        Panels.barHoverScreen = ""
+      }
+    }
   }
 }

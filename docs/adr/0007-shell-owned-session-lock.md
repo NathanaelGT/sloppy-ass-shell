@@ -2,7 +2,9 @@
 
 ## Status
 
-accepted
+accepted — the capture-blur background and the ext-session-lock surface
+are superseded by [0008](0008-live-lock-blur.md); the PAM, trigger-file and
+shell-owned-lock decisions stand
 
 ## Context
 

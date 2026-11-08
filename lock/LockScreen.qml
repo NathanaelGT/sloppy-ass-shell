@@ -32,7 +32,7 @@ Item {
   readonly property int fieldLength: field.text.length
 
   onAcceptInputChanged: if (root.acceptInput) {
-    field.forceFocus()
+    field.forceActiveFocus()
   }
 
   Connections {
@@ -47,14 +47,29 @@ Item {
 
   onShownChanged: {
     if (root.shown) {
+      root.opacity = 0
+      showAnim.restart()
       LockState.noteScreen(root)
     } else {
+      root.opacity = 0
       LockState.forgetScreen(root)
     }
   }
 
+  NumberAnimation {
+    id: showAnim
+
+    target: root
+    property: "opacity"
+    to: 1
+    duration: 200
+    easing.type: Easing.OutSine
+  }
+
   Component.onCompleted: {
     if (root.shown) {
+      root.opacity = 0
+      showAnim.restart()
       LockState.noteScreen(root)
     }
   }
@@ -65,7 +80,7 @@ Item {
     anchors.fill: parent
 
     cursorShape: Qt.PointingHandCursor
-    onClicked: field.forceFocus()
+    onClicked: field.forceActiveFocus()
   }
 
   Column {

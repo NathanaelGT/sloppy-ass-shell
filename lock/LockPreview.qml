@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import "../theme"
 import "../services"
 
 PanelWindow {
@@ -22,7 +21,8 @@ PanelWindow {
   }
 
   screen: modelData
-  color: Theme.base
+  color: "transparent"
+  WlrLayershell.namespace: "quickshell-lock"
   visible: LockState.previewActive && root.screenId === "eDP-1"
 
   anchors {
@@ -47,7 +47,6 @@ PanelWindow {
 
   LockBackground {
     anchors.fill: parent
-    screenName: root.screenId
     visible: root.visible
   }
 

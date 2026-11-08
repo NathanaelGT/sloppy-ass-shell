@@ -147,10 +147,10 @@ straight to History. _Avoid_: hyprlock — kept installed only as a manual
 fallback, never the shell's lock
 
 **Lock screen**:
-The full-screen surface the shell shows while Locked: the desktop as it
-looked when the lock was requested, blurred and dimmed, with the clock and
-the password field. Typing is accepted only once the compositor confirms
-the lock is secure. _Avoid_: login screen, greeter
+The full-screen surface the shell shows while Locked: the live desktop
+rendered blurred and dimmed behind it (compositor blur, docs/adr/0008),
+with the clock and the password field. Typing is accepted only once the
+compositor confirms the lock is secure. _Avoid_: login screen, greeter
 
 ## Notifications
 

@@ -76,16 +76,23 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   (no arg toggles); `test lockAttempt <password>` submits through the REAL PAM
   stack — wrong passwords are safe and expected in tests, the correct password
   closes the preview or unlocks for real; `test lockState` dumps preview/
-  locked/secure/attempts/error/capsLock/authenticating/passwordLength/capture —
-  never the password itself; capture with `test shotPanel lock eDP-1`. While
-  the session is locked, `shell reload` and `test reloadNow` are REFUSED; a
-  watched-file live reload cannot be refused and fail-opens the session, so
-  never leave watch reloads enabled around a lock test. hyprlock remains
-  installed as a manual fallback (its config is untouched) and the dormant
-  hypridle configs invoke `quickshell ipc call shell lock`. The real lock
-  (SUPER+L, power-menu rows) is user-tested manually: SUPER+L → wrong password
-  shows ✕ N → correct password unlocks; Lock & Suspend hold suspends and the
-  lock is up at resume.
+  locked/secure/attempts/error/capsLock/authenticating/passwordLength —
+  never the password itself; capture with `test shotPanel lock
+  eDP-1`. While the session is locked, `shell reload` and `test reloadNow` are
+  REFUSED; a watched-file live reload cannot be refused and fail-opens the
+  session, so never leave watch reloads enabled around a lock test. hyprlock
+  remains installed as a manual fallback (its config is untouched) and the
+  dormant hypridle configs invoke `quickshell ipc call shell lock`. The lock
+  mechanism is docs/adr/0008: a fullscreen overlay-layer `LockWindow` per
+  screen (NO ext-session-lock), live compositor blur behind it, blur strength
+  overridden while locked and animated down on unlock, `secure` shell-owned.
+  Locking engages IMMEDIATELY on the trigger (~90 ms after SUPER+L via
+  `~/.local/state/quickshell/lock-trigger`, FileView watch; the trigger
+  protocol in docs/adr/0008 guards against stale content).
+  `shell lock` ipc remains for hypridle and manual use.
+  The real lock (SUPER+L, power-menu rows) is user-tested manually: SUPER+L →
+  wrong password shows ✕ N → correct password unlocks; Lock & Suspend hold
+  suspends and the lock is up at resume.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no
@@ -134,7 +141,9 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   a stuck session (stuck watch-off recovers with `endWork`). `reloadNow false` is a SOFT
   reload: it re-reads child files but NOT the root `shell.qml` — after editing shell.qml use
   `test reloadNow true` (hard), and probe liveness (e.g. a version key in an ipc reply) when
-  behavior contradicts the files.
+  behavior contradicts the files. Edited singletons may also keep running stale code through a
+  soft reload (observed: LockState self-locked from the stale trigger-file seq until a hard
+  reload applied the guard fix) — after editing `services/*`, prefer `reloadNow true`.
 - Toggle once: `quickshell ipc call shell close` then `volumePanel`. Two calls in a row cancel out.
 - Cursor shape is invisible to the driver: move the pointer, then `grim -c` with a tight `-g`
   crop. A hover highlight proves delivery, never the cursor. Every `MouseArea` claims

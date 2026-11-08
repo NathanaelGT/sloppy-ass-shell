@@ -12,29 +12,27 @@ Singleton {
   property bool secure: false
   property bool authenticating: false
   property bool capsLock: false
-  property bool captureInFlight: false
-  property string captureMode: ""
   property int attempts: 0
-  property int captureSeq: 0
-  property int captureGen: 0
-  property int procCaptureGen: 0
   property string error: ""
   property string pendingPassword: ""
   property string fieldText: ""
-  property var captures: ({})
-  property var captureTargets: []
   property var previewScreen: null
   property var lockScreens: []
+  property int lastTriggerSeq: 0
+  property bool triggerArmed: false
 
-  readonly property string captureDir: Quickshell.stateDir + "/lock"
-  readonly property string grimPath: "/etc/profiles/per-user/nathanaelgt/bin/grim"
+  readonly property int blurLockSize: 12
+  readonly property int blurLockPasses: 3
+  readonly property int blurRestSize: 3
+  readonly property int blurRestPasses: 1
+  readonly property string triggerPath: Quickshell.stateDir + "/../../lock-trigger"
 
-  function captureFor(screen) {
-    const entry = root.captures[screen]
-    return entry ? entry : {
-      state: "idle",
-      path: ""
-    }
+  function applyBlur() {
+    Quickshell.execDetached(["hyprctl", "eval", "hl.config({ decoration = { blur = { size = " + root.blurLockSize + ", passes = " + root.blurLockPasses + " } } })"])
+  }
+
+  function restoreBlur() {
+    Quickshell.execDetached(["hyprctl", "eval", "hl.config({ decoration = { blur = { size = " + root.blurRestSize + ", passes = " + root.blurRestPasses + " } } })"])
   }
 
   function noteScreen(screen) {
@@ -74,14 +72,15 @@ Singleton {
   }
 
   function openPreview() {
-    if (root.sessionLocked || root.previewActive || root.captureInFlight) {
+    if (root.sessionLocked || root.previewActive) {
       return
     }
     root.attempts = 0
     root.error = ""
     root.fieldText = ""
     root.readCaps()
-    root.startCapture("preview", ["eDP-1"])
+    root.applyBlur()
+    root.previewActive = true
   }
 
   function closePreview() {
@@ -92,134 +91,37 @@ Singleton {
     root.attempts = 0
     root.error = ""
     root.fieldText = ""
+    blurRestoreAnim.startRestore()
   }
 
   function requestLock() {
-    if (root.sessionLocked || root.captureInFlight) {
+    if (root.sessionLocked) {
       return
     }
     root.closePreview()
     Panels.close()
     root.readCaps()
-    root.startCapture("lock", root.screenNames())
+    root.engage()
   }
 
   function lockAndSuspend() {
-    if (root.sessionLocked || root.captureInFlight) {
+    if (root.sessionLocked) {
       return
     }
     root.closePreview()
     Panels.close()
     root.readCaps()
-    root.startCapture("suspend", root.screenNames())
-  }
-
-  function screenNames() {
-    const out = []
-    for (let i = 0; i < Quickshell.screens.length; i++) {
-      out.push(Quickshell.screens[i].name)
-    }
-    return out
-  }
-
-  function startCapture(mode, screens) {
-    root.captureMode = mode
-    root.captureSeq += 1
-    root.captureGen = root.captureSeq
-    root.captures = {}
-    root.captureTargets = screens
-    const next = {}
-    for (let i = 0; i < screens.length; i++) {
-      next[screens[i]] = {
-        state: "pending",
-        path: root.captureDir + "/" + screens[i] + ".png"
-      }
-    }
-    root.captures = next
-    let script = "mkdir -p " + root.captureDir + "\n"
-    for (let j = 0; j < screens.length; j++) {
-      const name = screens[j]
-      const file = root.captureDir + "/" + name + ".png"
-      script += "timeout 2 " + root.grimPath + " -o '" + name + "' '" + file + "' && timeout 2 ffmpeg -y -loglevel error -i '" + file + "' -vf \"scale=iw/6:ih/6,boxblur=luma_radius=8:luma_power=2,scale=iw*6:ih*6\" '" + file + ".tmp.png' && mv '" + file + ".tmp.png' '" + file + "' && echo 'ok " + name + "' || echo 'fail " + name + "'\n"
-    }
-    captureProc.command = ["bash", "-c", script]
-    if (captureProc.running) {
-      captureProc.terminate()
-    }
-    root.procCaptureGen = root.captureGen
-    captureProc.running = true
-    root.captureInFlight = true
-    captureTimer.restart()
-  }
-
-  function parseCapture(text) {
-    if (root.procCaptureGen !== root.captureGen || !root.captureInFlight) {
-      return
-    }
-    if (text) {
-      const lines = text.split("\n")
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim()
-        if (line === "") {
-          continue
-        }
-        const parts = line.split(" ")
-        if (parts.length < 2 || root.captures[parts[1]] === undefined) {
-          continue
-        }
-        const next = {}
-        for (const k in root.captures) {
-          next[k] = root.captures[k]
-        }
-        next[parts[1]] = {
-          state: parts[0] === "ok" ? "captured" : "failed",
-          path: root.captures[parts[1]].path
-        }
-        root.captures = next
-      }
-    }
-    for (const k in root.captures) {
-      if (root.captures[k].state === "pending") {
-        return
-      }
-    }
-    root.captureDone()
-  }
-
-  function captureTimedOut() {
-    if (!root.captureInFlight) {
-      return
-    }
-    const next = {}
-    for (const k in root.captures) {
-      const entry = root.captures[k]
-      next[k] = {
-        state: entry.state === "pending" ? "failed" : entry.state,
-        path: entry.path
-      }
-    }
-    root.captures = next
-    root.captureDone()
-  }
-
-  function captureDone() {
-    root.captureInFlight = false
-    captureTimer.stop()
-    if (root.captureMode === "preview") {
-      root.previewActive = true
-    } else if (root.captureMode === "lock" || root.captureMode === "suspend") {
-      root.engage()
-      if (root.captureMode === "suspend") {
-        Quickshell.execDetached(["systemctl", "suspend"])
-      }
-    }
+    root.engage()
+    Quickshell.execDetached(["systemctl", "suspend"])
   }
 
   function engage() {
     if (root.sessionLocked) {
       return
     }
+    root.applyBlur()
     root.sessionLocked = true
+    root.secure = true
     root.setLockedHint(true)
   }
 
@@ -237,6 +139,7 @@ Singleton {
     root.error = ""
     root.fieldText = ""
     root.setLockedHint(false)
+    blurRestoreAnim.startRestore()
   }
 
   function submit(password) {
@@ -314,13 +217,29 @@ Singleton {
       error: root.error,
       capsLock: root.capsLock,
       authenticating: root.authenticating,
-      passwordLength: screen ? screen.fieldLength : 0,
-      capture: {
-        mode: root.captureMode,
-        inFlight: root.captureInFlight,
-        screens: root.captures
-      }
+      passwordLength: screen ? screen.fieldLength : 0
     })
+  }
+
+  function handleTrigger() {
+    const parts = triggerView.text().trim().split(" ")
+    if (parts[0] !== "lock" && parts[0] !== "suspend") {
+      return
+    }
+    const seq = parseInt(parts[1])
+    if (isNaN(seq) || seq <= root.lastTriggerSeq) {
+      return
+    }
+    root.lastTriggerSeq = seq
+    if (!root.triggerArmed) {
+      root.triggerArmed = true
+      return
+    }
+    if (parts[0] === "lock") {
+      root.requestLock()
+    } else {
+      root.lockAndSuspend()
+    }
   }
 
   onSessionLockedChanged: {
@@ -332,7 +251,49 @@ Singleton {
 
   Component.onCompleted: {
     Quickshell.execDetached(["bash", "-lc", "loginctl show-session self -p LockedHint | grep -q yes && busctl call --system org.freedesktop.login1 /org/freedesktop/login1/session/self org.freedesktop.login1.Session SetLockedHint b false || true"])
-    Quickshell.execDetached(["mkdir", "-p", root.captureDir])
+    Quickshell.execDetached(["touch", root.triggerPath])
+  }
+
+  Timer {
+    id: blurRestoreAnim
+
+    interval: 50
+    repeat: true
+    property int step: 0
+    readonly property int steps: 9
+
+    function startRestore() {
+      step = 0
+      restart()
+    }
+
+    onTriggered: {
+      if (root.sessionLocked || root.previewActive) {
+        stop()
+        step = 0
+        return
+      }
+      step += 1
+      if (step >= steps) {
+        stop()
+        step = 0
+        root.restoreBlur()
+        return
+      }
+      const size = Math.max(0, Math.round(root.blurLockSize * (1 - step / steps)))
+      Quickshell.execDetached(["hyprctl", "eval", "hl.config({ decoration = { blur = { size = " + size + " } } })"])
+    }
+  }
+
+  FileView {
+    id: triggerView
+
+    path: root.triggerPath
+    watchChanges: true
+
+    onFileChanged: this.reload()
+
+    onLoaded: root.handleTrigger()
   }
 
   PamContext {
@@ -365,18 +326,6 @@ Singleton {
   }
 
   Process {
-    id: captureProc
-
-    stdout: StdioCollector {
-      id: captureOut
-
-      onStreamFinished: root.parseCapture(captureOut.text)
-    }
-
-    onExited: root.parseCapture(null)
-  }
-
-  Process {
     id: capsProc
 
     stdout: StdioCollector {
@@ -384,12 +333,5 @@ Singleton {
 
       onStreamFinished: root.capsLock = capsOut.text.trim() === "1"
     }
-  }
-
-  Timer {
-    id: captureTimer
-
-    interval: 5000
-    onTriggered: root.captureTimedOut()
   }
 }

@@ -2206,21 +2206,10 @@ ShellRoot {
     }
   }
 
-  WlSessionLock {
-    id: sessionLock
-
-    locked: LockState.sessionLocked
-
-    onSecureChanged: LockState.secure = sessionLock.secure
-
-    onLockStateChanged: {
-      if (!sessionLock.locked && LockState.sessionLocked) {
-        LockState.unlock()
-      }
-    }
-
-    surface: Component {
-      LockSurface {}
+  Variants {
+    model: Quickshell.screens
+    delegate: Component {
+      LockWindow {}
     }
   }
 
