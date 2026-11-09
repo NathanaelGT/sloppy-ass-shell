@@ -7,8 +7,8 @@ PanelBase {
   id: root
 
   align: "center"
-  vertical: "center"
-  attached: false
+  attached: true
+  topMargin: Theme.barThickness + Math.round(6 * Theme.scale)
   cardWidth: Math.round(420 * Theme.scale)
   exclusiveFocus: true
   dismissOnBackdrop: false
