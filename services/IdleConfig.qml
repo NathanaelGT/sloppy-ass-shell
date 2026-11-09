@@ -34,6 +34,7 @@ Singleton {
   property int idleSeconds: 5
   property var stages: []
   property bool loaded: false
+  property var testArm: null
 
   function stage(kind) {
     for (let i = 0; i < stages.length; i++) {
@@ -42,6 +43,43 @@ Singleton {
       }
     }
     return null
+  }
+
+  function arm(idleSeconds, overrides) {
+    if (testArm !== null) {
+      return false
+    }
+    const next = []
+    for (let i = 0; i < stages.length; i++) {
+      const entry = stages[i]
+      const seconds = overrides && overrides[entry.kind] !== undefined ? overrides[entry.kind] : entry.afterSeconds
+      next.push({
+        kind: entry.kind,
+        afterSeconds: seconds,
+        enabled: entry.enabled,
+        audioGateSeconds: entry.audioGateSeconds
+      })
+    }
+    next.sort((a, b) => a.afterSeconds - b.afterSeconds)
+    testArm = {
+      idleSeconds: root.idleSeconds,
+      stages: root.stages
+    }
+    if (typeof idleSeconds === "number" && isFinite(idleSeconds) && idleSeconds > 0) {
+      root.idleSeconds = idleSeconds
+    }
+    root.stages = next
+    return true
+  }
+
+  function disarm() {
+    if (testArm === null) {
+      return false
+    }
+    root.idleSeconds = testArm.idleSeconds
+    root.stages = testArm.stages
+    testArm = null
+    return true
   }
 
   function posNum(value, fallback) {

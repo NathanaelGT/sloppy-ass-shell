@@ -2244,7 +2244,44 @@ ShellRoot {
         idle: Notifs.idle,
         dimmed: Brightness.dimmed,
         preDim: Brightness.preDim,
-        brightness: Brightness.level
+        brightness: Brightness.level,
+        chainRunning: IdleEngine.running,
+        chainApplied: IdleEngine.applied,
+        chainElapsed: Math.round(IdleEngine.elapsedSeconds()),
+        chainArmed: IdleConfig.testArm !== null
+      })
+    }
+
+    function idleArm(idleSeconds: int, dimSeconds: int, dpmsSeconds: int): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const overrides = {}
+      if (dimSeconds > 0) {
+        overrides["dim"] = dimSeconds
+      }
+      if (dpmsSeconds > 0) {
+        overrides["dpms"] = dpmsSeconds
+      }
+      const ok = IdleConfig.arm(idleSeconds > 0 ? idleSeconds : 0, overrides)
+      return JSON.stringify({
+        enabled: true,
+        armed: ok,
+        idleSeconds: IdleConfig.idleSeconds,
+        stages: IdleConfig.stages
+      })
+    }
+
+    function idleDisarm(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const ok = IdleConfig.disarm()
+      return JSON.stringify({
+        enabled: true,
+        disarmed: ok,
+        idleSeconds: IdleConfig.idleSeconds,
+        stages: IdleConfig.stages
       })
     }
 

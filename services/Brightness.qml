@@ -11,6 +11,7 @@ Singleton {
   property bool dimmed: false
   property var preDim: ({})
   property bool roundTrip: false
+  property bool pendingRestore: false
 
   function parseDetect(text) {
     const map = {}
@@ -113,6 +114,14 @@ Singleton {
     return true
   }
 
+  function revert() {
+    if (root.dimProc.running) {
+      root.pendingRestore = true
+      return true
+    }
+    return restore()
+  }
+
   function restore() {
     if (!root.dimmed) {
       root.roundTrip = false
@@ -140,6 +149,11 @@ Singleton {
     root.preDim = stored
     root.dimmed = true
     root.level = 0
+    if (root.pendingRestore) {
+      root.pendingRestore = false
+      restore()
+      return
+    }
     if (root.roundTrip) {
       roundTripTimer.restart()
     }
