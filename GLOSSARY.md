@@ -239,3 +239,15 @@ minutes. Only Suspend is gated — Dim and DPMS off still fire.
 The arrival sound. Plays on every arrival not muted by DND (Critical
 excepted) or Locked — even when the Banner is suppressed by an open
 panel. Honors a sender-requested sound, else falls back by urgency.
+
+## Launcher
+
+**Icon index**:
+The set of icon names ThemeIcons knows are installed: every svg/png/xpm
+file under the active theme's and hicolor's directories across the icon
+data dirs. Persisted as `icon-index.json` in the shell state directory and
+loaded when the singleton instantiates, so launcher app icons render
+without waiting for the startup scan; the scan (fd over the theme
+directories) rewrites the cache only when the discovered name set changed.
+_Avoid_: icon cache (that name belongs to AppIconCache's per-app audio
+overrides), icon theme
