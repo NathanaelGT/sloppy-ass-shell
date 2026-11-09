@@ -2228,6 +2228,19 @@ ShellRoot {
       }
       return LockState.testState()
     }
+
+    function idleState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      return JSON.stringify({
+        enabled: true,
+        loaded: IdleConfig.loaded,
+        configEnabled: IdleConfig.enabled,
+        idleSeconds: IdleConfig.idleSeconds,
+        stages: IdleConfig.stages
+      })
+    }
   }
 
   Variants {
