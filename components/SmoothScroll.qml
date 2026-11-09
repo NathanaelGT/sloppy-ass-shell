@@ -10,6 +10,9 @@ Item {
   property real hintOpacity: 0
   property real pendingPx: 0
   property real animTarget: 0
+  property real vel: 0
+  property int glideDir: 0
+  property real lastWheelMs: 0
 
   readonly property real maxScroll: target ? Math.max(0, target.contentHeight - target.height) : 0
   readonly property real visibleFrac: target && target.contentHeight > 0 ? Math.min(1, target.height / target.contentHeight) : 1
@@ -30,11 +33,53 @@ Item {
     if (event.pixelDelta.y !== 0) {
       root.pendingPx = 0
       stepAnim.stop()
-      t.contentY = Math.max(0, Math.min(root.maxScroll, t.contentY - event.pixelDelta.y))
+      glideAnim.stop()
+      const before = t.contentY
+      t.contentY = Math.max(0, Math.min(root.maxScroll, before - event.pixelDelta.y))
+      root.trackVelocity(t.contentY - before)
       root.bump()
       return
     }
     root.notch(event.angleDelta.y)
+  }
+
+  function trackVelocity(movePx) {
+    if (movePx === 0) {
+      return
+    }
+    const now = Date.now()
+    const dt = root.lastWheelMs > 0 ? Math.min(now - root.lastWheelMs, Theme.scrollVelocityWindowMs) : Theme.scrollVelocityWindowMs
+    root.lastWheelMs = now
+    const dir = movePx > 0 ? 1 : -1
+    if (dir !== root.glideDir) {
+      root.vel = 0
+      root.glideDir = dir
+    }
+    const instV = Math.abs(movePx) / Math.max(dt, 1)
+    root.vel += (instV - root.vel) * Theme.scrollVelocityBlend
+    glideArm.restart()
+  }
+
+  function startGlide() {
+    root.lastWheelMs = 0
+    const t = root.target
+    if (!t || root.maxScroll <= 0 || root.vel < Theme.scrollGlideMinVelocity) {
+      root.vel = 0
+      return
+    }
+    const from = Math.max(0, Math.min(root.maxScroll, t.contentY))
+    const base = stepAnim.running ? root.animTarget : from
+    const cap = t.height * Theme.scrollGlideMaxFrac
+    const extra = Math.max(-cap, Math.min(cap, root.vel * root.glideDir * Theme.scrollGlideTauMs))
+    const want = Math.max(0, Math.min(root.maxScroll, base + extra))
+    root.vel = 0
+    if (Math.abs(want - base) < 1) {
+      return
+    }
+    root.animTarget = want
+    stepAnim.stop()
+    glideAnim.to = want
+    glideAnim.restart()
   }
 
   function notch(delta) {
@@ -42,7 +87,10 @@ Item {
       return
     }
     root.bump()
-    root.pendingPx += -delta * root.step * Theme.scrollMultiplier / 120
+    glideAnim.stop()
+    const stepPx = -delta * root.step * Theme.scrollMultiplier / 120
+    root.pendingPx += stepPx
+    root.trackVelocity(stepPx)
     root.syncStep()
   }
 
@@ -61,6 +109,10 @@ Item {
 
   function snap() {
     root.pendingPx = 0
+    root.vel = 0
+    root.lastWheelMs = 0
+    glideArm.stop()
+    glideAnim.stop()
     stepAnim.stop()
   }
 
@@ -79,6 +131,23 @@ Item {
     property: "contentY"
     duration: 220
     easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: glideAnim
+
+    target: root.target
+    property: "contentY"
+    duration: Theme.scrollGlideDurationMs
+    easing.type: Easing.OutCubic
+  }
+
+  Timer {
+    id: glideArm
+
+    interval: Theme.scrollGlideIdleMs
+    running: false
+    onTriggered: root.startGlide()
   }
 
   Behavior on hintOpacity {
