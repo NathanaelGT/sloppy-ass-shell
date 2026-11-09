@@ -25,6 +25,7 @@ Singleton {
   readonly property real shadowBlur: 0.45
   readonly property real shadowOpacity: 0.5
   readonly property int shadowVerticalOffset: Math.round(2 * scale)
+  readonly property real scrollMultiplier: 2.0
 
   readonly property int chipHeight: Math.round(22 * scale)
   readonly property int chipRadius: Math.round(6 * scale)

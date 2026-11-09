@@ -42,7 +42,7 @@ Item {
       return
     }
     root.bump()
-    root.pendingPx += -delta * root.step / 120
+    root.pendingPx += -delta * root.step * Theme.scrollMultiplier / 120
     root.syncStep()
   }
 
