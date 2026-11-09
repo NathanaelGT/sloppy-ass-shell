@@ -42,6 +42,13 @@ Singleton {
     Quickshell.execDetached(["bash", "-lc", "mkdir -p \"$(dirname " + root.file + ")\"; printf '%s' '" + escaped + "' > " + root.file])
   }
 
+  function rescan() {
+    if (scan.running) {
+      return
+    }
+    scan.running = true
+  }
+
   function scanCommand() {
     const theme = root.themeName()
     return "dirs=\"$HOME/.local/share/icons\"\n" + "for d in $(printf '%s' \"${XDG_DATA_DIRS:-/usr/local/share:/usr/share}\" | tr ':' ' '); do dirs=\"$dirs $d/icons\"; done\n" + "for base in $dirs; do\n" + "  for name in " + theme + " hicolor; do\n" + "    [ -d \"$base/$name\" ] || continue\n" + "    fd --type f --hidden --no-ignore --follow --absolute-path --extension svg --extension png --extension xpm . \"$base/$name\" 2>/dev/null\n" + "  done\n" + "done | sed -E 's|.*/||; s|\\.[^.]+$||' | sort -u"

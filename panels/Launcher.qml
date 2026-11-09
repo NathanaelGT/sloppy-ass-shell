@@ -2145,6 +2145,7 @@ PanelBase {
     scrollToTop()
     searchInput.forceActiveFocus()
     root.iconRefreshTick += 1
+    ThemeIcons.rescan()
   }
 
   headerData: Column {
