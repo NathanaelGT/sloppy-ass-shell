@@ -2229,6 +2229,42 @@ ShellRoot {
       return LockState.testState()
     }
 
+    function polkitShow(screen: string): string {
+      if (!TestDriver.active) {
+        return "disabled"
+      }
+      return Polkit.testShow(screen)
+    }
+
+    function polkitHide(): string {
+      if (!TestDriver.active) {
+        return "disabled"
+      }
+      return Polkit.testHide()
+    }
+
+    function polkitFail(): string {
+      if (!TestDriver.active) {
+        return "disabled"
+      }
+      return Polkit.testFail()
+    }
+
+    function polkitState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("polkit")
+      return JSON.stringify({
+        enabled: true,
+        active: Polkit.active,
+        fake: Polkit.fakeActive,
+        targetScreen: Polkit.targetScreen,
+        pinScreen: Polkit.pinScreen,
+        panel: panel && panel.open ? panel.testState() : null
+      })
+    }
+
     function idleState(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"

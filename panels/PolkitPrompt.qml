@@ -14,10 +14,61 @@ PanelBase {
   dismissOnBackdrop: false
   autoFocusKeyCatcher: false
   externalRequested: Polkit.active && Polkit.pinScreen === screenId
+  property string errorText: ""
+  property bool shaking: false
+
+  function failAttempt() {
+    const flow = Polkit.flow
+    root.errorText = flow && flow.supplementaryMessage !== "" ? flow.supplementaryMessage : "Sorry, that didn't work. Please try again."
+    response.text = ""
+    fieldBox.failTint = true
+    tintTimer.restart()
+    response.forceActiveFocus()
+    root.shaking = true
+    shakeAnim.restart()
+  }
+
+  function testState() {
+    return {
+      open: root.open,
+      screenId: root.screenId,
+      fake: Polkit.fakeActive,
+      error: root.errorText,
+      inputLength: response.text.length,
+      shaking: root.shaking,
+      failTint: fieldBox.failTint
+    }
+  }
 
   onOpened: {
     response.text = ""
+    root.errorText = ""
+    fieldBox.failTint = false
+    tintTimer.stop()
+    shakeAnim.stop()
+    shakeTranslate.x = 0
+    root.shaking = false
     response.forceActiveFocus()
+  }
+
+  Connections {
+    target: root
+
+    function onOpenChanged() {
+      if (root.open) {
+        TestDriver.register("polkit", root.screenId, root)
+      } else {
+        TestDriver.unregister("polkit", root.screenId)
+      }
+    }
+  }
+
+  Connections {
+    target: Polkit.flow
+
+    function onAuthenticationFailed() {
+      root.failAttempt()
+    }
   }
 
   Column {
@@ -48,10 +99,19 @@ PanelBase {
     }
 
     Rectangle {
+      id: fieldBox
+
+      property bool failTint: false
+
       width: parent.width
       height: Math.round(40 * Theme.scale)
       radius: Math.round(10 * Theme.scale)
       color: Theme.surface
+      border.width: Math.round(2 * Theme.scale)
+      border.color: failTint ? Theme.red : fieldBox.color
+      transform: Translate {
+        id: shakeTranslate
+      }
 
       TextInput {
         id: response
@@ -67,12 +127,23 @@ PanelBase {
             Polkit.flow.submit(text)
           }
         }
+        onTextEdited: root.errorText = ""
       }
     }
 
     Text {
       width: parent.width
-      visible: text.length > 0
+      visible: root.errorText !== ""
+      text: root.errorText
+      color: Theme.red
+      font.family: Theme.fontFamily
+      font.pixelSize: Theme.fontSizeSmall
+      wrapMode: Text.WordWrap
+    }
+
+    Text {
+      width: parent.width
+      visible: text.length > 0 && !(root.errorText !== "" && Polkit.flow && Polkit.flow.supplementaryIsError)
       text: Polkit.flow ? Polkit.flow.supplementaryMessage : ""
       color: Polkit.flow && Polkit.flow.supplementaryIsError ? Theme.red : Theme.yellow
       font.family: Theme.fontFamily
@@ -107,5 +178,49 @@ PanelBase {
         }
       }
     }
+  }
+
+  Timer {
+    id: tintTimer
+
+    interval: 600
+    running: false
+    onTriggered: fieldBox.failTint = false
+  }
+
+  SequentialAnimation {
+    id: shakeAnim
+
+    readonly property int swing: Math.round(6 * Theme.scale)
+
+    NumberAnimation {
+      target: shakeTranslate
+      property: "x"
+      to: -shakeAnim.swing
+      duration: 75
+    }
+
+    NumberAnimation {
+      target: shakeTranslate
+      property: "x"
+      to: shakeAnim.swing
+      duration: 75
+    }
+
+    NumberAnimation {
+      target: shakeTranslate
+      property: "x"
+      to: -shakeAnim.swing
+      duration: 75
+    }
+
+    NumberAnimation {
+      target: shakeTranslate
+      property: "x"
+      to: 0
+      duration: 75
+    }
+
+    onStopped: root.shaking = false
   }
 }
