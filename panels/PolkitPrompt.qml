@@ -13,7 +13,7 @@ PanelBase {
   exclusiveFocus: true
   dismissOnBackdrop: false
   autoFocusKeyCatcher: false
-  externalRequested: Polkit.active && Hypr.focusedScreenName === screenId
+  externalRequested: Polkit.active && Polkit.pinScreen === screenId
 
   onOpened: {
     response.text = ""
