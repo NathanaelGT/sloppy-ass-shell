@@ -62,7 +62,7 @@ PanelWindow {
   property bool cardHovered: false
   property bool popupOpen: false
   readonly property bool exitCloseActive: open && dismissOnBackdrop && !exclusiveFocus
-  readonly property bool keepOpen: cardHovered || Panels.barHoverScreen === screenId || popupOpen
+  readonly property bool keepOpen: cardHovered || Panels.barHoverScreen === screenId || popupOpen || (root.scrollDriver ? root.scrollDriver.dragActive : false)
 
   color: "transparent"
   visible: requested || closeDelay.running
@@ -317,6 +317,8 @@ PanelWindow {
         keyCatcher.forceActiveFocus()
       }
       root.opened()
+    } else if (root.scrollDriver) {
+      root.scrollDriver.dragActive = false
     }
   }
 

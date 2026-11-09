@@ -15,6 +15,7 @@ Item {
   property real lastWheelMs: 0
   property bool chainRebound: false
   property real reboundTo: 0
+  property bool dragActive: false
 
   readonly property real maxScroll: target ? Math.max(0, target.contentHeight - target.height) : 0
   readonly property real visibleFrac: target && target.contentHeight > 0 ? Math.min(1, target.height / target.contentHeight) : 1
