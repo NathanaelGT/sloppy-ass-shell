@@ -36,6 +36,9 @@ Singleton {
   readonly property int scrollOvershootMs: 250
   readonly property int scrollOvershootCap: Math.round(40 * scale)
   readonly property real scrollOvershootVelMs: 25
+  readonly property int scrollThumbGap: Math.max(2, Math.round(3 * scale))
+  readonly property int scrollThumbWidth: Math.max(3, Math.round(3 * scale))
+  readonly property int scrollThumbStrip: scrollThumbGap * 2 + scrollThumbWidth
 
   readonly property int chipHeight: Math.round(22 * scale)
   readonly property int chipRadius: Math.round(6 * scale)

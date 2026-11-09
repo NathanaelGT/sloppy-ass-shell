@@ -38,9 +38,11 @@ PanelWindow {
   property int contentInset: 0
   property int contentOuterPad: contentPad
   property bool closePending: false
+  property SmoothScroll scrollDriver: scrollerScroll
   default property alias cardData: bodyColumn.data
   property alias headerData: headerColumn.data
   property alias overlayData: overlayArea.data
+  property alias gutterData: gutterStrip.data
 
   signal opened
   signal scrolled
@@ -86,6 +88,13 @@ PanelWindow {
     width: root.cardWidth
     height: root.cardHeight
     radius: root.cornerRadius
+
+    Region {
+      x: root.cardWidth
+      y: 0
+      width: root.gutterActive ? Theme.scrollThumbStrip : 0
+      height: root.gutterActive ? root.cardHeight : 0
+    }
   }
 
   Region {
@@ -149,7 +158,9 @@ PanelWindow {
   readonly property int contentInnerWidth: contentWidth - contentInset * 2
   readonly property real contentHeight: bodyColumn.implicitHeight
   readonly property real viewportHeight: scroller.height
+  readonly property real viewportY: scroller.y
   readonly property real scrollY: scroller.contentY
+  readonly property bool gutterActive: root.scrollDriver ? root.scrollDriver.maxScroll > 0 : false
 
   function ensureVisible(y, height, margin) {
     scrollerScroll.snap()
@@ -573,6 +584,33 @@ PanelWindow {
             }
             root.cancelRequested()
           }
+        }
+      }
+
+      Item {
+        id: gutterStrip
+
+        x: root.shadowPad + root.cardWidth
+        y: root.shadowPad
+        width: Theme.scrollThumbStrip
+        height: root.cardHeight
+
+        MouseArea {
+          anchors.fill: parent
+          enabled: root.gutterActive
+          onWheel: event => {
+            if (root.scrollDriver) {
+              root.scrollDriver.wheel(event)
+            }
+            event.accepted = true
+          }
+        }
+
+        ScrollGutter {
+          track: scrollerScroll
+
+          y: scroller.y
+          height: scroller.height
         }
       }
     }

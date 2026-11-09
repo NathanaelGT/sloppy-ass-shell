@@ -28,6 +28,23 @@ PanelBase {
       root.activeEditor.cancel()
     }
   }
+  scrollDriver: root.currentTab === 0 ? foldersScroll : queueScroll
+  gutterData: [
+    ScrollGutter {
+      track: foldersScroll
+
+      visible: root.currentTab === 0
+      y: root.viewportY + contentArea.y - root.scrollY + foldersList.y
+      height: foldersList.height
+    },
+    ScrollGutter {
+      track: queueScroll
+
+      visible: root.currentTab === 1
+      y: root.viewportY + contentArea.y - root.scrollY
+      height: queueList.height
+    }
+  ]
 
   readonly property var song: Mpd.song
   readonly property bool playing: Mpd.state === "play"

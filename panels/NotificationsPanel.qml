@@ -19,6 +19,13 @@ PanelBase {
   contentInset: 18
   stemEnabled: true
   stemX: Panels.clusterRight(root.screenId) - Panels.clusterWidth(root.screenId)
+  scrollDriver: notifScroll
+  gutterData: ScrollGutter {
+    track: notifScroll
+
+    y: root.viewportY + listWrap.y - root.scrollY
+    height: notificationList.height
+  }
   readonly property int budgetCount: 5
   readonly property real minCardHeight: Math.round(16 * Theme.scale) + Math.round(8 * Theme.scale) + Math.max(cardMetric.implicitHeight, Math.round(16 * Theme.scale)) + Math.round(20 * Theme.scale) + Math.round(8 * Theme.scale)
   property int measureRevision: 0
@@ -254,6 +261,8 @@ PanelBase {
   }
 
   Item {
+    id: listWrap
+
     width: root.contentInnerWidth
     height: root.listHeight
 

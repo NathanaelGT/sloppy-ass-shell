@@ -222,17 +222,4 @@ Item {
     running: false
     onTriggered: root.hintOpacity = 0
   }
-
-  Rectangle {
-    id: thumb
-
-    visible: root.maxScroll > 0
-    opacity: root.hintOpacity
-    x: root.width - width - Math.max(2, Math.round(3 * Theme.scale))
-    y: root.thumbY
-    width: Math.max(3, Math.round(3 * Theme.scale))
-    height: root.thumbHeight
-    radius: width / 2
-    color: Theme.surfaceHigher
-  }
 }
