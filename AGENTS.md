@@ -62,8 +62,9 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   morph is driven by the same arrival. Senders drive the live paths: `notify-send -u critical`
   (sticky, red border), `-h string:sound-name:bell` (chime override), transient/resident via
   `notify-send -h` hints. `quickshell ipc call shell setIdle <bool>` / `setLocked <bool>`
-  drive the countdown gate and the lock suppression (the real sources are the user's hypridle
-  listeners). `test bannerShot` captures the morphed pill (poll `shotPoll`);
+  drive the countdown gate and the lock suppression (idle detection is shell-owned now —
+  docs/adr/0010, the IdleMonitor chain feeds `Notifs.idle`, so `setIdle` is a manual
+  override of it; nothing else writes `Notifs.locked`). `test bannerShot` captures the morphed pill (poll `shotPoll`);
   `test bannerDismiss` mirrors the banner right-click (dismiss early — real,
   announces first), `bannerDismissAll` mirrors middle-click.
   `test notifQuery <sql>` / `test notifRaw` run read-only sqlite against
@@ -93,6 +94,32 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   The real lock (SUPER+L, power-menu rows) is user-tested manually: SUPER+L →
   wrong password shows ✕ N → correct password unlocks; Lock & Suspend hold
   suspends and the lock is up at resume.
+  Idle chain flows (docs/adr/0010): `test idleState` dumps the loaded config
+  (loaded/configEnabled/idleSeconds/stages), detection (detected/manual/idle), dim state
+  (dimmed/preDim/brightness), chain state (chainRunning/chainApplied/chainElapsed/
+  chainArmed) and the suspend gate (waiting/audioPlaying/lastAudioAt/silenceSeconds/
+  gateSeconds) — read-only, no cursor or focus effects. `test idleArm <idleSec> <dimSec>
+  <dpmsSec> [lockSec]` arms a short-timeout IN-MEMORY config (idle.json is never written;
+  pass 0 to keep a loaded timeout, suspend has no override); `test idleDisarm` restores
+  the loaded config. Arm is NOT idempotent — a second arm while armed returns
+  `armed:false`, disarm first. Real effects when the elapsed time is reached: Dim (every
+  monitor to 0, ddcutil first, brightnessctl last), DPMS off (global), Lock (the same
+  engage as SUPER+L — the session is LOCKED for real, reloads are refused and the password
+  is needed, so never arm a lock timeout you cannot beat) — announce first and snapshot
+  brightness (`dimmed`/`preDim`/`brightness` in `idleState`) per the routeStream
+  convention; any input reverts applied stages (DPMS on, pre-dim brightness back).
+  `test idleDimRoundTrip` does a real dim to 0 with its own announce toast and
+  auto-restores after 4 s — read `dimmed`/`preDim` back through `idleState` while it runs.
+  Suspend never fires while armed (gated in the engine, not time-skipped): verify the gate
+  by state inspection only — play real audio with `test musicCmd play`, watch
+  `audioPlaying`/`silenceSeconds`/`waiting` in `idleState`; a live suspend test is
+  user-run. Wake behavior: logind PrepareForSleep reverts every applied stage immediately
+  and the chain re-arms from wake with the full timeouts — an untouched woken machine
+  re-dims after 3 min and suspends again after another 1.5 h, so nothing stays lit
+  indefinitely. Reload caveats: after editing idle services prefer `reloadNow true`; a
+  reload or restart while dimmed resets the Brightness singleton (`dimmed:false` with
+  hardware still at 0, preDim lost) — restore manually (`brightnessctl set <n>%`,
+  `ddcutil setvcp 10 <n>`) or re-run the round trip.
 - Capture with the driver, not full `grim`: `test panelRect <name>` / `test barRect` return
   screen-absolute geometry; `test shotPanel` / `test shotBar` write a tight crop to
   `/tmp/opencode/test-shot-N.png` — poll `test shotPoll` until `done:true` (one `Process`, no
