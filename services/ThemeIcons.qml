@@ -6,6 +6,7 @@ Singleton {
   id: root
 
   readonly property string file: "$HOME/.local/state/quickshell/icon-index.json"
+  readonly property string theme: Quickshell.env("QT_QPA_SYSTEM_ICON_THEME")
 
   property var names: ({})
   property bool loaded: false
