@@ -152,6 +152,14 @@ rendered blurred and dimmed behind it (compositor blur, docs/adr/0008),
 with the clock and the password field. Typing is accepted only once the
 compositor confirms the lock is secure. _Avoid_: login screen, greeter
 
+## Auth
+
+**Polkit prompt**:
+The under-bar credential card the shell shows when polkit requests
+authentication (`pkexec`, GUI apps): pinned to the screen focused when
+the request arrived for the whole flow, ignoring focus changes
+(docs/adr/0011). _Avoid_: sudo dialog, password popup
+
 ## Notifications
 
 **Banner**:
