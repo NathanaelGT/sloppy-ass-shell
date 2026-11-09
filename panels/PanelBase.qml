@@ -97,11 +97,13 @@ PanelWindow {
     height: root.height
   }
 
-  WlrLayershell.layer: exclusiveFocus ? WlrLayer.Overlay : WlrLayer.Top
+  WlrLayershell.layer: exclusiveFocus || topDocked ? WlrLayer.Overlay : WlrLayer.Top
   WlrLayershell.keyboardFocus: root.exclusiveFocus && root.ownerFocused ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
 
   readonly property int shadowPad: Theme.shadowPad
   readonly property int contentPad: Math.round(14 * Theme.scale)
+  readonly property bool topDocked: attached && Hypr.fullscreen(screenId)
+  readonly property int dockY: topDocked ? 0 : Theme.barThickness
   readonly property int cornerRadius: attached ? Math.min(Theme.cardRadius, edge) : Theme.cardRadius
   readonly property int headerHeight: headerColumn.implicitHeight
   property int cardHeight: Math.min(bodyColumn.implicitHeight + (root.headerHeight > 0 ? root.headerHeight + Theme.gap : 0) + contentPad + contentOuterPad + contentInset, maxCardHeight)
@@ -342,9 +344,9 @@ PanelWindow {
     id: clipFrame
 
     x: 0
-    y: root.attached ? Theme.barThickness : 0
+    y: root.attached ? root.dockY : 0
     width: root.width
-    height: root.attached ? root.height - Theme.barThickness : root.height
+    height: root.attached ? root.height - root.dockY : root.height
     clip: root.attached
 
     Item {
@@ -579,7 +581,7 @@ PanelWindow {
   Item {
     id: stem
 
-    visible: root.stemEnabled && root.stemProgress > 0
+    visible: root.stemEnabled && root.stemProgress > 0 && !root.topDocked
     x: root.stemX
     y: root.stemTop
     width: Theme.capsuleThickness
