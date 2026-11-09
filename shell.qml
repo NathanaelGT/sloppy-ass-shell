@@ -1477,6 +1477,19 @@ ShellRoot {
       return JSON.stringify(rect)
     }
 
+    function hyprState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      return JSON.stringify({
+        enabled: true,
+        fullscreen: Hypr.fullscreenMap,
+        tileless: Hypr.tilelessMap,
+        workspace: Hypr.workspaceMap,
+        special: Hypr.specialMap
+      })
+    }
+
     function barRect(screen: string): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
