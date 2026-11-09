@@ -105,13 +105,12 @@ Singleton {
   }
 
   function lockAndSuspend() {
-    if (root.sessionLocked) {
-      return
+    if (!root.sessionLocked) {
+      root.closePreview()
+      Panels.close()
+      root.readCaps()
+      root.engage()
     }
-    root.closePreview()
-    Panels.close()
-    root.readCaps()
-    root.engage()
     Quickshell.execDetached(["systemctl", "suspend"])
   }
 

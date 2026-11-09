@@ -2248,7 +2248,14 @@ ShellRoot {
         chainRunning: IdleEngine.running,
         chainApplied: IdleEngine.applied,
         chainElapsed: Math.round(IdleEngine.elapsedSeconds()),
-        chainArmed: IdleConfig.testArm !== null
+        chainArmed: IdleConfig.testArm !== null,
+        chainGate: {
+          waiting: IdleEngine.gateWaiting,
+          audioPlaying: IdleEngine.audioPlaying,
+          lastAudioAt: IdleEngine.lastAudioAt,
+          silenceSeconds: IdleEngine.lastAudioAt > 0 ? Math.round(IdleEngine.silenceMs() / 1000) : -1,
+          gateSeconds: IdleConfig.stage("suspend") !== null ? IdleConfig.stage("suspend").audioGateSeconds : 0
+        }
       })
     }
 
