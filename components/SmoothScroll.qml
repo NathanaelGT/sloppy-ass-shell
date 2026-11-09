@@ -13,6 +13,8 @@ Item {
   property real vel: 0
   property int glideDir: 0
   property real lastWheelMs: 0
+  property bool chainRebound: false
+  property real reboundTo: 0
 
   readonly property real maxScroll: target ? Math.max(0, target.contentHeight - target.height) : 0
   readonly property real visibleFrac: target && target.contentHeight > 0 ? Math.min(1, target.height / target.contentHeight) : 1
@@ -25,6 +27,30 @@ Item {
     fadeTimer.restart()
   }
 
+  function overClamp(raw) {
+    const depth = Math.min(Theme.scrollOvershootCap, Math.abs(root.vel) * Theme.scrollOvershootVelMs)
+    return Math.max(-depth, Math.min(root.maxScroll + depth, raw))
+  }
+
+  function armRebound(pos) {
+    if (pos < 0 || pos > root.maxScroll) {
+      root.reboundTo = pos < 0 ? 0 : root.maxScroll
+      root.chainRebound = true
+    }
+  }
+
+  function startRebound(pos) {
+    reboundAnim.to = pos < 0 ? 0 : root.maxScroll
+    reboundAnim.restart()
+  }
+
+  function chainStopped() {
+    if (root.chainRebound) {
+      root.chainRebound = false
+      startRebound(root.reboundTo)
+    }
+  }
+
   function wheel(event) {
     const t = root.target
     if (!t || root.maxScroll <= 0) {
@@ -32,11 +58,17 @@ Item {
     }
     if (event.pixelDelta.y !== 0) {
       root.pendingPx = 0
+      root.chainRebound = false
+      reboundAnim.stop()
       stepAnim.stop()
       glideAnim.stop()
       const before = t.contentY
-      t.contentY = Math.max(0, Math.min(root.maxScroll, before - event.pixelDelta.y))
-      root.trackVelocity(t.contentY - before)
+      const applied = root.overClamp(before - event.pixelDelta.y)
+      t.contentY = applied
+      root.trackVelocity(applied - before)
+      if (applied < 0 || applied > root.maxScroll) {
+        root.startRebound(applied)
+      }
       root.bump()
       return
     }
@@ -67,17 +99,20 @@ Item {
       root.vel = 0
       return
     }
-    const from = Math.max(0, Math.min(root.maxScroll, t.contentY))
-    const base = stepAnim.running ? root.animTarget : from
+    const base = stepAnim.running ? root.animTarget : t.contentY
     const cap = t.height * Theme.scrollGlideMaxFrac
     const extra = Math.max(-cap, Math.min(cap, root.vel * root.glideDir * Theme.scrollGlideTauMs))
-    const want = Math.max(0, Math.min(root.maxScroll, base + extra))
+    const want = root.overClamp(base + extra)
     root.vel = 0
     if (Math.abs(want - base) < 1) {
       return
     }
-    root.animTarget = want
+    root.chainRebound = false
+    reboundAnim.stop()
+    glideAnim.stop()
     stepAnim.stop()
+    root.animTarget = want
+    root.armRebound(want)
     glideAnim.to = want
     glideAnim.restart()
   }
@@ -96,13 +131,24 @@ Item {
 
   function syncStep() {
     const t = root.target
-    const from = stepAnim.running ? root.animTarget : Math.max(0, Math.min(root.maxScroll, t.contentY))
-    const want = Math.max(0, Math.min(root.maxScroll, from + root.pendingPx))
+    const base = stepAnim.running ? root.animTarget : t.contentY
+    const want = root.overClamp(base + root.pendingPx)
     root.pendingPx = 0
-    if (want === from) {
+    if (want === base) {
+      if (base < 0 || base > root.maxScroll) {
+        root.armRebound(base)
+        if (!stepAnim.running && !glideAnim.running) {
+          root.startRebound(base)
+        }
+      }
       return
     }
+    root.chainRebound = false
+    reboundAnim.stop()
+    glideAnim.stop()
+    stepAnim.stop()
     root.animTarget = want
+    root.armRebound(want)
     stepAnim.to = want
     stepAnim.restart()
   }
@@ -111,9 +157,11 @@ Item {
     root.pendingPx = 0
     root.vel = 0
     root.lastWheelMs = 0
+    root.chainRebound = false
     glideArm.stop()
     glideAnim.stop()
     stepAnim.stop()
+    reboundAnim.stop()
   }
 
   Connections {
@@ -131,6 +179,7 @@ Item {
     property: "contentY"
     duration: 220
     easing.type: Easing.OutCubic
+    onStopped: root.chainStopped()
   }
 
   NumberAnimation {
@@ -139,6 +188,16 @@ Item {
     target: root.target
     property: "contentY"
     duration: Theme.scrollGlideDurationMs
+    easing.type: Easing.OutCubic
+    onStopped: root.chainStopped()
+  }
+
+  NumberAnimation {
+    id: reboundAnim
+
+    target: root.target
+    property: "contentY"
+    duration: Theme.scrollOvershootMs
     easing.type: Easing.OutCubic
   }
 

@@ -180,6 +180,7 @@ PanelBase {
   onOpenChanged: {
     if (root.open) {
       NotifStore.markSeen()
+      notifScroll.snap()
       notificationList.contentY = 0
     }
   }

@@ -33,6 +33,9 @@ Singleton {
   readonly property int scrollVelocityWindowMs: 200
   readonly property real scrollVelocityBlend: 0.5
   readonly property real scrollGlideMinVelocity: 0.9
+  readonly property int scrollOvershootMs: 250
+  readonly property int scrollOvershootCap: Math.round(40 * scale)
+  readonly property real scrollOvershootVelMs: 25
 
   readonly property int chipHeight: Math.round(22 * scale)
   readonly property int chipRadius: Math.round(6 * scale)
