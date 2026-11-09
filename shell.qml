@@ -2252,7 +2252,7 @@ ShellRoot {
       })
     }
 
-    function idleArm(idleSeconds: int, dimSeconds: int, dpmsSeconds: int): string {
+    function idleArm(idleSeconds: int, dimSeconds: int, dpmsSeconds: int, lockSeconds: int): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
       }
@@ -2262,6 +2262,9 @@ ShellRoot {
       }
       if (dpmsSeconds > 0) {
         overrides["dpms"] = dpmsSeconds
+      }
+      if (lockSeconds > 0) {
+        overrides["lock"] = lockSeconds
       }
       const ok = IdleConfig.arm(idleSeconds > 0 ? idleSeconds : 0, overrides)
       return JSON.stringify({

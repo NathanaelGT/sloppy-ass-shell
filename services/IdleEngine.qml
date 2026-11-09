@@ -21,6 +21,8 @@ Singleton {
       }
     } else if (kind === "dpms") {
       Quickshell.execDetached(["hyprctl", "dispatch", "dpms off"])
+    } else if (kind === "lock") {
+      LockState.requestLock()
     } else {
       return
     }
