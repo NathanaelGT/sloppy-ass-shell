@@ -42,7 +42,7 @@ ShellRoot {
     target: "shell"
 
     function setIdle(state: bool): void {
-      Notifs.idle = state
+      Idle.manual = state
     }
 
     function setLocked(state: bool): void {
@@ -2238,7 +2238,10 @@ ShellRoot {
         loaded: IdleConfig.loaded,
         configEnabled: IdleConfig.enabled,
         idleSeconds: IdleConfig.idleSeconds,
-        stages: IdleConfig.stages
+        stages: IdleConfig.stages,
+        detected: Idle.detected,
+        manual: Idle.manual,
+        idle: Notifs.idle
       })
     }
   }

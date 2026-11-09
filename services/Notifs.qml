@@ -13,7 +13,7 @@ Singleton {
   readonly property alias active: instance.trackedNotifications
 
   property bool dnd: false
-  property bool idle: false
+  property bool idle: Idle.active
   property bool locked: false
   property var records: []
   property string lastError: ""
