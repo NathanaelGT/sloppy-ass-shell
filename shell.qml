@@ -1477,6 +1477,17 @@ ShellRoot {
       return JSON.stringify(rect)
     }
 
+    function barState(screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const bar = TestDriver.bar(screen ? screen : "eDP-1")
+      if (!bar) {
+        return "{\"enabled\":true,\"found\":false}"
+      }
+      return JSON.stringify(bar.testState())
+    }
+
     function hyprState(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"

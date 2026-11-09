@@ -39,6 +39,26 @@ PanelWindow {
   Component.onCompleted: {
     Panels.setClusterWidth(screen.name, clusterWidth)
     Panels.setClusterRight(screen.name, clusterRight)
+    TestDriver.registerBar(screen.name, root)
+  }
+
+  function testState() {
+    return {
+      screen: screen.name,
+      autoHide: autoHide,
+      revealed: revealed,
+      menuOpen: menuOpen,
+      closingScreen: Panels.closingScreen === screen.name,
+      shown: shown,
+      tilelessShown: tilelessShown,
+      fullscreen: Hypr.fullscreen(screen.name),
+      maskFull: maskFull,
+      visualY: Math.round(visual.y),
+      targetY: shown ? 0 : hiddenY,
+      maskX: mask.x,
+      maskWidth: mask.width,
+      maskHeight: mask.height
+    }
   }
 
   exclusiveZone: reserveSpace ? Theme.barThickness : 0
@@ -46,15 +66,18 @@ PanelWindow {
   aboveWindows: true
 
   property bool revealed: false
+  readonly property int hiddenY: -(Theme.barThickness + Theme.shadowPad)
   readonly property bool floatingPanel: Panels.panel === "window-switcher"
-  readonly property bool menuOpen: Panels.panel !== "" && !floatingPanel && Panels.screenName === screen.name
-  readonly property bool shown: !autoHide || revealed || menuOpen || Panels.closingScreen === screen.name || notifWidget.merging
+  readonly property bool menuOpen: Panels.panel !== "" && !floatingPanel && Panels.screenName === screen.name && !Hypr.fullscreen(screen.name)
+  readonly property bool tilelessShown: autoHide && Hypr.tileless(screen.name) && !Hypr.fullscreen(screen.name)
+  readonly property bool shown: !autoHide || revealed || menuOpen || (Panels.closingScreen === screen.name && !Hypr.fullscreen(screen.name)) || notifWidget.merging || tilelessShown
+  readonly property bool maskFull: shown || visual.y > root.hiddenY + 0.5
 
   mask: Region {
-    x: root.shown ? root.edgeMargin : 0
+    x: root.maskFull ? root.edgeMargin : 0
     y: 0
-    width: root.shown ? root.barWidth : screen.width
-    height: root.shown ? Theme.barThickness : Math.round(4 * Theme.scale)
+    width: root.maskFull ? root.barWidth : screen.width
+    height: root.maskFull ? Theme.barThickness : Math.round(4 * Theme.scale)
 
     Region {
       x: bannerWidget.x
@@ -90,7 +113,7 @@ PanelWindow {
     x: 0
     width: screen.width
     height: Theme.barThickness + Theme.shadowPad + Theme.bannerMaxExpand
-    y: root.shown ? 0 : -height
+    y: root.shown ? 0 : root.hiddenY
     layer.enabled: true
     layer.samples: 4
 

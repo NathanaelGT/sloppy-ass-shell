@@ -10,6 +10,7 @@ Singleton {
   property bool active: false
 
   property var panels: ({})
+  property var bars: ({})
 
   property int shotSeq: 0
   property var shotResult: ({
@@ -61,6 +62,23 @@ Singleton {
       return null
     }
     const item = root.panels[root.key(name, screen)]
+    return item === undefined ? null : item
+  }
+
+  function registerBar(screen, item) {
+    if (!screen || !item) {
+      return
+    }
+    const next = {}
+    for (const k in root.bars) {
+      next[k] = root.bars[k]
+    }
+    next[screen] = item
+    root.bars = next
+  }
+
+  function bar(screen) {
+    const item = root.bars[screen]
     return item === undefined ? null : item
   }
 
