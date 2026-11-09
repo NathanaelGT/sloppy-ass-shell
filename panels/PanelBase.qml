@@ -112,7 +112,7 @@ PanelWindow {
   readonly property int shadowPad: Theme.shadowPad
   readonly property int contentPad: Math.round(14 * Theme.scale)
   readonly property bool topDocked: attached && Hypr.fullscreen(screenId)
-  readonly property int dockY: topDocked ? 0 : Theme.barThickness
+  readonly property int dockY: topDocked ? 0 : root.topMargin
   readonly property int cornerRadius: attached ? Math.min(Theme.cardRadius, edge) : Theme.cardRadius
   readonly property int headerHeight: headerColumn.implicitHeight
   property int cardHeight: Math.min(bodyColumn.implicitHeight + (root.headerHeight > 0 ? root.headerHeight + Theme.gap : 0) + contentPad + contentOuterPad + contentInset, maxCardHeight)
