@@ -2241,8 +2241,20 @@ ShellRoot {
         stages: IdleConfig.stages,
         detected: Idle.detected,
         manual: Idle.manual,
-        idle: Notifs.idle
+        idle: Notifs.idle,
+        dimmed: Brightness.dimmed,
+        preDim: Brightness.preDim,
+        brightness: Brightness.level
       })
+    }
+
+    function idleDimRoundTrip(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const state = Brightness.testRoundTrip()
+      state.enabled = true
+      return JSON.stringify(state)
     }
   }
 

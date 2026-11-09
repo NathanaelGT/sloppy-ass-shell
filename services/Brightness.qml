@@ -8,6 +8,9 @@ Singleton {
 
   property real level: 0
   property var ddcMap: ({})
+  property bool dimmed: false
+  property var preDim: ({})
+  property bool roundTrip: false
 
   function parseDetect(text) {
     const map = {}
@@ -67,6 +70,106 @@ Singleton {
     workProc.running = true
   }
 
+  function dimScript() {
+    const names = Object.keys(ddcMap)
+    const lines = []
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i]
+      const disp = ddcMap[name]
+      lines.push("cur=$(ddcutil getvcp 10 --brief --display " + disp + " 2>/dev/null | awk '{print $4}')")
+      lines.push("echo \"DIM " + name + " ${cur:-0} 100\"")
+      lines.push("ddcutil setvcp 10 0 --display " + disp + " >/dev/null 2>&1")
+    }
+    lines.push("cur=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%')")
+    lines.push("echo \"DIM eDP-1 ${cur:-0} 100\"")
+    lines.push("brightnessctl set 0% >/dev/null 2>&1")
+    return lines.join("\n")
+  }
+
+  function restoreScript() {
+    const names = Object.keys(preDim)
+    const lines = []
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i]
+      const value = preDim[name]
+      if (ddcMap[name] !== undefined && ddcMap[name] !== null) {
+        lines.push("ddcutil setvcp 10 " + value + " --display " + ddcMap[name] + " >/dev/null 2>&1")
+        lines.push("echo \"RST " + name + " " + value + " 100\"")
+      }
+    }
+    if (preDim["eDP-1"] !== undefined) {
+      lines.push("brightnessctl set " + preDim["eDP-1"] + "% >/dev/null 2>&1")
+      lines.push("echo \"RST eDP-1 " + preDim["eDP-1"] + " 100\"")
+    }
+    return lines.join("\n")
+  }
+
+  function dim() {
+    if (root.dimmed || root.dimProc.running) {
+      return false
+    }
+    dimProc.command = ["bash", "-lc", dimScript()]
+    dimProc.running = true
+    return true
+  }
+
+  function restore() {
+    if (!root.dimmed) {
+      root.roundTrip = false
+      return false
+    }
+    if (root.restoreProc.running) {
+      return false
+    }
+    restoreProc.command = ["bash", "-lc", restoreScript()]
+    restoreProc.running = true
+    return true
+  }
+
+  function applyDim(text) {
+    const stored = {}
+    const lines = text.trim().split("\n")
+    for (let i = 0; i < lines.length; i++) {
+      const parts = lines[i].trim().split(/\s+/)
+      if (parts.length < 3 || parts[0] !== "DIM") {
+        continue
+      }
+      const value = parseInt(parts[2], 10)
+      stored[parts[1]] = isNaN(value) ? 0 : value
+    }
+    root.preDim = stored
+    root.dimmed = true
+    root.level = 0
+    if (root.roundTrip) {
+      roundTripTimer.restart()
+    }
+  }
+
+  function applyRestore() {
+    root.roundTrip = false
+    root.dimmed = false
+    root.refresh()
+  }
+
+  function testRoundTrip() {
+    Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", "normal", "opencode", "idle chain round trip: dimming every monitor to 0, restoring in 4 s"])
+    root.roundTrip = true
+    if (!dim()) {
+      roundTripTimer.restart()
+    }
+    return testState()
+  }
+
+  function testState() {
+    return {
+      dimmed: root.dimmed,
+      roundTrip: root.roundTrip,
+      preDim: root.preDim,
+      level: root.level,
+      ddc: root.ddcMap
+    }
+  }
+
   Process {
     id: detectProc
     command: ["bash", "-lc", "ddcutil detect --brief 2>/dev/null"]
@@ -86,6 +189,31 @@ Singleton {
     stdout: StdioCollector {
       onStreamFinished: root.applyResult(text)
     }
+  }
+
+  Process {
+    id: dimProc
+    command: ["bash", "-lc", "true"]
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: root.applyDim(text)
+    }
+  }
+
+  Process {
+    id: restoreProc
+    command: ["bash", "-lc", "true"]
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: root.applyRestore()
+    }
+  }
+
+  Timer {
+    id: roundTripTimer
+    interval: 4000
+    running: false
+    onTriggered: root.restore()
   }
 
   Timer {
