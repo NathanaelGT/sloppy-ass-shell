@@ -13,7 +13,7 @@ Singleton {
   IdleMonitor {
     id: monitor
 
-    enabled: IdleConfig.loaded && IdleConfig.enabled
+    enabled: IdleConfig.loaded
     timeout: IdleConfig.idleSeconds
     respectInhibitors: true
   }
