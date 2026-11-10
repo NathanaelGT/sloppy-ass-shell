@@ -2325,6 +2325,7 @@ ShellRoot {
         enabled: true,
         active: Polkit.active,
         fake: Polkit.fakeActive,
+        registered: Polkit.agent.isRegistered,
         targetScreen: Polkit.targetScreen,
         pinScreen: Polkit.pinScreen,
         panel: panel && panel.open ? panel.testState() : null
