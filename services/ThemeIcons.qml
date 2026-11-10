@@ -11,6 +11,7 @@ Singleton {
   property var names: ({})
   property bool loaded: false
   property bool scanDone: false
+  readonly property bool scanning: scan.running
 
   function themeName() {
     return root.theme && root.theme.length > 0 ? root.theme : "hicolor"
@@ -38,9 +39,7 @@ Singleton {
   }
 
   function save() {
-    const data = JSON.stringify(root.names)
-    const escaped = data.replace(/'/g, "'\\''")
-    Quickshell.execDetached(["bash", "-lc", "mkdir -p \"$(dirname " + root.file + ")\"; printf '%s' '" + escaped + "' > " + root.file])
+    cacheView.setText(JSON.stringify(root.names))
   }
 
   function rescan() {
@@ -71,6 +70,15 @@ Singleton {
         root.loaded = true
       }
     }
+  }
+
+  FileView {
+    id: cacheView
+
+    path: Quickshell.env("HOME") + "/.local/state/quickshell/icon-index.json"
+    watchChanges: false
+    atomicWrites: true
+    printErrors: false
   }
 
   Process {

@@ -228,6 +228,51 @@ ShellRoot {
       return Quickshell.watchFiles
     }
 
+    function iconIndex(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      return JSON.stringify({
+        theme: ThemeIcons.themeName(),
+        loaded: ThemeIcons.loaded,
+        scanDone: ThemeIcons.scanDone,
+        count: Object.keys(ThemeIcons.names).length,
+        scanning: ThemeIcons.scanning,
+        firefox: ThemeIcons.has("firefox"),
+        terminal: ThemeIcons.has("utilities-terminal")
+      })
+    }
+
+    function appIcon(appId: string): string {
+      if (!TestDriver.active) {
+        return "{}"
+      }
+      const panel = TestDriver.panel("launcher")
+      if (!panel) {
+        return "{}"
+      }
+      const app = DesktopEntries.byId(appId)
+      return JSON.stringify({
+        icon: app && app.icon ? app.icon : "",
+        resolved: app ? panel.testAppIcon(app, appId) : ""
+      })
+    }
+
+    function appimageState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      return JSON.stringify({
+        indexLoaded: AppImages.indexLoaded,
+        resolved: Object.keys(AppImages.resolved).length,
+        queued: AppImages.queue.length,
+        available: AppImages.available.length,
+        paths: AppImages.available.map(function (a) {
+          return a.path
+        })
+      })
+    }
+
     function reloadNow(hard: bool): bool {
       if (!TestDriver.active) {
         return false
