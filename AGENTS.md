@@ -102,7 +102,8 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   (dimmed/preDim/brightness), chain state (chainRunning/chainApplied/chainElapsed/
   chainArmed) and the suspend gate (waiting/audioPlaying/lastAudioAt/silenceSeconds/
   gateSeconds) — read-only, no cursor or focus effects. `test idleArm <idleSec> <dimSec>
-  <dpmsSec> [lockSec]` arms a short-timeout IN-MEMORY config (idle.json is never written;
+  <dpmsSec> <lockSec>` (all four args required by the ipc; 0 keeps that loaded timeout)
+  arms a short-timeout IN-MEMORY config (idle.json is never written;
   pass 0 to keep a loaded timeout, suspend has no override); `test idleDisarm` restores
   the loaded config. Arm is NOT idempotent — a second arm while armed returns
   `armed:false`, disarm first. Real effects when the elapsed time is reached: Dim (every
