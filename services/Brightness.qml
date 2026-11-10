@@ -249,6 +249,23 @@ Singleton {
   }
 
   Timer {
+    id: procWatchdog
+
+    interval: 10000
+    repeat: true
+    running: dimProc.running || restoreProc.running
+    onTriggered: {
+      if (restoreProc.running) {
+        restoreProc.running = false
+        restore()
+      } else if (dimProc.running) {
+        dimProc.running = false
+        dim()
+      }
+    }
+  }
+
+  Timer {
     id: retryTimer
 
     interval: 2500
