@@ -70,6 +70,9 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `test notifQuery <sql>` / `test notifRaw` run read-only sqlite against
   `~/.local/state/quickshell/notifications.db` and poll the result — use for retention,
   soft-delete and lastSeen assertions, never for writes (the mirror would desync).
+  `test notifScrollState [screen]` dumps the notification list's scroll state (contentY,
+  contentHeight, viewportHeight, count, maxScroll, thumbY, thumbHeight, dragIndex, topIndex,
+  firstCardY, lastEnd) — read-only, the scroll-position seam for thumb/wheel assertions.
   History row delete and panel action buttons have no driver seam
   (clicks are real); the countdown only advances while not idle, so idle pause is asserted
   via `remaining` freezing in `notifState`/`bannerState`, not wall-clock.

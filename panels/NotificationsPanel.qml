@@ -28,7 +28,6 @@ PanelBase {
   }
   readonly property int budgetCount: 5
   readonly property real minCardHeight: Math.round(16 * Theme.scale) + Math.round(8 * Theme.scale) + Math.max(cardMetric.implicitHeight, Math.round(16 * Theme.scale)) + Math.round(20 * Theme.scale) + Math.round(8 * Theme.scale)
-  property int measureRevision: 0
 
   readonly property var items: {
     const active = Notifs.active && Notifs.active.values ? Notifs.active.values : []
@@ -90,17 +89,78 @@ PanelBase {
     return out
   }
 
+  property var rowHeights: ({})
+
+  property string scrollAnchorKey: ""
+  property int scrollAnchorIndex: -1
+  property bool scrollAnchorAtEnd: false
+
+  function captureScrollAnchor() {
+    if (!notificationList.visible || notificationList.count === 0) {
+      return
+    }
+    const idx = notificationList.indexAt(0, notificationList.contentY + 1)
+    if (idx < 0 || idx >= root.items.length) {
+      return
+    }
+    root.scrollAnchorKey = root.items[idx].key
+    root.scrollAnchorIndex = idx
+    const last = notificationList.itemAtIndex(notificationList.count - 1)
+    root.scrollAnchorAtEnd = last !== null && last !== undefined && last.y + last.height <= notificationList.contentY + notificationList.height + 0.5
+  }
+
+  function restoreScrollAnchor() {
+    if (root.items.length === 0) {
+      return
+    }
+    if (root.scrollAnchorAtEnd) {
+      notifScroll.positionTo(1)
+      return
+    }
+    if (root.scrollAnchorIndex < 0) {
+      return
+    }
+    let target = root.scrollAnchorIndex
+    for (let i = 0; i < root.items.length; i++) {
+      if (root.items[i].key === root.scrollAnchorKey) {
+        target = i
+        break
+      }
+    }
+    notifScroll.beginDrag()
+    notificationList.positionViewAtIndex(Math.min(target, root.items.length - 1), ListView.Beginning)
+  }
+
+  function checkEnd() {
+    if (!NotifStore.ready || NotifStore.exhausted || NotifStore.loadingMore || root.closingCount > 0) {
+      return
+    }
+    const last = notificationList.itemAtIndex(notificationList.count - 1)
+    if (last && last.y + last.height <= notificationList.contentY + notificationList.height + 0.5) {
+      NotifStore.loadMore()
+    }
+  }
+
+  function rememberRowHeight(key, height) {
+    if (!key || !(height > 0) || root.rowHeights[key] === height) {
+      return
+    }
+    const next = Object.assign({}, root.rowHeights)
+    next[key] = height
+    root.rowHeights = next
+  }
+
   readonly property var topCardHeights: {
-    const revision = root.measureRevision
     const out = []
     for (let i = 0; i < root.budgetCount; i++) {
-      const d = notificationList.itemAtIndex(i)
-      out.push(d ? d.implicitHeight : root.minCardHeight)
+      const item = root.items[i]
+      const cached = item ? root.rowHeights[item.key] : undefined
+      out.push(typeof cached === "number" ? cached : root.minCardHeight)
     }
     return out
   }
 
-  readonly property real listHeight: {
+  readonly property real listBudget: {
     if (root.items.length === 0) {
       return 0
     }
@@ -114,9 +174,33 @@ PanelBase {
     }
     return sum + Theme.gap * (root.budgetCount - 1)
   }
+  readonly property real listChrome: root.contentPad + root.contentOuterPad + root.contentInset + headerCard.implicitHeight + Theme.gap
+  readonly property real listHeight: Math.max(0, Math.min(root.listBudget, root.maxCardHeight - root.listChrome))
 
   function timeLabel(ts) {
     return Qt.formatTime(new Date(ts * 1000), "HH:mm")
+  }
+
+  function testScrollState() {
+    let topIndex = -1
+    for (let y = 1; y < 48 && topIndex < 0; y += 4) {
+      topIndex = notificationList.indexAt(0, notificationList.contentY + y)
+    }
+    const first = notificationList.itemAtIndex(0)
+    const last = notificationList.itemAtIndex(notificationList.count - 1)
+    return {
+      contentY: notificationList.contentY,
+      contentHeight: notificationList.contentHeight,
+      viewportHeight: notificationList.height,
+      count: notificationList.count,
+      maxScroll: notifScroll.maxScroll,
+      thumbY: notifScroll.thumbY,
+      thumbHeight: notifScroll.thumbHeight,
+      dragIndex: notifScroll.dragIndex,
+      topIndex: topIndex,
+      firstCardY: first ? first.y : null,
+      lastEnd: last ? last.y + last.height : null
+    }
   }
 
   property bool undoArmed: false
@@ -192,7 +276,31 @@ PanelBase {
     }
   }
 
+  onItemsChanged: Qt.callLater(root.restoreScrollAnchor)
+
+  Connections {
+    target: notificationList
+
+    function onContentYChanged() {
+      root.checkEnd()
+      if (notificationList.contentY > 0) {
+        root.captureScrollAnchor()
+      } else {
+        scrollAnchorTimer.restart()
+      }
+    }
+  }
+
+  Timer {
+    id: scrollAnchorTimer
+
+    interval: 200
+    onTriggered: root.captureScrollAnchor()
+  }
+
   PanelHeader {
+    id: headerCard
+
     title: "Notifications"
 
     Text {
@@ -277,14 +385,6 @@ PanelBase {
       cacheBuffer: Math.round(600 * Theme.scale)
       interactive: contentHeight > height
       boundsBehavior: Flickable.StopAtBounds
-
-      onCountChanged: Qt.callLater(() => root.measureRevision += 1)
-
-      onAtYEndChanged: {
-        if (atYEnd && NotifStore.ready && !NotifStore.exhausted && !NotifStore.loadingMore && root.closingCount === 0) {
-          NotifStore.loadMore()
-        }
-      }
 
       delegate: Column {
         id: notificationRow
@@ -380,13 +480,11 @@ PanelBase {
 
         ListView.onReused: {
           notificationRow.resetRow()
-          root.measureRevision += 1
         }
 
         Component.onCompleted: {
           notificationRow.itemKey = modelData.key
           notificationRow.syncImage()
-          root.measureRevision += 1
         }
 
         onModelDataChanged: {
@@ -396,7 +494,7 @@ PanelBase {
           }
           notificationRow.resetRow()
         }
-        onImplicitHeightChanged: root.measureRevision += 1
+        onImplicitHeightChanged: root.rememberRowHeight(modelData.key, implicitHeight)
 
         SequentialAnimation {
           id: rowClearAnim

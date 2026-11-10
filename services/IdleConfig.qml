@@ -63,12 +63,14 @@ Singleton {
     next.sort((a, b) => a.afterSeconds - b.afterSeconds)
     testArm = {
       idleSeconds: root.idleSeconds,
-      stages: root.stages
+      stages: root.stages,
+      enabled: root.enabled
     }
     if (typeof idleSeconds === "number" && isFinite(idleSeconds) && idleSeconds > 0) {
       root.idleSeconds = idleSeconds
     }
     root.stages = next
+    root.enabled = true
     return true
   }
 
@@ -78,6 +80,7 @@ Singleton {
     }
     root.idleSeconds = testArm.idleSeconds
     root.stages = testArm.stages
+    root.enabled = testArm.enabled
     testArm = null
     return true
   }

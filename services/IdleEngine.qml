@@ -132,6 +132,7 @@ Singleton {
     id: idleTick
 
     interval: 1000
+    repeat: true
     running: root.running
     onRunningChanged: {
       if (running) {

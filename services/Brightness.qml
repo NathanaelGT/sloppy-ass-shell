@@ -12,6 +12,8 @@ Singleton {
   property var preDim: ({})
   property bool roundTrip: false
   property bool pendingRestore: false
+  property bool dimQueued: false
+  property bool restoreQueued: false
 
   function parseDetect(text) {
     const map = {}
@@ -29,7 +31,7 @@ Singleton {
         continue
       }
       const connectorMatch = line.match(/DRM connector:\s*card\d+-(.+?)\s*$/)
-      if (connectorMatch && display !== null) {
+      if (connectorMatch && display !== null && connectorMatch[1].indexOf("eDP") !== 0) {
         map[connectorMatch[1]] = display
       }
     }
@@ -78,12 +80,16 @@ Singleton {
       const name = names[i]
       const disp = ddcMap[name]
       lines.push("cur=$(ddcutil getvcp 10 --brief --display " + disp + " 2>/dev/null | awk '{print $4}')")
-      lines.push("echo \"DIM " + name + " ${cur:-0} 100\"")
-      lines.push("ddcutil setvcp 10 0 --display " + disp + " >/dev/null 2>&1")
+      lines.push("if [ -z \"$cur\" ] || [ \"$cur\" = \"0\" ]; then echo \"SKIP " + name + "\"; else")
+      lines.push("  echo \"DIM " + name + " $cur 100\"")
+      lines.push("  ddcutil setvcp 10 0 --display " + disp + " >/dev/null 2>&1")
+      lines.push("fi")
     }
     lines.push("cur=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%')")
-    lines.push("echo \"DIM eDP-1 ${cur:-0} 100\"")
-    lines.push("brightnessctl set 0% >/dev/null 2>&1")
+    lines.push("if [ -z \"$cur\" ] || [ \"$cur\" = \"0\" ]; then echo \"SKIP eDP-1\"; else")
+    lines.push("  echo \"DIM eDP-1 $cur 100\"")
+    lines.push("  brightnessctl set 0% >/dev/null 2>&1")
+    lines.push("fi")
     return lines.join("\n")
   }
 
@@ -106,16 +112,22 @@ Singleton {
   }
 
   function dim() {
-    if (root.dimmed || root.dimProc.running) {
+    if (root.dimmed || dimProc.running) {
       return false
     }
+    if (detectProc.running || workProc.running) {
+      root.dimQueued = true
+      retryTimer.restart()
+      return false
+    }
+    root.dimQueued = false
     dimProc.command = ["bash", "-lc", dimScript()]
     dimProc.running = true
     return true
   }
 
   function revert() {
-    if (root.dimProc.running) {
+    if (dimProc.running) {
       root.pendingRestore = true
       return true
     }
@@ -127,9 +139,15 @@ Singleton {
       root.roundTrip = false
       return false
     }
-    if (root.restoreProc.running) {
+    if (restoreProc.running) {
       return false
     }
+    if (detectProc.running || workProc.running) {
+      root.restoreQueued = true
+      retryTimer.restart()
+      return false
+    }
+    root.restoreQueued = false
     restoreProc.command = ["bash", "-lc", restoreScript()]
     restoreProc.running = true
     return true
@@ -231,8 +249,29 @@ Singleton {
   }
 
   Timer {
+    id: retryTimer
+
+    interval: 2500
+    running: false
+    onTriggered: {
+      if (root.restoreQueued) {
+        root.restoreQueued = false
+        root.restore()
+      } else if (root.dimQueued) {
+        root.dimQueued = false
+        root.dim()
+      }
+    }
+  }
+
+  Timer {
     interval: 1500
+    repeat: true
     running: true
-    onTriggered: root.detect()
+    onTriggered: {
+      if (!dimProc.running && !restoreProc.running && !workProc.running) {
+        root.detect()
+      }
+    }
   }
 }

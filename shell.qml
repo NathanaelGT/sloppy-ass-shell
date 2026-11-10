@@ -1989,6 +1989,23 @@ ShellRoot {
       })
     }
 
+    function notifScrollState(screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("notifications", screen && screen.length > 0 ? screen : "eDP-1")
+      if (!panel || !panel.open) {
+        return JSON.stringify({
+          enabled: true,
+          open: false
+        })
+      }
+      return JSON.stringify(Object.assign({
+        enabled: true,
+        open: true
+      }, panel.testScrollState()))
+    }
+
     function notifState(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"

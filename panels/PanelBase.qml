@@ -88,13 +88,6 @@ PanelWindow {
     width: root.cardWidth
     height: root.cardHeight
     radius: root.cornerRadius
-
-    Region {
-      x: root.cardWidth
-      y: 0
-      width: root.gutterActive ? Theme.scrollThumbStrip : 0
-      height: root.gutterActive ? root.cardHeight : 0
-    }
   }
 
   Region {
@@ -160,7 +153,6 @@ PanelWindow {
   readonly property real viewportHeight: scroller.height
   readonly property real viewportY: scroller.y
   readonly property real scrollY: scroller.contentY
-  readonly property bool gutterActive: root.scrollDriver ? root.scrollDriver.maxScroll > 0 : false
 
   function ensureVisible(y, height, margin) {
     scrollerScroll.snap()
@@ -348,7 +340,9 @@ PanelWindow {
       Panels.close()
     }
     onWheel: event => {
-      scrollerScroll.wheel(event)
+      if (root.scrollDriver) {
+        root.scrollDriver.wheel(event)
+      }
       event.accepted = true
     }
   }
@@ -461,7 +455,9 @@ PanelWindow {
         MouseArea {
           anchors.fill: parent
           onWheel: event => {
-            scrollerScroll.wheel(event)
+            if (root.scrollDriver) {
+              root.scrollDriver.wheel(event)
+            }
             event.accepted = true
           }
         }
@@ -592,21 +588,10 @@ PanelWindow {
       Item {
         id: gutterStrip
 
-        x: root.shadowPad + root.cardWidth
+        x: root.shadowPad + root.cardWidth - Math.max(Theme.scrollThumbStrip, root.contentOuterPad + root.contentInset)
         y: root.shadowPad
         width: Theme.scrollThumbStrip
         height: root.cardHeight
-
-        MouseArea {
-          anchors.fill: parent
-          enabled: root.gutterActive
-          onWheel: event => {
-            if (root.scrollDriver) {
-              root.scrollDriver.wheel(event)
-            }
-            event.accepted = true
-          }
-        }
 
         ScrollGutter {
           track: scrollerScroll
