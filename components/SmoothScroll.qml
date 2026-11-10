@@ -13,8 +13,6 @@ Item {
   property real vel: 0
   property int glideDir: 0
   property real lastWheelMs: 0
-  property bool chainRebound: false
-  property real reboundTo: 0
   property bool dragActive: false
   property int dragIndex: -1
   property real jumpFraction: 0
@@ -36,27 +34,50 @@ Item {
   }
 
   function overClamp(raw) {
+    if (root.listTarget && raw < 0) {
+      return 0
+    }
     const depth = Math.min(Theme.scrollOvershootCap, Math.abs(root.vel) * Theme.scrollOvershootVelMs)
     return Math.max(-depth, Math.min(root.maxScroll + depth, raw))
   }
 
-  function armRebound(pos) {
-    if (pos < 0 || pos > root.maxScroll) {
-      root.reboundTo = pos < 0 ? 0 : root.maxScroll
-      root.chainRebound = true
-    }
+  function stepRunning() {
+    return stepAnim.running
   }
 
   function startRebound(pos) {
-    reboundAnim.to = pos < 0 ? 0 : root.maxScroll
+    reboundAnim.to = Math.max(0, Math.min(root.maxScroll, pos))
     reboundAnim.restart()
   }
 
   function chainStopped() {
-    if (root.chainRebound) {
-      root.chainRebound = false
-      startRebound(root.reboundTo)
+    healBounds()
+  }
+
+  function healBounds() {
+    const t = root.target
+    if (!t || root.dragActive) {
+      return
     }
+    if (t.contentY < 0 || t.contentY > root.maxScroll) {
+      if (!stepAnim.running && !glideAnim.running && !jumpAnim.running && !reboundAnim.running && !jumpFracAnim.running) {
+        startRebound(t.contentY)
+      }
+      return
+    }
+    if (!reboundAnim.running && t.positionViewAtIndex !== undefined && (t.contentY <= 0 || t.contentY >= root.maxScroll)) {
+      t.forceLayout()
+      const first = t.contentY <= 0 ? t.itemAtIndex(0) : null
+      if (first && Math.abs(first.y) > 1 && t.resetLayout !== undefined) {
+        t.resetLayout()
+      }
+    }
+  }
+
+  function isNotchEvent(event) {
+    const a = event.angleDelta.y
+    const p = event.pixelDelta.y
+    return event.phase === 0 && a !== 0 && a % 120 === 0 && Math.abs(p) * 8 === Math.abs(a)
   }
 
   function wheel(event) {
@@ -64,9 +85,12 @@ Item {
     if (!t || root.maxScroll <= 0) {
       return
     }
+    if (isNotchEvent(event)) {
+      root.notch(event.angleDelta.y)
+      return
+    }
     if (event.pixelDelta.y !== 0) {
       root.pendingPx = 0
-      root.chainRebound = false
       reboundAnim.stop()
       stepAnim.stop()
       glideAnim.stop()
@@ -116,12 +140,10 @@ Item {
     if (Math.abs(want - base) < 1) {
       return
     }
-    root.chainRebound = false
     reboundAnim.stop()
     glideAnim.stop()
     stepAnim.stop()
     root.animTarget = want
-    root.armRebound(want)
     glideAnim.to = want
     glideAnim.restart()
   }
@@ -145,20 +167,15 @@ Item {
     const want = root.overClamp(base + root.pendingPx)
     root.pendingPx = 0
     if (want === base) {
-      if (base < 0 || base > root.maxScroll) {
-        root.armRebound(base)
-        if (!stepAnim.running && !glideAnim.running) {
-          root.startRebound(base)
-        }
+      if ((base < 0 || base > root.maxScroll) && !stepAnim.running && !glideAnim.running) {
+        root.startRebound(base)
       }
       return
     }
-    root.chainRebound = false
     reboundAnim.stop()
     glideAnim.stop()
     stepAnim.stop()
     root.animTarget = want
-    root.armRebound(want)
     stepAnim.to = want
     stepAnim.restart()
   }
@@ -167,7 +184,6 @@ Item {
     root.pendingPx = 0
     root.vel = 0
     root.lastWheelMs = 0
-    root.chainRebound = false
     root.jumpArmed = false
     glideArm.stop()
     glideAnim.stop()
@@ -187,6 +203,10 @@ Item {
   function updateListFraction() {
     const t = root.target
     if (!t || t.positionViewAtIndex === undefined || t.count <= 1) {
+      return
+    }
+    if (t.contentY <= 0) {
+      root.listFraction = 0
       return
     }
     const last = t.itemAtIndex(t.count - 1)
@@ -218,7 +238,7 @@ Item {
       root.dragIndex = -1
       const last = t.itemAtIndex(t.count - 1)
       if (last) {
-        t.contentY = Math.max(0, last.y + last.height - t.height)
+        t.contentY = Math.max(0, Math.min(root.maxScroll, last.y + last.height - t.height))
         return
       }
       t.positionViewAtIndex(t.count - 1, ListView.Visible)
@@ -284,6 +304,7 @@ Item {
 
     function onContentHeightChanged() {
       root.updateListFraction()
+      root.healBounds()
     }
   }
 
@@ -340,7 +361,7 @@ Item {
       }
       const last = t.itemAtIndex(t.count - 1)
       if (last) {
-        t.contentY = Math.max(0, last.y + last.height - t.height)
+        t.contentY = Math.max(0, Math.min(root.maxScroll, last.y + last.height - t.height))
       }
     }
   }

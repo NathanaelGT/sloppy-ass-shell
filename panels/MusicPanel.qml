@@ -152,6 +152,16 @@ PanelBase {
       maxScrollY: Math.round(Math.max(0, queueList.contentHeight - queueList.height)),
       viewportY: Math.round(queueList.mapToItem(null, 0, 0).y),
       viewportHeight: Math.round(queueList.height),
+      ss: {
+        maxScroll: Math.round(queueScroll.maxScroll),
+        pendingPx: queueScroll.pendingPx,
+        vel: queueScroll.vel,
+        animTarget: queueScroll.animTarget,
+        stepRunning: queueScroll.stepRunning(),
+        thumbY: queueScroll.thumbY,
+        hint: queueScroll.hintOpacity,
+        target: queueScroll.target === queueList
+      },
       rows: rows
     }
   }

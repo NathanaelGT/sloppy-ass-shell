@@ -12,6 +12,10 @@ Item {
 
   width: Theme.scrollThumbStrip
 
+  function hitEnabled() {
+    return hit.enabled
+  }
+
   function contentFraction(y) {
     const t = root.track
     if (!t || !t.target || t.thumbTravel <= 0) {

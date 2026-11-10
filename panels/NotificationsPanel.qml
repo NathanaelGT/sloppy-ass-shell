@@ -21,6 +21,8 @@ PanelBase {
   stemX: Panels.clusterRight(root.screenId) - Panels.clusterWidth(root.screenId)
   scrollDriver: notifScroll
   gutterData: ScrollGutter {
+    id: notifGutter
+
     track: notifScroll
 
     y: root.viewportY + listWrap.y - root.scrollY
@@ -29,7 +31,14 @@ PanelBase {
   readonly property int budgetCount: 5
   readonly property real minCardHeight: Math.round(16 * Theme.scale) + Math.round(8 * Theme.scale) + Math.max(cardMetric.implicitHeight, Math.round(16 * Theme.scale)) + Math.round(20 * Theme.scale) + Math.round(8 * Theme.scale)
 
+  property int layoutEpoch: 0
+
+  function resetLayout() {
+    root.layoutEpoch += 1
+  }
+
   readonly property var items: {
+    const epoch = root.layoutEpoch
     const active = Notifs.active && Notifs.active.values ? Notifs.active.values : []
     const history = NotifStore.history
     const out = []
@@ -94,6 +103,7 @@ PanelBase {
   property string scrollAnchorKey: ""
   property int scrollAnchorIndex: -1
   property bool scrollAnchorAtEnd: false
+  property real lastPinMs: 0
 
   function captureScrollAnchor() {
     if (!notificationList.visible || notificationList.count === 0) {
@@ -114,6 +124,7 @@ PanelBase {
       return
     }
     if (root.scrollAnchorAtEnd) {
+      root.lastPinMs = Date.now()
       notifScroll.positionTo(1)
       return
     }
@@ -181,6 +192,20 @@ PanelBase {
     return Qt.formatTime(new Date(ts * 1000), "HH:mm")
   }
 
+  function gutterDebug() {
+    const g = notifGutter.mapToItem(null, 0, 0)
+    return {
+      x: g.x,
+      y: g.y,
+      w: notifGutter.width,
+      h: notifGutter.height,
+      visible: notifGutter.visible,
+      enabled: notifGutter.hitEnabled(),
+      engaged: notifGutter.engaged,
+      maxScroll: notifScroll.maxScroll
+    }
+  }
+
   function testScrollState() {
     let topIndex = -1
     for (let y = 1; y < 48 && topIndex < 0; y += 4) {
@@ -197,6 +222,7 @@ PanelBase {
       thumbY: notifScroll.thumbY,
       thumbHeight: notifScroll.thumbHeight,
       dragIndex: notifScroll.dragIndex,
+      gutter: root.gutterDebug(),
       topIndex: topIndex,
       firstCardY: first ? first.y : null,
       lastEnd: last ? last.y + last.height : null
@@ -273,6 +299,9 @@ PanelBase {
       NotifStore.markSeen()
       notifScroll.snap()
       notificationList.contentY = 0
+      root.scrollAnchorKey = ""
+      root.scrollAnchorIndex = -1
+      root.scrollAnchorAtEnd = false
     }
   }
 
@@ -282,7 +311,9 @@ PanelBase {
     target: notificationList
 
     function onContentYChanged() {
-      root.checkEnd()
+      if (Date.now() - root.lastPinMs > 200) {
+        root.checkEnd()
+      }
       if (notificationList.contentY > 0) {
         root.captureScrollAnchor()
       } else {
