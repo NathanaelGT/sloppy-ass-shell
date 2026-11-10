@@ -57,7 +57,7 @@ Singleton {
         return
       }
     } else if (kind === "dpms") {
-      Quickshell.execDetached(["hyprctl", "dispatch", "dpms off"])
+      Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.dpms({ action = \"off\" })"])
     } else if (kind === "lock") {
       LockState.requestLock()
     } else if (kind === "suspend") {
@@ -77,7 +77,7 @@ Singleton {
     if (kind === "dim") {
       Brightness.revert()
     } else if (kind === "dpms") {
-      Quickshell.execDetached(["hyprctl", "dispatch", "dpms on"])
+      Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.dpms({ action = \"on\" })"])
     }
   }
 
@@ -159,7 +159,7 @@ Singleton {
     id: wakeProc
 
     running: true
-    command: ["bash", "-lc", "exec gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1"]
+    command: ["/usr/bin/gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1", "--object-path", "/org/freedesktop/login1"]
     stdout: SplitParser {
       splitMarker: "\n"
       onRead: message => root.handleWakeLine(message)

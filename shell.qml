@@ -19,6 +19,10 @@ ShellRoot {
 
   Component.onCompleted: Quickshell.watchFiles = false
 
+  QtObject {
+    property bool engineKeepalive: IdleEngine.running
+  }
+
   function workToast(urgency, title, body) {
     Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", urgency, title, body])
   }
