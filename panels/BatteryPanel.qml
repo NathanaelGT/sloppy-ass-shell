@@ -734,17 +734,15 @@ PanelBase {
       g.count = members.length
       g.members = members
     }
-    groups.sort(procCompare)
-    if (groups.length > root.procMax) {
-      groups.length = root.procMax
+    const shown = groups.filter(g => g.skip !== true)
+    shown.sort(procCompare)
+    if (shown.length > root.procMax) {
+      shown.length = root.procMax
     }
     const filtered = terms.length > 0
     const disp = []
-    for (let i = 0; i < groups.length; i++) {
-      const g = groups[i]
-      if (g.skip === true) {
-        continue
-      }
+    for (let i = 0; i < shown.length; i++) {
+      const g = shown[i]
       const expanded = filtered || root.procExpanded[g.leader] === true
       disp.push({
         kind: "group",
@@ -956,6 +954,11 @@ PanelBase {
       px = cardX + inset
     }
     procMenu.openAt(px, py, entries)
+  }
+
+  function testProcFilter(text) {
+    filterInput.text = text
+    return true
   }
 
   function testProcRows() {

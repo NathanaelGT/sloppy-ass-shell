@@ -1853,6 +1853,17 @@ ShellRoot {
       return JSON.stringify(panel.testValidate(parsed, raw))
     }
 
+    function procFilter(text: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testProcFilter(text)
+    }
+
     function procRows(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"

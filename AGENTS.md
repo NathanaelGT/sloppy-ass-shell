@@ -27,7 +27,9 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   chevrons; `wifiForgetAsk`/`wifiForgetCancel` stage and drop the confirm strip. Live ammo:
   `wifiPassSubmit` attempts a real join, `wifiForgetConfirm` really forgets (reconnect by hand
   afterwards) — announce first, like `routeStream`.
-  Battery process list: `test procRows` dumps the rows (kind/key/name/count); `test procMenu <row>`
+  Battery process list: `test procRows` dumps the rows (kind/key/name/count),
+  `test procFilter <text>` sets the process filter through the real input path (idempotent,
+  empty string clears — read back with `procRows`); `test procMenu <row>`
   opens the right-click context menu for a row, `test procMenuState` reads it back,
   `test procMenuInvoke <index>` clicks an entry (dangerous ones arm first and return `armed`,
   the second invoke executes — kills are real), `test procMenuClose` drops it.
