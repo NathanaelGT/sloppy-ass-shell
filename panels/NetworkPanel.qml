@@ -25,6 +25,9 @@ PanelBase {
   property bool connectedExpanded: true
   property bool savedExpanded: true
   property bool availableExpanded: true
+  property var sortStrength: ({})
+
+  readonly property bool interacting: pending !== "" || expanded !== "" || confirmForget !== "" || sharing !== ""
 
   readonly property bool enabled: Networking.wifiEnabled
 
@@ -73,7 +76,7 @@ PanelBase {
         out.push(n)
       }
     }
-    out.sort((a, b) => (b.signalStrength || 0) - (a.signalStrength || 0))
+    out.sort((a, b) => root.sortValue(b) - root.sortValue(a))
     return out
   }
 
@@ -85,7 +88,7 @@ PanelBase {
         out.push(n)
       }
     }
-    out.sort((a, b) => (b.signalStrength || 0) - (a.signalStrength || 0))
+    out.sort((a, b) => root.sortValue(b) - root.sortValue(a))
     return out
   }
 
@@ -97,12 +100,14 @@ PanelBase {
         section: "connected",
         text: "Connected"
       })
-      out.push({
-        kind: "connected",
-        section: "connected",
-        itemKey: connectedNetwork.name,
-        active: !!connectedNetwork.connected
-      })
+      if (root.connectedExpanded) {
+        out.push({
+          kind: "connected",
+          section: "connected",
+          itemKey: connectedNetwork.name,
+          active: !!connectedNetwork.connected
+        })
+      }
     }
     if (savedNetworks.length > 0) {
       out.push({
@@ -110,13 +115,15 @@ PanelBase {
         section: "saved",
         text: "Saved"
       })
-      for (let i = 0; i < savedNetworks.length; i++) {
-        out.push({
-          kind: "net",
-          section: "saved",
-          itemKey: savedNetworks[i].name,
-          active: !!savedNetworks[i].connected
-        })
+      if (root.savedExpanded) {
+        for (let i = 0; i < savedNetworks.length; i++) {
+          out.push({
+            kind: "net",
+            section: "saved",
+            itemKey: savedNetworks[i].name,
+            active: !!savedNetworks[i].connected
+          })
+        }
       }
     }
     if (availableNetworks.length > 0) {
@@ -125,16 +132,24 @@ PanelBase {
         section: "available",
         text: "Available"
       })
-      for (let i = 0; i < availableNetworks.length; i++) {
-        out.push({
-          kind: "net",
-          section: "available",
-          itemKey: availableNetworks[i].name,
-          active: !!availableNetworks[i].connected
-        })
+      if (root.availableExpanded) {
+        for (let i = 0; i < availableNetworks.length; i++) {
+          out.push({
+            kind: "net",
+            section: "available",
+            itemKey: availableNetworks[i].name,
+            active: !!availableNetworks[i].connected
+          })
+        }
       }
     }
     return out
+  }
+
+  onAllNetworksChanged: root.rebuildSortStrength()
+
+  onInteractingChanged: if (!root.interacting) {
+    root.rebuildSortStrength()
   }
 
   onEnabledChanged: {
@@ -150,6 +165,22 @@ PanelBase {
     }
   }
 
+  function sortValue(network) {
+    const s = root.sortStrength[network.name]
+    return s === undefined ? (network.signalStrength || 0) : s
+  }
+
+  function rebuildSortStrength() {
+    if (root.interacting) {
+      return
+    }
+    const next = {}
+    for (let i = 0; i < allNetworks.length; i++) {
+      next[allNetworks[i].name] = allNetworks[i].signalStrength || 0
+    }
+    root.sortStrength = next
+  }
+
   function toggleSection(section) {
     if (section === "connected") {
       root.connectedExpanded = !root.connectedExpanded
@@ -159,6 +190,9 @@ PanelBase {
       root.availableExpanded = !root.availableExpanded
     }
     root.sharing = ""
+    if (root.pending !== "" || root.confirmForget !== "") {
+      root.focusKeyCatcher()
+    }
   }
 
   function signalPct(network) {
@@ -365,6 +399,17 @@ PanelBase {
     onExited: {
       root.scanning = false
       root.lastRefresh = Date.now()
+      root.rebuildSortStrength()
+    }
+  }
+
+  Connections {
+    target: root
+
+    function onOpenChanged() {
+      if (!root.open && root.device) {
+        root.device.scannerEnabled = false
+      }
     }
   }
 
@@ -639,6 +684,7 @@ PanelBase {
       root.device.scannerEnabled = true
     }
     root.maybeRescan()
+    root.rebuildSortStrength()
     pending = ""
     confirmForget = ""
     expanded = ""
@@ -736,6 +782,33 @@ PanelBase {
       }
       readonly property int actionsHeight: entry.qrExpanded ? entry.qrSize + Math.round(24 * Theme.scale) : Math.round(34 * Theme.scale)
       readonly property int extraHeight: (entry.pwOpen || entry.confirmOpen) ? Math.round(34 * Theme.scale) : (entry.actionsOpen ? entry.actionsHeight : 0)
+
+      function revealRow() {
+        root.ensureVisible(list.y + entry.y, Math.round(44 * Theme.scale) + entry.extraHeight)
+      }
+
+      onPwOpenChanged: if (entry.pwOpen) {
+        Qt.callLater(entry.revealRow)
+        revealTimer.restart()
+      }
+
+      onConfirmOpenChanged: if (entry.confirmOpen) {
+        Qt.callLater(entry.revealRow)
+        revealTimer.restart()
+      }
+
+      onActionsOpenChanged: if (entry.actionsOpen) {
+        Qt.callLater(entry.revealRow)
+        revealTimer.restart()
+      }
+
+      Timer {
+        id: revealTimer
+
+        interval: 240
+        onTriggered: entry.revealRow()
+      }
+
       readonly property color cardColor: entry.qrOpen ? Theme.qrSurface : (entry.highlighted ? Theme.surfaceHigh : Theme.surface)
       readonly property color hoverSurface: entry.qrOpen ? Theme.qrHover : Theme.surfaceHigher
       readonly property color strongText: entry.qrOpen ? Theme.crust : (entry.isConnected ? Theme.primary : Theme.text)
