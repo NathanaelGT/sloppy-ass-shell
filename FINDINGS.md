@@ -333,6 +333,14 @@ or a decision worth knowing. LOW: cosmetic, edge case, or note.
   device) through a 150 ms timer into a single `audio-priority.json` write — without it, concurrent
   `printf` writers interleaved and the file came back as concatenated JSON fragments. Same
   `bash -lc` write pattern as `Pins`/`Aliases` (S1).
+- **S6 — `HyprlandToplevel.lastIpcObject` is empty for windows opened after startup. LOW, QUIRK
+  (workaround in place).** Quickshell fills `lastIpcObject` only in `refreshToplevels()` (startup and
+  `configreloaded`); the `openwindow` path uses `updateInitial()` and stores only address, title and
+  workspace, so `lastIpcObject.pid`/`class` are unavailable for later windows. Map PIDs to classes
+  from the shell's live `hyprctl clients -j` snapshot instead (`services/Hypr.qml:90-136`,
+  `clientsText`); `panels/BatteryPanel.qml:673-746` names app groups from the toplevel class this way
+  (T3 Code's AppImage group was previously labelled after its largest child, the embedded
+  `opencode serve`). Treat any future toplevel metadata the same way.
 
 ## 7. Notification Banner rework
 

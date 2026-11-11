@@ -623,7 +623,13 @@ PanelBase {
     }
     const key = procNormal(comm)
     const d = AppIcons.describe(key)
-    let source = d && d.icon ? Quickshell.iconPath(d.icon, "") : ""
+    const icon = d && d.icon ? String(d.icon) : ""
+    let source = ""
+    if (icon.charAt(0) === "/") {
+      source = "file://" + icon
+    } else if (icon.length > 0) {
+      source = Quickshell.iconPath(icon, "")
+    }
     if (source === "" && d) {
       source = Quickshell.iconPath(key, "")
     }
@@ -664,8 +670,40 @@ PanelBase {
     return procNameMatches(hay, terms)
   }
 
+  function procToplevelClasses() {
+    const classes = {}
+    let clients = []
+    try {
+      clients = JSON.parse(Hypr.clientsText)
+    } catch (e) {
+      return classes
+    }
+    for (let i = 0; i < clients.length; i++) {
+      const client = clients[i]
+      if (!client || !client.pid) {
+        continue
+      }
+      const cls = client.class || client.initialClass || ""
+      if (cls.length > 0) {
+        classes[client.pid] = cls
+      }
+    }
+    return classes
+  }
+
+  function procTopClass(procs, classes) {
+    for (let i = 0; i < procs.length; i++) {
+      const cls = classes[procs[i].pid]
+      if (cls !== undefined) {
+        return cls
+      }
+    }
+    return ""
+  }
+
   function buildProcDisplay() {
     const raw = root.procRaw
+    const topClasses = procToplevelClasses()
     const byPid = {}
     for (let i = 0; i < raw.length; i++) {
       byPid[raw[i].pid] = raw[i]
@@ -705,7 +743,7 @@ PanelBase {
           dispProc = best
         }
       }
-      const meta = procMeta(dispProc.name)
+      const meta = procMeta(procTopClass(g.procs, topClasses) || dispProc.name)
       const game = root.procGames[g.leader]
       g.disp = game !== undefined && game.name.length > 0 ? game.name : meta.name
       g.icon = game !== undefined && game.icon.length > 0 ? game.icon : meta.source
