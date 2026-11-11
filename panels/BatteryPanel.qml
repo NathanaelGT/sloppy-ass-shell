@@ -99,7 +99,6 @@ PanelBase {
     }
   ]
   readonly property var procTarget: buildProcDisplay()
-  animateCardHeight: true
 
   function rowToModel(r) {
     return {
@@ -162,6 +161,16 @@ PanelBase {
   }
 
   onProcTargetChanged: root.syncProcModel()
+
+  function syncBodyHeight() {
+    bodyAnim.stop()
+    if (procBody.bodyHeight <= 0 || root.procRaw.length === 0) {
+      procBody.bodyHeight = procBody.targetHeight
+      return
+    }
+    bodyAnim.to = procBody.targetHeight
+    bodyAnim.start()
+  }
 
   readonly property int animMs: 500
   property bool primed: false
@@ -2112,144 +2121,175 @@ PanelBase {
           }
         }
 
-        ListView {
-          id: procList
+        Item {
+          id: procBody
+
+          readonly property real emptyHeight: Math.round(76 * Theme.scale) + Theme.gap
+          readonly property bool empty: root.procRaw.length !== 0 && procModel.count === 0
+          readonly property real targetHeight: empty ? emptyHeight : procList.contentHeight
+          property real bodyHeight: 0
 
           width: parent.width
-          height: contentHeight
-          interactive: false
-          spacing: Math.round(3 * Theme.scale)
-          visible: root.procRaw.length !== 0
-          model: procModel
+          height: bodyHeight
 
-          delegate: Item {
-            id: rowWrap
+          onTargetHeightChanged: root.syncBodyHeight()
 
-            required property int index
-            required property string kind
-            required property int key
-            required property string name
-            required property string icon
-            required property string letter
-            required property color accent
-            required property int count
-            required property bool expanded
-            required property real cpu
-            required property real mem
-            required property real disk
-            required property real net
-            required property real dgpu
-            required property real dvram
-            required property real igpu
-            required property real ivram
+          NumberAnimation {
+            id: bodyAnim
 
-            readonly property var rowData: ({
-                kind: kind,
-                key: key,
-                name: name,
-                icon: icon,
-                letter: letter,
-                accent: accent,
-                count: count,
-                expanded: expanded,
-                cpu: cpu,
-                mem: mem,
-                disk: disk,
-                net: net,
-                dgpu: dgpu,
-                dvram: dvram,
-                igpu: igpu,
-                ivram: ivram
-              })
+            target: procBody
+            property: "bodyHeight"
+            duration: 220
+            easing.type: Easing.OutCubic
+          }
 
-            width: procList.width
-            height: Math.round(22 * Theme.scale)
+          ListView {
+            id: procList
 
-            Rectangle {
-              anchors.fill: parent
-              anchors.leftMargin: -(Theme.gap + root.contentPad)
-              anchors.rightMargin: -(Theme.gap + root.contentPad)
-              color: Theme.surfaceHigh
-              opacity: rowHover.hovered ? 0.55 : rowWrap.index % 2 === 1 ? 0.16 : 0
-              Behavior on opacity {
-                NumberAnimation {
-                  duration: 120
+            width: parent.width
+            height: contentHeight
+            interactive: false
+            spacing: Math.round(3 * Theme.scale)
+            visible: root.procRaw.length !== 0
+            model: procModel
+
+            delegate: Item {
+              id: rowWrap
+
+              required property int index
+              required property string kind
+              required property int key
+              required property string name
+              required property string icon
+              required property string letter
+              required property color accent
+              required property int count
+              required property bool expanded
+              required property real cpu
+              required property real mem
+              required property real disk
+              required property real net
+              required property real dgpu
+              required property real dvram
+              required property real igpu
+              required property real ivram
+
+              readonly property var rowData: ({
+                  kind: kind,
+                  key: key,
+                  name: name,
+                  icon: icon,
+                  letter: letter,
+                  accent: accent,
+                  count: count,
+                  expanded: expanded,
+                  cpu: cpu,
+                  mem: mem,
+                  disk: disk,
+                  net: net,
+                  dgpu: dgpu,
+                  dvram: dvram,
+                  igpu: igpu,
+                  ivram: ivram
+                })
+
+              width: procList.width
+              height: Math.round(22 * Theme.scale)
+
+              Rectangle {
+                anchors.fill: parent
+                anchors.leftMargin: -(Theme.gap + root.contentPad)
+                anchors.rightMargin: -(Theme.gap + root.contentPad)
+                color: Theme.surfaceHigh
+                opacity: rowHover.hovered ? 0.55 : rowWrap.index % 2 === 1 ? 0.16 : 0
+                Behavior on opacity {
+                  NumberAnimation {
+                    duration: 120
+                  }
                 }
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.RightButton
+                cursorShape: Qt.ArrowCursor
+                onClicked: mouse => {
+                  if (mouse.button === Qt.RightButton) {
+                    const p = rowWrap.mapToItem(null, mouse.x, mouse.y)
+                    root.procMenuOpen(rowWrap.rowData, p.x, p.y)
+                  }
+                }
+              }
+
+              ProcRow {
+                width: parent.width
+                height: parent.height
+                item: rowWrap.rowData
+              }
+
+              HoverHandler {
+                id: rowHover
               }
             }
 
-            MouseArea {
-              anchors.fill: parent
-              acceptedButtons: Qt.RightButton
-              cursorShape: Qt.ArrowCursor
-              onClicked: mouse => {
-                if (mouse.button === Qt.RightButton) {
-                  const p = rowWrap.mapToItem(null, mouse.x, mouse.y)
-                  root.procMenuOpen(rowWrap.rowData, p.x, p.y)
-                }
+            add: Transition {
+              NumberAnimation {
+                property: "opacity"
+                from: 0
+                to: 1
+                duration: 150
+                easing.type: Easing.OutCubic
               }
             }
 
-            ProcRow {
-              width: parent.width
-              height: parent.height
-              item: rowWrap.rowData
+            addDisplaced: Transition {
+              NumberAnimation {
+                property: "y"
+                duration: 150
+                easing.type: Easing.OutCubic
+              }
             }
 
-            HoverHandler {
-              id: rowHover
+            remove: Transition {
+              NumberAnimation {
+                property: "opacity"
+                to: 0
+                duration: 150
+                easing.type: Easing.OutCubic
+              }
+            }
+
+            removeDisplaced: Transition {
+              NumberAnimation {
+                property: "y"
+                duration: 150
+                easing.type: Easing.OutCubic
+              }
+            }
+
+            move: Transition {
+              NumberAnimation {
+                property: "y"
+                duration: 150
+                easing.type: Easing.OutCubic
+              }
+            }
+
+            moveDisplaced: Transition {
+              NumberAnimation {
+                property: "y"
+                duration: 150
+                easing.type: Easing.OutCubic
+              }
             }
           }
 
-          add: Transition {
-            NumberAnimation {
-              property: "opacity"
-              from: 0
-              to: 1
-              duration: 150
-              easing.type: Easing.OutCubic
-            }
-          }
-
-          addDisplaced: Transition {
-            NumberAnimation {
-              property: "y"
-              duration: 150
-              easing.type: Easing.OutCubic
-            }
-          }
-
-          remove: Transition {
-            NumberAnimation {
-              property: "opacity"
-              to: 0
-              duration: 150
-              easing.type: Easing.OutCubic
-            }
-          }
-
-          removeDisplaced: Transition {
-            NumberAnimation {
-              property: "y"
-              duration: 150
-              easing.type: Easing.OutCubic
-            }
-          }
-
-          move: Transition {
-            NumberAnimation {
-              property: "y"
-              duration: 150
-              easing.type: Easing.OutCubic
-            }
-          }
-
-          moveDisplaced: Transition {
-            NumberAnimation {
-              property: "y"
-              duration: 150
-              easing.type: Easing.OutCubic
-            }
+          PlaceholderCard {
+            shown: procBody.empty
+            bodyHeight: procBody.height
+            animateHeight: false
+            icon: "search"
+            text: "No matching processes"
           }
         }
       }
