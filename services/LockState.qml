@@ -18,14 +18,11 @@ Singleton {
   property string fieldText: ""
   property var previewScreen: null
   property var lockScreens: []
-  property int lastTriggerSeq: 0
-  property bool triggerArmed: false
 
   readonly property int blurLockSize: 12
   readonly property int blurLockPasses: 3
   readonly property int blurRestSize: 3
   readonly property int blurRestPasses: 1
-  readonly property string triggerPath: Quickshell.stateDir + "/../../lock-trigger"
 
   function applyBlur() {
     Quickshell.execDetached(["hyprctl", "eval", "hl.config({ decoration = { blur = { size = " + root.blurLockSize + ", passes = " + root.blurLockPasses + " } } })"])
@@ -220,27 +217,6 @@ Singleton {
     })
   }
 
-  function handleTrigger() {
-    const parts = triggerView.text().trim().split(" ")
-    if (parts[0] !== "lock" && parts[0] !== "suspend") {
-      return
-    }
-    const seq = parseInt(parts[1])
-    if (isNaN(seq) || seq <= root.lastTriggerSeq) {
-      return
-    }
-    root.lastTriggerSeq = seq
-    if (!root.triggerArmed) {
-      root.triggerArmed = true
-      return
-    }
-    if (parts[0] === "lock") {
-      root.requestLock()
-    } else {
-      root.lockAndSuspend()
-    }
-  }
-
   onSessionLockedChanged: {
     Notifs.locked = root.sessionLocked
     if (root.sessionLocked) {
@@ -250,7 +226,6 @@ Singleton {
 
   Component.onCompleted: {
     Quickshell.execDetached(["bash", "-lc", "loginctl show-session self -p LockedHint | grep -q yes && busctl call --system org.freedesktop.login1 /org/freedesktop/login1/session/self org.freedesktop.login1.Session SetLockedHint b false || true"])
-    Quickshell.execDetached(["touch", root.triggerPath])
   }
 
   Timer {
@@ -282,17 +257,6 @@ Singleton {
       const size = Math.max(0, Math.round(root.blurLockSize * (1 - step / steps)))
       Quickshell.execDetached(["hyprctl", "eval", "hl.config({ decoration = { blur = { size = " + size + " } } })"])
     }
-  }
-
-  FileView {
-    id: triggerView
-
-    path: root.triggerPath
-    watchChanges: true
-
-    onFileChanged: this.reload()
-
-    onLoaded: root.handleTrigger()
   }
 
   PamContext {
