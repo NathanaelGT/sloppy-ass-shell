@@ -21,6 +21,7 @@ PanelWindow {
   property int maxCardHeight: (modelData ? modelData.height : 0) - Theme.barThickness - Math.round(40 * Theme.scale)
   property bool externalRequested: false
   property bool exclusiveFocus: false
+  property bool exclusiveKeyboard: false
   property bool ownerFocused: false
   property bool dismissOnBackdrop: true
   property bool autoFocusKeyCatcher: true
@@ -100,7 +101,7 @@ PanelWindow {
   }
 
   WlrLayershell.layer: exclusiveFocus || topDocked ? WlrLayer.Overlay : WlrLayer.Top
-  WlrLayershell.keyboardFocus: root.exclusiveFocus && root.ownerFocused ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
+  WlrLayershell.keyboardFocus: (root.exclusiveFocus || root.exclusiveKeyboard) && root.ownerFocused ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
 
   readonly property int shadowPad: Theme.shadowPad
   readonly property int contentPad: Math.round(14 * Theme.scale)

@@ -10,6 +10,7 @@ PanelBase {
 
   panelName: "battery"
   cardWidth: Theme.panelWidth * 2
+  exclusiveKeyboard: true
   popupOpen: procMenu.opened
 
   property real cpuUsage: 0
