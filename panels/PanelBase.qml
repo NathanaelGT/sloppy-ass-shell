@@ -173,6 +173,10 @@ PanelWindow {
     scroller.contentY = 0
   }
 
+  function focusKeyCatcher() {
+    keyCatcher.forceActiveFocus()
+  }
+
   function hitCancelTarget(lx, ly) {
     const target = root.cancelItem
     if (!target) {

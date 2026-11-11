@@ -994,9 +994,42 @@ PanelBase {
     procMenu.openAt(px, py, entries)
   }
 
+  function focusProcFilter() {
+    filterInput.forceActiveFocus()
+    filterInput.cursorPosition = filterInput.text.length
+  }
+
+  function releaseProcFilter() {
+    filterInput.focus = false
+    root.focusKeyCatcher()
+  }
+
   function testProcFilter(text) {
     filterInput.text = text
+    filterInput.cursorPosition = 0
     return true
+  }
+
+  function testProcSlash() {
+    root.keyPressed({
+      key: Qt.Key_Slash,
+      accepted: false
+    })
+    return filterInput.activeFocus
+  }
+
+  function testProcEscape() {
+    root.releaseProcFilter()
+    return !filterInput.activeFocus
+  }
+
+  function testProcFilterState() {
+    return {
+      focus: filterInput.activeFocus,
+      keys: filterInput.Window.window.activeFocusItem !== null,
+      text: filterInput.text,
+      cursor: filterInput.cursorPosition
+    }
   }
 
   function testProcRows() {
@@ -1548,7 +1581,14 @@ PanelBase {
   onContentClicked: pos => {
     const b = procFilterBox.mapToItem(null, 0, 0)
     if (pos.x < b.x || pos.y < b.y || pos.x > b.x + procFilterBox.width || pos.y > b.y + procFilterBox.height) {
-      filterInput.focus = false
+      root.releaseProcFilter()
+    }
+  }
+
+  onKeyPressed: event => {
+    if (event.key === Qt.Key_Slash) {
+      root.focusProcFilter()
+      event.accepted = true
     }
   }
 
@@ -1992,10 +2032,7 @@ PanelBase {
         clip: true
         verticalAlignment: TextInput.AlignVCenter
         onTextChanged: root.procFilter = text
-        Keys.onEscapePressed: {
-          text = ""
-          focus = false
-        }
+        Keys.onEscapePressed: root.releaseProcFilter()
 
         Text {
           anchors.fill: parent

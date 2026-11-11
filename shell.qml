@@ -1864,6 +1864,41 @@ ShellRoot {
       return panel.testProcFilter(text)
     }
 
+    function procSlash(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testProcSlash()
+    }
+
+    function procEscape(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testProcEscape()
+    }
+
+    function procFilterState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testProcFilterState()
+      state.enabled = true
+      return JSON.stringify(state)
+    }
+
     function procRows(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
