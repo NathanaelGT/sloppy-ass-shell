@@ -5,7 +5,7 @@ t1=$tmp/c
 t4=$tmp/g
 t5=$tmp/w
 
-awk '
+awk -v self="${1:-0}" '
   function rindex(s, t,  i, k) {
     k = 0
     while ((i = index(substr(s, k + 1), t)) > 0) {
@@ -121,6 +121,20 @@ awk '
     }
     return p
   }
+  function own(p,  up, d) {
+    d = 0
+    up = pp[p]
+    while (up > 1 && d++ < 64) {
+      if (up == self) {
+        return 1
+      }
+      if (!(up in pp)) {
+        break
+      }
+      up = pp[up]
+    }
+    return 0
+  }
   function full(p,  orig, c, line, nul, i, n, seg, base) {
     if (length(orig) != 15) {
       return orig
@@ -192,9 +206,15 @@ awk '
   }
   END {
     for (p in nm) {
+      if (self > 0 && own(p)) {
+        continue
+      }
       ld[p] = leader(p + 0)
     }
     for (p in nm) {
+      if (self > 0 && own(p)) {
+        continue
+      }
       l = ld[p]
       if (!mach(nm[l])) {
         continue
@@ -208,6 +228,9 @@ awk '
       }
     }
     for (p in nm) {
+      if (self > 0 && own(p)) {
+        continue
+      }
       l = ld[p]
       if (l in rep) {
         l = rep[l] + 0

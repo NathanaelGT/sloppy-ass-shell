@@ -435,7 +435,7 @@ PanelBase {
     if (procProc.running) {
       return
     }
-    procProc.command = ["bash", Quickshell.shellDir + "/services/procstats.sh"]
+    procProc.command = ["bash", Quickshell.shellDir + "/services/procstats.sh", String(Quickshell.processId)]
     procProc.running = true
   }
 
