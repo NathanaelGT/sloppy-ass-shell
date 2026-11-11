@@ -1911,18 +1911,20 @@ PanelBase {
     }
   }
 
-  SectionHeader {
-    id: procSectionHeader
+  Column {
+    width: root.contentWidth
+    spacing: 0
 
     Rectangle {
       id: procFilterBox
 
+      x: parent.width - width
       width: Math.round(150 * Theme.scale)
       height: Math.round(20 * Theme.scale)
       radius: height / 2
-      color: Theme.surfaceHigh
-      border.width: filterInput.activeFocus ? Math.round(1 * Theme.scale) : 0
-      border.color: Theme.primary
+      bottomLeftRadius: 0
+      bottomRightRadius: 0
+      color: Theme.surface
 
       Icon {
         id: filterIcon
@@ -1970,197 +1972,214 @@ PanelBase {
         cursorShape: Qt.IBeamCursor
         onClicked: filterInput.forceActiveFocus()
       }
-    }
-  }
-
-  Rectangle {
-    id: procCard
-
-    width: root.contentWidth
-    radius: Theme.cardRadius
-    color: Theme.surface
-    antialiasing: true
-    implicitHeight: procCol.implicitHeight + Theme.gap * 2
-
-    Column {
-      id: procCol
-
-      anchors.fill: parent
-      anchors.margins: Theme.gap
-      spacing: Math.round(3 * Theme.scale)
-
-      ProcRow {
-        header: true
-      }
 
       Rectangle {
-        width: parent.width
-        height: 1
-        color: Theme.surfaceHigher
-        opacity: 0.5
+        anchors.fill: parent
+        radius: parent.radius
+        color: "transparent"
+        border.width: Math.round(1 * Theme.scale)
+        border.color: Theme.primary
+        visible: filterInput.activeFocus
       }
+    }
+
+    Rectangle {
+      id: procCard
+
+      width: parent.width
+      radius: Theme.cardRadius
+      topRightRadius: 0
+      color: Theme.surface
+      antialiasing: true
+      implicitHeight: procCol.implicitHeight + Theme.gap * 2
 
       Column {
-        id: procStripes
+        id: procCol
 
-        readonly property real rowH: Math.round(22 * Theme.scale)
-        readonly property real rowGap: Math.round(3 * Theme.scale)
-        readonly property real avail: root.maxCardHeight - (root.contentPad * 2 + Theme.gap * 5 + rowGap * 2 + Math.round(18 * Theme.scale) + 1 + powerHeader.height + statGrid.height + procSectionHeader.height)
-        readonly property int uncappedRows: Math.max(0, Math.floor((avail + rowGap) / (rowH + rowGap)))
-        readonly property int rowCount: Math.max(1, Math.min(root.procMax, uncappedRows))
-        readonly property real rowFill: rowCount * rowH + (rowCount - 1) * rowGap
+        anchors.fill: parent
+        anchors.margins: Theme.gap
+        spacing: Math.round(3 * Theme.scale)
 
-        width: parent.width
-        height: uncappedRows <= root.procMax ? Math.max(avail, rowFill) : rowFill
-        spacing: rowGap
-        visible: root.procRaw.length === 0
+        ProcRow {
+          header: true
+        }
 
-        Repeater {
-          model: procStripes.rowCount
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Theme.surfaceHigher
+          opacity: 0.5
+        }
 
-          delegate: ProcStripeRow {}
+        Column {
+          id: procStripes
+
+          readonly property real rowH: Math.round(22 * Theme.scale)
+          readonly property real rowGap: Math.round(3 * Theme.scale)
+          readonly property real avail: root.maxCardHeight - (root.contentPad * 2 + Theme.gap * 4 + rowGap * 2 + Math.round(18 * Theme.scale) + 1 + powerHeader.height + statGrid.height + procFilterBox.height)
+          readonly property int uncappedRows: Math.max(0, Math.floor((avail + rowGap) / (rowH + rowGap)))
+          readonly property int rowCount: Math.max(1, Math.min(root.procMax, uncappedRows))
+          readonly property real rowFill: rowCount * rowH + (rowCount - 1) * rowGap
+
+          width: parent.width
+          height: uncappedRows <= root.procMax ? Math.max(avail, rowFill) : rowFill
+          spacing: rowGap
+          visible: root.procRaw.length === 0
+
+          Repeater {
+            model: procStripes.rowCount
+
+            delegate: ProcStripeRow {}
+          }
+        }
+
+        ListView {
+          id: procList
+
+          width: parent.width
+          height: contentHeight
+          interactive: false
+          spacing: Math.round(3 * Theme.scale)
+          visible: root.procRaw.length !== 0
+          model: procModel
+
+          delegate: Item {
+            id: rowWrap
+
+            required property int index
+            required property string kind
+            required property int key
+            required property string name
+            required property string icon
+            required property string letter
+            required property color accent
+            required property int count
+            required property bool expanded
+            required property real cpu
+            required property real mem
+            required property real disk
+            required property real net
+            required property real dgpu
+            required property real dvram
+            required property real igpu
+            required property real ivram
+
+            readonly property var rowData: ({
+                kind: kind,
+                key: key,
+                name: name,
+                icon: icon,
+                letter: letter,
+                accent: accent,
+                count: count,
+                expanded: expanded,
+                cpu: cpu,
+                mem: mem,
+                disk: disk,
+                net: net,
+                dgpu: dgpu,
+                dvram: dvram,
+                igpu: igpu,
+                ivram: ivram
+              })
+
+            width: procList.width
+            height: Math.round(22 * Theme.scale)
+
+            Rectangle {
+              anchors.fill: parent
+              anchors.leftMargin: -(Theme.gap + root.contentPad)
+              anchors.rightMargin: -(Theme.gap + root.contentPad)
+              color: Theme.surfaceHigh
+              opacity: rowHover.hovered ? 0.55 : rowWrap.index % 2 === 1 ? 0.16 : 0
+              Behavior on opacity {
+                NumberAnimation {
+                  duration: 120
+                }
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              acceptedButtons: Qt.RightButton
+              cursorShape: Qt.ArrowCursor
+              onClicked: mouse => {
+                if (mouse.button === Qt.RightButton) {
+                  const p = rowWrap.mapToItem(null, mouse.x, mouse.y)
+                  root.procMenuOpen(rowWrap.rowData, p.x, p.y)
+                }
+              }
+            }
+
+            ProcRow {
+              width: parent.width
+              height: parent.height
+              item: rowWrap.rowData
+            }
+
+            HoverHandler {
+              id: rowHover
+            }
+          }
+
+          add: Transition {
+            NumberAnimation {
+              property: "opacity"
+              from: 0
+              to: 1
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          addDisplaced: Transition {
+            NumberAnimation {
+              property: "y"
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          remove: Transition {
+            NumberAnimation {
+              property: "opacity"
+              to: 0
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          removeDisplaced: Transition {
+            NumberAnimation {
+              property: "y"
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          move: Transition {
+            NumberAnimation {
+              property: "y"
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          moveDisplaced: Transition {
+            NumberAnimation {
+              property: "y"
+              duration: 150
+              easing.type: Easing.OutCubic
+            }
+          }
         }
       }
 
-      ListView {
-        id: procList
-
-        width: parent.width
-        height: contentHeight
-        interactive: false
-        spacing: Math.round(3 * Theme.scale)
-        visible: root.procRaw.length !== 0
-        model: procModel
-
-        delegate: Item {
-          id: rowWrap
-
-          required property int index
-          required property string kind
-          required property int key
-          required property string name
-          required property string icon
-          required property string letter
-          required property color accent
-          required property int count
-          required property bool expanded
-          required property real cpu
-          required property real mem
-          required property real disk
-          required property real net
-          required property real dgpu
-          required property real dvram
-          required property real igpu
-          required property real ivram
-
-          readonly property var rowData: ({
-              kind: kind,
-              key: key,
-              name: name,
-              icon: icon,
-              letter: letter,
-              accent: accent,
-              count: count,
-              expanded: expanded,
-              cpu: cpu,
-              mem: mem,
-              disk: disk,
-              net: net,
-              dgpu: dgpu,
-              dvram: dvram,
-              igpu: igpu,
-              ivram: ivram
-            })
-
-          width: procList.width
-          height: Math.round(22 * Theme.scale)
-
-          Rectangle {
-            anchors.fill: parent
-            anchors.leftMargin: -(Theme.gap + root.contentPad)
-            anchors.rightMargin: -(Theme.gap + root.contentPad)
-            color: Theme.surfaceHigh
-            opacity: rowHover.hovered ? 0.55 : rowWrap.index % 2 === 1 ? 0.16 : 0
-            Behavior on opacity {
-              NumberAnimation {
-                duration: 120
-              }
-            }
-          }
-
-          MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.RightButton
-            cursorShape: Qt.ArrowCursor
-            onClicked: mouse => {
-              if (mouse.button === Qt.RightButton) {
-                const p = rowWrap.mapToItem(null, mouse.x, mouse.y)
-                root.procMenuOpen(rowWrap.rowData, p.x, p.y)
-              }
-            }
-          }
-
-          ProcRow {
-            width: parent.width
-            height: parent.height
-            item: rowWrap.rowData
-          }
-
-          HoverHandler {
-            id: rowHover
-          }
-        }
-
-        add: Transition {
-          NumberAnimation {
-            property: "opacity"
-            from: 0
-            to: 1
-            duration: 150
-            easing.type: Easing.OutCubic
-          }
-        }
-
-        addDisplaced: Transition {
-          NumberAnimation {
-            property: "y"
-            duration: 150
-            easing.type: Easing.OutCubic
-          }
-        }
-
-        remove: Transition {
-          NumberAnimation {
-            property: "opacity"
-            to: 0
-            duration: 150
-            easing.type: Easing.OutCubic
-          }
-        }
-
-        removeDisplaced: Transition {
-          NumberAnimation {
-            property: "y"
-            duration: 150
-            easing.type: Easing.OutCubic
-          }
-        }
-
-        move: Transition {
-          NumberAnimation {
-            property: "y"
-            duration: 150
-            easing.type: Easing.OutCubic
-          }
-        }
-
-        moveDisplaced: Transition {
-          NumberAnimation {
-            property: "y"
-            duration: 150
-            easing.type: Easing.OutCubic
-          }
-        }
+      InnerFillet {
+        x: procCard.width - procFilterBox.width - width
+        y: -height
+        radius: procFilterBox.radius
+        color: procFilterBox.color
       }
     }
   }
