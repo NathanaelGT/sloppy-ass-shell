@@ -24,6 +24,7 @@ PanelBase {
   property var picked: null
   property var activeEditor: null
   property bool seeking: false
+  property bool seekDragging: false
   property var seekTarget: null
   property real seekPreview: 0
   property real routeDismissedAt: 0
@@ -105,8 +106,11 @@ PanelBase {
     if (!root.target || !root.target.positionSupported || !root.target.canSeek) {
       return
     }
-    root.target.position = Math.max(0, root.target.position + (delta > 0 ? 1 : -1) * 5)
-    root.localPosition = Math.max(0, root.localPosition + (delta > 0 ? 1 : -1) * 5)
+    const step = (delta > 0 ? 1 : -1) * 5
+    const limit = root.target.length > 0 ? root.target.length : Number.MAX_VALUE
+    const next = Math.max(0, Math.min(limit, root.target.position + step))
+    root.target.position = next
+    root.localPosition = next
   }
 
   function openPopupAt(popup, anchor) {
@@ -174,6 +178,10 @@ PanelBase {
       resetPick()
       syncPosition()
       calendar.returnToToday()
+    } else {
+      root.seekDragging = false
+      root.seeking = false
+      seekCommitTimer.stop()
     }
   }
 
@@ -457,8 +465,14 @@ PanelBase {
               root.previewSeek(mouse.x / seekTrack.width)
             }
           }
-          onPressed: mouse => root.previewSeek(mouse.x / seekTrack.width)
-          onReleased: root.commitSeek()
+          onPressed: mouse => {
+            root.seekDragging = true
+            root.previewSeek(mouse.x / seekTrack.width)
+          }
+          onReleased: {
+            root.seekDragging = false
+            root.commitSeek()
+          }
           onWheel: e => {
             root.wheelSeek(e.angleDelta.y)
             e.accepted = true
@@ -714,7 +728,11 @@ PanelBase {
     id: seekCommitTimer
 
     interval: 200
-    onTriggered: root.commitSeek()
+    onTriggered: {
+      if (!root.seekDragging) {
+        root.commitSeek()
+      }
+    }
   }
 
   Timer {

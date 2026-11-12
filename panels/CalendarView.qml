@@ -52,6 +52,8 @@ Column {
   }
 
   function step(delta) {
+    slideAnim.stop()
+    prevSlideAnim.stop()
     root.previousCursor = root.cursor
     root.previousWeeks = root.weeks
     root.cursor = new Date(root.cursor.getFullYear(), root.cursor.getMonth() + delta, 1)
