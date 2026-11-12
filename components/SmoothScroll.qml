@@ -85,6 +85,9 @@ Item {
     if (!t || root.maxScroll <= 0) {
       return
     }
+    root.jumpArmed = false
+    jumpFracAnim.stop()
+    endSeek.stop()
     if (isNotchEvent(event)) {
       root.notch(event.angleDelta.y)
       return
@@ -191,6 +194,7 @@ Item {
     jumpAnim.stop()
     jumpFracAnim.stop()
     reboundAnim.stop()
+    endSeek.stop()
   }
 
   function currentFraction() {

@@ -316,7 +316,10 @@ PanelWindow {
       }
       root.opened()
     } else if (root.scrollDriver) {
+      root.scrollDriver.snap()
       root.scrollDriver.dragActive = false
+      root.scrollDriver.hintOpacity = 0
+      root.scrollDriver.lastFraction = 0
     }
   }
 
@@ -346,7 +349,7 @@ PanelWindow {
       Panels.close()
     }
     onWheel: event => {
-      if (root.scrollDriver) {
+      if (root.open && !root.popupOpen && root.scrollDriver) {
         root.scrollDriver.wheel(event)
       }
       event.accepted = true
@@ -461,7 +464,7 @@ PanelWindow {
         MouseArea {
           anchors.fill: parent
           onWheel: event => {
-            if (root.scrollDriver) {
+            if (root.open && !root.popupOpen && root.scrollDriver) {
               root.scrollDriver.wheel(event)
             }
             event.accepted = true
