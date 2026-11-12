@@ -100,6 +100,7 @@ PanelBase {
   property var providerSessions: ({})
   property var providerProcs: ({})
   property var providerStaleRuns: ({})
+  property string providerWatchdogKey: ""
 
   readonly property bool providerLocal: root.currentProvider !== null && root.currentProvider.local === true
   readonly property var providerSession: root.providerLocal ? root.localSession() : root.sessionFor(root.activeProviderKey)
@@ -1194,11 +1195,14 @@ PanelBase {
     chips[key] = chip
     root.chipRegistry = chips
     if (root.focusTarget === key) {
+      root.activeChip = chip
       chip.activateEditor()
+      Qt.callLater(root.positionDropdown)
     }
   }
 
   function unregisterChip(key) {
+    const removed = root.chipRegistry[key]
     const chips = {}
     const keys = Object.keys(root.chipRegistry)
     for (let i = 0; i < keys.length; i++) {
@@ -1207,6 +1211,9 @@ PanelBase {
       }
     }
     root.chipRegistry = chips
+    if (removed && root.activeChip === removed) {
+      root.activeChip = null
+    }
   }
 
   function focusParam(key) {
@@ -1539,6 +1546,7 @@ PanelBase {
       results: []
     })
     const proc = root.providerProc(key)
+    root.armProviderWatchdog(key)
     if (!proc) {
       return false
     }
@@ -1555,6 +1563,7 @@ PanelBase {
     if (root.procStale(key)) {
       return
     }
+    root.disarmProviderWatchdog(key)
     const session = root.sessionFor(key)
     if (!session.loading) {
       return
@@ -1576,18 +1585,16 @@ PanelBase {
       root.markProcStale(key, false)
       return
     }
-    const session = root.sessionFor(key)
-    if (!session.loading) {
+    root.disarmProviderWatchdog(key)
+    if (code === 0) {
       return
     }
-    if (code !== 0) {
-      const provider = root.providerForKey(key)
-      root.updateSession(key, {
-        loading: false,
-        error: provider ? provider.errorText : "",
-        results: []
-      })
-    }
+    const provider = root.providerForKey(key)
+    root.updateSession(key, {
+      loading: false,
+      error: provider ? provider.errorText : "",
+      results: []
+    })
   }
 
   function testProviderMock(key, payload) {
@@ -1607,6 +1614,7 @@ PanelBase {
       root.markProcStale(key, true)
       proc.running = false
     }
+    root.disarmProviderWatchdog(key)
     root.updateSession(key, {
       searchedTerm: root.providerTerm,
       searchedValues: root.providerValuesKey,
@@ -1660,6 +1668,36 @@ PanelBase {
       delete next[k]
     }
     root.providerStaleRuns = next
+  }
+
+  function armProviderWatchdog(key) {
+    root.providerWatchdogKey = String(key)
+    providerWatchdog.restart()
+  }
+
+  function disarmProviderWatchdog(key) {
+    if (root.providerWatchdogKey === String(key)) {
+      root.providerWatchdogKey = ""
+      providerWatchdog.stop()
+    }
+  }
+
+  function providerWatchdogFired() {
+    const key = root.providerWatchdogKey
+    root.providerWatchdogKey = ""
+    if (key.length === 0) {
+      return
+    }
+    const session = root.sessionFor(key)
+    if (!session.loading) {
+      return
+    }
+    const provider = root.providerForKey(key)
+    root.updateSession(key, {
+      loading: false,
+      error: provider ? provider.errorText : "",
+      results: []
+    })
   }
 
   function kittyArgv(command) {
@@ -2104,6 +2142,14 @@ PanelBase {
 
     interval: 160
     onTriggered: root.finishXfade()
+  }
+
+  Timer {
+    id: providerWatchdog
+
+    interval: 15000
+    singleShot: true
+    onTriggered: root.providerWatchdogFired()
   }
 
   NumberAnimation {
@@ -2651,6 +2697,7 @@ PanelBase {
 
         MouseArea {
           anchors.fill: parent
+          cursorShape: Qt.PointingHandCursor
           onClicked: root.activateIndex(0)
         }
 
@@ -2663,7 +2710,8 @@ PanelBase {
 
       MouseArea {
         anchors.fill: parent
-        visible: morphCard.mode === "provider" && root.providerCard === "search"
+        visible: root.morphCard.mode === "provider" && root.providerCard === "search"
+        cursorShape: Qt.PointingHandCursor
         onClicked: root.runProviderSearch()
       }
     }
@@ -2927,6 +2975,7 @@ PanelBase {
 
           anchors.fill: parent
           hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
           onContainsMouseChanged: if (containsMouse) {
             root.selectedIndex = index
           }

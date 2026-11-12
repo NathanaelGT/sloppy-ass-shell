@@ -14,6 +14,7 @@ Rectangle {
 
   signal activated(int index)
 
+  readonly property int rowSpacing: Math.round(1 * Theme.scale)
   readonly property int codeColumnWidth: root.codeWidth > 0 ? Math.ceil(codeRuler.implicitWidth) : 0
 
   function optionText(item) {
@@ -43,9 +44,9 @@ Rectangle {
     if (index < 0) {
       return
     }
-    const rowHeight = Theme.dropdownRowHeight
-    const top = index * rowHeight
-    const bottom = top + rowHeight
+    const stride = Theme.dropdownRowHeight + root.rowSpacing
+    const top = index * stride
+    const bottom = top + Theme.dropdownRowHeight
     if (top < flick.contentY) {
       flick.contentY = top
     } else if (bottom > flick.contentY + flick.height) {
@@ -87,7 +88,7 @@ Rectangle {
       id: column
 
       width: flick.width
-      spacing: Math.round(1 * Theme.scale)
+      spacing: root.rowSpacing
 
       Repeater {
         model: root.candidates
@@ -144,6 +145,7 @@ Rectangle {
           MouseArea {
             anchors.fill: parent
             hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: root.activated(optionRow.index)
           }
         }
