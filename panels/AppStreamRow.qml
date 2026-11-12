@@ -13,6 +13,7 @@ Column {
   property bool pinVisible: true
   property bool open: false
   property bool active: true
+  property bool waveActive: true
   property real maxVolume: 1.5
 
   signal pinToggled
@@ -136,6 +137,7 @@ Column {
       width: parent.width - Math.round(64 * Theme.scale)
       anchors.verticalCenter: parent.verticalCenter
       node: root.node
+      waveActive: root.waveActive
       value: root.audio ? root.audio.volume / root.maxVolume : 0
       fullMark: 1 / root.maxVolume
       onMoved: v => {

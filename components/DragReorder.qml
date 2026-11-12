@@ -19,6 +19,7 @@ Item {
   property int dragTarget: -1
   property real dragStartY: 0
   property real lastSceneY: 0
+  property real lastContentY: 0
   property real scrollShift: 0
   property real dragDelta: 0
   property bool dragging: false
@@ -40,6 +41,23 @@ Item {
     onTriggered: root.scrollTick()
   }
 
+  Connections {
+    target: root.flickable
+
+    function onContentYChanged() {
+      if (!root.dragging || !root.flickable) {
+        return
+      }
+      const delta = root.flickable.contentY - root.lastContentY
+      root.lastContentY = root.flickable.contentY
+      if (delta === 0) {
+        return
+      }
+      root.scrollShift = root.scrollShift + delta
+      root.update(root.lastSceneY)
+    }
+  }
+
   function scrollTick() {
     if (!root.dragging || !root.flickable) {
       return
@@ -58,18 +76,7 @@ Item {
       return
     }
     const max = Math.max(0, f.contentHeight - f.height)
-    const next = Math.max(0, Math.min(max, f.contentY + speed))
-    const applied = next - f.contentY
-    if (applied === 0) {
-      return
-    }
-    f.contentY = next
-    root.scrollShift = root.scrollShift + applied
-    root.dragDelta = root.dragDelta + applied
-    const target = root.rowIndexAt(root.lastSceneY)
-    if (target >= 0) {
-      root.dragTarget = root.clampTarget(target)
-    }
+    f.contentY = Math.max(0, Math.min(max, f.contentY + speed))
   }
 
   Behavior on dropShift {
@@ -148,6 +155,7 @@ Item {
     root.dragTarget = root.dragFrom
     root.dragStartY = sceneY
     root.lastSceneY = sceneY
+    root.lastContentY = root.flickable ? root.flickable.contentY : 0
     root.scrollShift = 0
     root.dragDelta = 0
     root.dragging = true

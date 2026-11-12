@@ -9,7 +9,9 @@ Item {
   property string kind: "output"
   property var devices: []
   property bool showAll: false
+  property bool waveActive: true
   property real maxVolume: 1.5
+  property var flickable: null
 
   signal setDefault(var node)
   signal togglePin(string name)
@@ -23,6 +25,7 @@ Item {
     model: deviceModel
     keyRole: "key"
     rowObjectName: "deviceRow"
+    flickable: root.flickable
     onMoved: (key, target) => root.reordered(key, target)
   }
 
@@ -443,6 +446,7 @@ Item {
                     width: parent.width - Math.round(64 * Theme.scale)
                     anchors.verticalCenter: parent.verticalCenter
                     node: entry.monitored ? entry.node : null
+                    waveActive: root.waveActive && entry.shown
                     value: entry.audio ? entry.audio.volume / root.maxVolume : 0
                     fullMark: 1 / root.maxVolume
                     onMoved: v => {

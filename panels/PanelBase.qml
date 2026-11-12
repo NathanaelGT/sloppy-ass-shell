@@ -40,6 +40,7 @@ PanelWindow {
   property int contentOuterPad: contentPad
   property bool closePending: false
   property SmoothScroll scrollDriver: scrollerScroll
+  readonly property alias scrollerItem: scroller
   default property alias cardData: bodyColumn.data
   property alias headerData: headerColumn.data
   property alias overlayData: overlayArea.data
@@ -496,27 +497,6 @@ PanelWindow {
           }
         }
 
-        Item {
-          id: headerArea
-
-          anchors.top: contentClip.top
-          anchors.left: contentClip.left
-          anchors.right: contentClip.right
-          anchors.topMargin: root.contentPad
-          anchors.leftMargin: root.contentOuterPad + root.contentInset
-          anchors.rightMargin: root.contentOuterPad + root.contentInset
-          height: root.headerHeight
-          visible: root.headerHeight > 0
-          clip: true
-
-          Column {
-            id: headerColumn
-
-            width: parent.width
-            spacing: Theme.gap
-          }
-        }
-
         Flickable {
           id: scroller
 
@@ -545,6 +525,67 @@ PanelWindow {
             id: bodyColumn
 
             width: scroller.width
+            spacing: Theme.gap
+          }
+        }
+
+        MouseArea {
+          id: topShield
+
+          anchors.left: contentClip.left
+          anchors.right: contentClip.right
+          anchors.top: contentClip.top
+          anchors.bottom: scroller.top
+          visible: !root.popupOpen
+          onPressed: mouse => root.contentClicked(mapToItem(null, mouse.x, mouse.y))
+          onClicked: if (root.dismissOnBackdrop && !root.popupOpen) {
+            Panels.close()
+          }
+          onWheel: event => {
+            if (root.open && !root.popupOpen && root.scrollDriver) {
+              root.scrollDriver.wheel(event)
+            }
+            event.accepted = true
+          }
+        }
+
+        MouseArea {
+          id: bottomShield
+
+          anchors.left: contentClip.left
+          anchors.right: contentClip.right
+          anchors.top: scroller.bottom
+          anchors.bottom: contentClip.bottom
+          visible: !root.popupOpen
+          onPressed: mouse => root.contentClicked(mapToItem(null, mouse.x, mouse.y))
+          onClicked: if (root.dismissOnBackdrop && !root.popupOpen) {
+            Panels.close()
+          }
+          onWheel: event => {
+            if (root.open && !root.popupOpen && root.scrollDriver) {
+              root.scrollDriver.wheel(event)
+            }
+            event.accepted = true
+          }
+        }
+
+        Item {
+          id: headerArea
+
+          anchors.top: contentClip.top
+          anchors.left: contentClip.left
+          anchors.right: contentClip.right
+          anchors.topMargin: root.contentPad
+          anchors.leftMargin: root.contentOuterPad + root.contentInset
+          anchors.rightMargin: root.contentOuterPad + root.contentInset
+          height: root.headerHeight
+          visible: root.headerHeight > 0
+          clip: true
+
+          Column {
+            id: headerColumn
+
+            width: parent.width
             spacing: Theme.gap
           }
         }
@@ -667,9 +708,15 @@ PanelWindow {
     anchors.fill: parent
     focus: root.autoFocusKeyCatcher
     Keys.onPressed: event => {
-      if (event.key === Qt.Key_Escape) {
+      if (event.key === Qt.Key_Escape && !root.popupOpen) {
         Panels.close()
         event.accepted = true
+      } else if (event.key === Qt.Key_Escape && root.popupOpen) {
+        root.keyPressed(event)
+        if (!event.accepted) {
+          Panels.close()
+          event.accepted = true
+        }
       } else {
         root.keyPressed(event)
       }

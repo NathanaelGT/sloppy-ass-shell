@@ -11,6 +11,7 @@ Rectangle {
   property bool expanded: false
   property bool appPinned: false
   property bool sectionVisible: true
+  property bool waveActive: true
   property bool animate: true
   property var routeStream: null
   property var targetFor: null
@@ -559,6 +560,7 @@ Rectangle {
             pinVisible: root.sectionVisible || root.expanded
             open: root.routeStream === rowItem.node
             active: Audio.streamActive(rowItem.node)
+            waveActive: root.waveActive && rowItem.shown
             maxVolume: root.maxVolume
             onPinToggled: root.pinToggled(rowItem.rowKey)
             onRoutePressed: anchor => root.routePressed(rowItem.rowKey, rowItem.node, anchor)

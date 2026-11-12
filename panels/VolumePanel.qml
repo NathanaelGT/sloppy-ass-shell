@@ -882,6 +882,12 @@ PanelBase {
   readonly property var activePercentEditor: root.activeDevicePercentEditor ? root.activeDevicePercentEditor : root.appPercentEditor
   readonly property var activeEditor: root.activeNameEditor ? root.activeNameEditor : root.activePercentEditor
 
+  onActiveEditorChanged: {
+    if (!root.activeEditor) {
+      root.focusKeyCatcher()
+    }
+  }
+
   function testFindDevicePercentEditor(kind, displayText) {
     const entry = root.testFindEntry(kind, displayText)
     if (!entry || !entry.node) {
@@ -1321,6 +1327,8 @@ PanelBase {
     kind: "output"
     devices: root.deviceEntries("output")
     showAll: root.outputExpanded
+    waveActive: root.open
+    flickable: root.scrollerItem
     maxVolume: Audio.maxVolume
     onSetDefault: node => root.setDefault("output", node)
     onTogglePin: name => root.togglePin("output", name)
@@ -1349,6 +1357,8 @@ PanelBase {
     kind: "input"
     devices: root.deviceEntries("input")
     showAll: root.inputExpanded
+    waveActive: root.open
+    flickable: root.scrollerItem
     maxVolume: Audio.maxVolume
     onSetDefault: node => root.setDefault("input", node)
     onTogglePin: name => root.togglePin("input", name)
@@ -1391,6 +1401,7 @@ PanelBase {
           model: appModel
           keyRole: "name"
           rowObjectName: "appCard"
+          flickable: root.scrollerItem
           maxTarget: Pins.apps.length - 1
           onMoved: (key, target) => Pins.reorderApp(key, target)
         }
@@ -1442,6 +1453,7 @@ PanelBase {
               expanded: root.effectiveExpanded(group.name)
               appPinned: Pins.isAppPinned(group.name)
               sectionVisible: root.appExpanded
+              waveActive: root.open
               animate: !root.measuring
               routeStream: root.routeStream
               targetFor: node => root.targetLabel(node)
@@ -1540,6 +1552,13 @@ PanelBase {
       if (!root.open) {
         routePopup.close()
         root.appPercentEditor = null
+      }
+    }
+
+    function onKeyPressed(event) {
+      if (event.key === Qt.Key_Escape && routePopup.opened) {
+        closeRoute()
+        event.accepted = true
       }
     }
   }

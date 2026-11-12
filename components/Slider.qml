@@ -11,6 +11,7 @@ Item {
   property color trackColor: Theme.trackFill
   property var node: null
   property bool wave: true
+  property bool waveActive: true
   readonly property alias pressed: slideMouse.pressed
 
   signal moved(real value)
@@ -29,12 +30,12 @@ Item {
   PwNodePeakMonitor {
     id: peakMon
     node: root.node
-    enabled: root.wave && root.node !== null
+    enabled: root.wave && root.node !== null && root.waveActive
   }
 
   Timer {
     interval: 50
-    running: root.wave && root.node !== null
+    running: root.wave && root.node !== null && root.waveActive
     repeat: true
     triggeredOnStart: true
     onTriggered: {
