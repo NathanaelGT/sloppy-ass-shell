@@ -2,8 +2,12 @@ pragma Singleton
 import Quickshell
 
 Singleton {
-  property string panel: ""
-  property string screenName: ""
+  property var openState: ({
+      name: "",
+      screen: ""
+    })
+  readonly property string panel: openState.name
+  readonly property string screenName: openState.screen
   property string barHoverScreen: ""
   signal closeCleared(string name, string screen)
   property var clusterWidths: ({})
@@ -62,13 +66,17 @@ Singleton {
   }
 
   function open(name, screen) {
-    panel = name
-    screenName = screen
+    openState = {
+      name: name,
+      screen: screen
+    }
   }
 
   function close() {
-    panel = ""
-    screenName = ""
+    openState = {
+      name: "",
+      screen: ""
+    }
   }
 
   function openTray(item, anchorX, screen) {
