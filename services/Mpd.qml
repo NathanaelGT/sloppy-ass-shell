@@ -41,6 +41,7 @@ Singleton {
   property bool single: false
   property var queue: []
   property int artIndex: 0
+  property bool coverRestartPending: false
   property bool idleInFlight: false
   property var awaiting: null
   property var sendQueue: []
@@ -50,6 +51,7 @@ Singleton {
 
   property var favorites: ({})
   property var pinned: ({})
+  property int stickerSeq: 0
   property string playSource: ""
   property bool weightedRandom: false
   property int lastTab: 0
@@ -309,8 +311,10 @@ Singleton {
     root.localOrderApplied = false
     root.musicDir = ""
     root.artIndex = 0
+    root.coverRestartPending = false
     root.favorites = ({})
     root.pinned = ({})
+    root.stickerSeq = 0
     root.folders = ({})
     root.counts = ({})
     root.songsByUri = ({})
@@ -1024,10 +1028,17 @@ Singleton {
   }
 
   function refreshStickers() {
+    const seq = root.stickerSeq
     root.send('sticker find song "" favorite', l => {
+      if (seq !== root.stickerSeq) {
+        return
+      }
       root.favorites = root.parseStickerFind(l)
     })
     root.send('sticker find song "" pinned', l => {
+      if (seq !== root.stickerSeq) {
+        return
+      }
       root.pinned = root.parseStickerFind(l)
     })
   }
@@ -1036,11 +1047,7 @@ Singleton {
     if (uri.length === 0) {
       return
     }
-    if (on) {
-      root.send('sticker set song "' + root.esc(uri) + '" favorite 1', null)
-    } else {
-      root.send('sticker delete song "' + root.esc(uri) + '" favorite', null)
-    }
+    root.stickerSeq += 1
     const next = Object.assign({}, root.favorites)
     if (on) {
       next[uri] = true
@@ -1048,17 +1055,18 @@ Singleton {
       delete next[uri]
     }
     root.favorites = next
+    if (on) {
+      root.send('sticker set song "' + root.esc(uri) + '" favorite 1', null, () => root.refreshStickers())
+    } else {
+      root.send('sticker delete song "' + root.esc(uri) + '" favorite', null, () => root.refreshStickers())
+    }
   }
 
   function setPinned(uri, on) {
     if (uri.length === 0) {
       return
     }
-    if (on) {
-      root.send('sticker set song "' + root.esc(uri) + '" pinned 1', null)
-    } else {
-      root.send('sticker delete song "' + root.esc(uri) + '" pinned', null)
-    }
+    root.stickerSeq += 1
     const next = Object.assign({}, root.pinned)
     if (on) {
       next[uri] = true
@@ -1066,6 +1074,11 @@ Singleton {
       delete next[uri]
     }
     root.pinned = next
+    if (on) {
+      root.send('sticker set song "' + root.esc(uri) + '" pinned 1', null, () => root.refreshStickers())
+    } else {
+      root.send('sticker delete song "' + root.esc(uri) + '" pinned', null, () => root.refreshStickers())
+    }
   }
 
   function isFavorite(uri) {
@@ -1081,12 +1094,14 @@ Singleton {
       root.coverPath = ""
       return
     }
+    if (coverProc.running) {
+      root.coverRestartPending = true
+      coverProc.running = false
+      return
+    }
     const prev = root.artIndex
     root.artIndex = root.artIndex + 1
     const tag = root.artIndex
-    if (coverProc.running) {
-      coverProc.running = false
-    }
     coverProc.tag = tag
     const out = root.cacheDir + "/cover-" + tag + ".img"
     const folder = root.parentDir(root.song.file)
@@ -1228,19 +1243,16 @@ Singleton {
   }
 
   function clearAndPlayWeighted(dir) {
-    // gather files via lsinfo recursively? MPD add dir handles recursion for play folder.
-    // For weighted, we need file list. Use lsinfo on dir (non-recursive) only; spec says including subfolders.
-    // Simpler: clear, add dir (mpd recursion), then fetch playlist and reorder.
     root.beginClear()
     root.send("clear", null)
-    if (dir === "") {
-      root.send("add \"\"", null)
-    } else {
-      root.send("add \"" + root.esc(dir) + "\"", null)
-    }
-    root.send("play", null)
-    // reorder after load via idle playlist event; handle in syncAll? We'll call reorderRemaining after a delay
-    reorderTimer.restart()
+    const addCmd = dir === "" ? 'add ""' : 'add "' + root.esc(dir) + '"'
+    root.send(addCmd, () => {
+      root.send("play", null)
+      root.send("playlistinfo", l => {
+        root.applyQueue(root.parseSongs(l))
+        root.reorderRemaining()
+      })
+    })
   }
 
   function fmtTime(seconds) {
@@ -1375,14 +1387,6 @@ Singleton {
   }
 
   Timer {
-    id: reorderTimer
-
-    interval: 800
-    repeat: false
-    onTriggered: root.reorderRemaining()
-  }
-
-  Timer {
     id: saveTimer
 
     interval: 400
@@ -1439,6 +1443,11 @@ Singleton {
 
     running: false
     onExited: (code, status) => {
+      if (root.coverRestartPending) {
+        root.coverRestartPending = false
+        root.resolveCover()
+        return
+      }
       if (coverProc.tag !== root.artIndex) {
         return
       }

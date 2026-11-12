@@ -261,29 +261,23 @@ PanelBase {
 
   function syncQueueModel() {
     const items = Mpd.queue
+    const present = {}
+    for (let j = 0; j < items.length; j++) {
+      present[items[j].id] = true
+    }
     for (let i = queueModel.count - 1; i >= 0; i--) {
-      const qid = queueModel.get(i).qid
-      let found = false
-      for (let j = 0; j < items.length; j++) {
-        if (items[j].id === qid) {
-          found = true
-          break
-        }
-      }
-      if (!found) {
+      if (!present[queueModel.get(i).qid]) {
         queueModel.remove(i)
       }
     }
+    const at = {}
+    for (let i = 0; i < queueModel.count; i++) {
+      at[queueModel.get(i).qid] = i
+    }
     for (let j = 0; j < items.length; j++) {
       const q = items[j]
-      let at = -1
-      for (let i = 0; i < queueModel.count; i++) {
-        if (queueModel.get(i).qid === q.id) {
-          at = i
-          break
-        }
-      }
-      if (at < 0) {
+      const i = at[q.id]
+      if (i === undefined) {
         queueModel.insert(j, {
           qid: q.id,
           pos: q.pos,
@@ -292,9 +286,27 @@ PanelBase {
           artist: q.artist,
           duration: q.duration
         })
+        for (const k in at) {
+          if (at[k] >= j) {
+            at[k] += 1
+          }
+        }
+        at[q.id] = j
       } else {
-        if (at !== j) {
-          queueModel.move(at, j, 1)
+        if (i !== j) {
+          queueModel.move(i, j, 1)
+          for (const k in at) {
+            const p = at[k]
+            if (p === i) {
+              continue
+            }
+            if (i < j && p > i && p <= j) {
+              at[k] = p - 1
+            } else if (i > j && p < i && p >= j) {
+              at[k] = p + 1
+            }
+          }
+          at[q.id] = j
         }
         const row = queueModel.get(j)
         if (row.pos !== q.pos) {
