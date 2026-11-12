@@ -31,6 +31,10 @@ Singleton {
   property int insertSeq: 0
   property int clearCutoffSeq: 0
   property real clearStamp: 0
+  property string lastError: ""
+
+  readonly property string imageTmpDir: "/tmp/quickshell-notif-img"
+  readonly property int busyTimeoutMs: 3000
 
   function sqlText(s) {
     return "'" + String(s === undefined || s === null ? "" : s).replace(/'/g, "''") + "'"
@@ -42,8 +46,9 @@ Singleton {
   }
 
   function run(argv, onDone) {
+    const full = argv[0] === root.sqlite ? [argv[0], "-cmd", ".timeout " + root.busyTimeoutMs].concat(argv.slice(1)) : argv
     queue.push({
-      argv: argv,
+      argv: full,
       onDone: onDone
     })
     pump()
@@ -57,9 +62,11 @@ Singleton {
     current = queue.shift()
     dbProc.command = current.argv
     dbProc.running = true
+    dbWatchdog.restart()
   }
 
   function settle(code) {
+    dbWatchdog.stop()
     busy = false
     const job = current
     current = null
@@ -125,6 +132,7 @@ Singleton {
   }
 
   function open() {
+    run(["bash", "-lc", "mkdir -p " + root.imageTmpDir + "; rm -f " + root.imageTmpDir + "/hist-*.png " + root.imageTmpDir + "/avatar-*.png " + root.imageTmpDir + "/*.img"])
     const cutoff = "strftime('%s','now') - " + retentionDays * 86400
     const init = "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, app_name TEXT, app_icon TEXT, desktop_entry TEXT, summary TEXT, body TEXT, urgency INTEGER DEFAULT 1, actions TEXT, transient INTEGER DEFAULT 0, deleted_at INTEGER, image BLOB); CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT); CREATE TABLE IF NOT EXISTS avatars (key TEXT PRIMARY KEY, image BLOB NOT NULL, updated_at INTEGER NOT NULL); DELETE FROM notifications WHERE ts < " + cutoff + "; DELETE FROM avatars WHERE key NOT IN (SELECT app_name || char(31) || summary FROM notifications WHERE deleted_at IS NULL AND app_name IS NOT NULL AND summary IS NOT NULL);"
     run([sqlite, dbPath, init], code => {
@@ -234,6 +242,10 @@ Singleton {
     fetchPage(pageSize, false)
   }
 
+  function stageImage(src, dst) {
+    run(["cp", "-f", src, dst])
+  }
+
   function record(entry) {
     root.insertSeq += 1
     const seq = root.insertSeq
@@ -253,7 +265,14 @@ Singleton {
             id = JSON.parse(out)[0].id
           } catch (e) {}
         }
+        if (entry.imageTmp) {
+          Quickshell.execDetached(["rm", "-f", entry.imageTmp])
+        }
         if (seq <= root.clearCutoffSeq) {
+          return
+        }
+        if (code !== 0 || id <= 0) {
+          root.lastError = "notification insert failed (" + code + ") " + out.trim()
           return
         }
         root.history = [
@@ -279,6 +298,9 @@ Singleton {
     if (key !== "" && avatarTmp !== "" && root.avatarKeys[key] !== true) {
       const avatarSql = "INSERT INTO avatars (key,image,updated_at) SELECT " + sqlText(key) + "," + blobExpr(avatarTmp) + "," + Math.floor(Date.now() / 1000) + " WHERE NOT EXISTS (SELECT 1 FROM avatars WHERE key=" + sqlText(key) + ")"
       run([sqlite, dbPath, avatarSql], code => {
+        if (avatarTmp) {
+          Quickshell.execDetached(["rm", "-f", avatarTmp])
+        }
         if (code === 0) {
           const upd = Object.assign({}, root.avatarKeys)
           upd[key] = true
@@ -287,6 +309,9 @@ Singleton {
         insertNotification()
       })
     } else {
+      if (avatarTmp) {
+        Quickshell.execDetached(["rm", "-f", avatarTmp])
+      }
       insertNotification()
     }
   }
@@ -425,5 +450,17 @@ Singleton {
       id: dbErr
     }
     onExited: code => root.settle(code)
+  }
+
+  Timer {
+    id: dbWatchdog
+
+    interval: 10000
+    running: false
+    onTriggered: {
+      if (root.busy && !dbProc.running) {
+        root.settle(125)
+      }
+    }
   }
 }

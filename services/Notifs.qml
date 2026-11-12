@@ -465,7 +465,7 @@ Singleton {
     if (img !== "") {
       root.imageSeq += 1
       staged = root.imageTmpDir + "/" + root.imageSeq + ".img"
-      Quickshell.execDetached(["cp", "-f", img, staged])
+      NotifStore.stageImage(img, staged)
     }
     n.closed.connect(reason => root.closed(n, reason))
     const snap = {
