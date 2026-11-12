@@ -128,7 +128,6 @@ PanelBase {
   }
 
   function switchTab(i) {
-    root.currentTab = i
     Mpd.lastTab = i
     Mpd.saveState()
   }
@@ -320,6 +319,57 @@ PanelBase {
   readonly property bool inCollection: root.browsePath === "pinned" || root.browsePath === "favorites"
   readonly property bool searching: root.searchText.trim().length > 0
 
+  function syncFolderModel() {
+    const items = root.folderListRows
+    for (let i = folderModel.count - 1; i >= 0; i--) {
+      const path = folderModel.get(i).path
+      let found = false
+      for (let j = 0; j < items.length; j++) {
+        if (items[j].path === path) {
+          found = true
+          break
+        }
+      }
+      if (!found) {
+        folderModel.remove(i)
+      }
+    }
+    for (let j = 0; j < items.length; j++) {
+      const it = items[j]
+      let at = -1
+      for (let i = 0; i < folderModel.count; i++) {
+        if (folderModel.get(i).path === it.path) {
+          at = i
+          break
+        }
+      }
+      if (at < 0) {
+        folderModel.insert(j, {
+          kind: it.kind,
+          path: it.path,
+          label: it.label,
+          num: it.num
+        })
+      } else {
+        if (at !== j) {
+          folderModel.move(at, j, 1)
+        }
+        const row = folderModel.get(j)
+        if (row.kind !== it.kind) {
+          folderModel.setProperty(j, "kind", it.kind)
+        }
+        if (row.label !== it.label) {
+          folderModel.setProperty(j, "label", it.label)
+        }
+        if (row.num !== it.num) {
+          folderModel.setProperty(j, "num", it.num)
+        }
+      }
+    }
+  }
+
+  onFolderListRowsChanged: root.syncFolderModel()
+
   function dirEntries(path) {
     const folder = Mpd.folders[path]
     return folder && folder.entries ? folder.entries : []
@@ -395,6 +445,16 @@ PanelBase {
 
   function matchesQuery(entry, q) {
     return (entry.title || "").toLowerCase().indexOf(q) >= 0 || (entry.artist || "").toLowerCase().indexOf(q) >= 0
+  }
+
+  function trackEntry(path) {
+    const tracks = root.trackRows
+    for (let i = 0; i < tracks.length; i++) {
+      if (tracks[i].path === path) {
+        return tracks[i]
+      }
+    }
+    return null
   }
 
   function isAncestorOf(ancestor, path) {
@@ -953,6 +1013,7 @@ PanelBase {
 
   Component.onCompleted: {
     root.syncQueueModel()
+    root.syncFolderModel()
     syncCrumbs()
   }
 
@@ -1019,10 +1080,31 @@ PanelBase {
     function onQueueChanged() {
       root.syncQueueModel()
     }
+
+    function onGreetedChanged() {
+      root.searchPending = false
+      root.searchResults = []
+    }
+
+    function onFoldersChanged() {
+      if (!root.inCollection && !Mpd.folders[root.browsePath]) {
+        root.loadPath()
+      }
+    }
+
+    function onAllSongsLoadedChanged() {
+      if (root.inCollection && !Mpd.allSongsLoaded) {
+        root.loadPath()
+      }
+    }
   }
 
   ListModel {
     id: queueModel
+  }
+
+  ListModel {
+    id: folderModel
   }
 
   Timer {
@@ -2024,7 +2106,7 @@ PanelBase {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        model: root.folderListRows
+        model: folderModel
         spacing: s(4)
         boundsBehavior: Flickable.StopAtBounds
         clip: true
@@ -2038,9 +2120,10 @@ PanelBase {
             Rectangle {
               id: trackRow
 
-              required property var modelData
+              required property int num
+              required property string path
 
-              property var entry: modelData.entry
+              readonly property var entry: root.trackEntry(trackRow.path)
               readonly property bool isCurrent: Mpd.song ? Mpd.song.file === trackRow.entry.path : false
               readonly property bool rowHovered: trackHover.containsMouse || trackFavHover.containsMouse || trackPinHover.containsMouse || trackAddHover.containsMouse
 
@@ -2077,7 +2160,7 @@ PanelBase {
                 spacing: s(4)
 
                 Text {
-                  text: trackRow.isCurrent ? Icons.get("player-play") : String(modelData.num)
+                  text: trackRow.isCurrent ? Icons.get("player-play") : String(trackRow.num)
                   font.family: trackRow.isCurrent ? Theme.iconFamily : "monospace"
                   font.pixelSize: s(10)
                   color: trackRow.isCurrent ? Theme.mauve : Theme.subtext
@@ -2219,14 +2302,12 @@ PanelBase {
 
           DelegateChoice {
             MusicFolderRow {
-              required property var modelData
-
-              kind: modelData.kind
-              path: modelData.path
-              label: modelData.label
-              activeSource: Mpd.playSource === modelData.path
+              kind: model.kind
+              path: model.path
+              label: model.label
+              activeSource: Mpd.playSource === model.path
               onOpen: p => root.goTo(p)
-              onPlayRow: p => modelData.kind === "dir" ? Mpd.playFolder(p, root.screenId) : root.playRowPath(p)
+              onPlayRow: p => model.kind === "dir" ? Mpd.playFolder(p, root.screenId) : root.playRowPath(p)
             }
           }
         }
@@ -2506,9 +2587,6 @@ PanelBase {
               onReleased: queueRow.gestureRelease()
               onClicked: {
                 if (queueRow.wasGesture || queueRow.revealed) {
-                  return
-                }
-                if (Mpd.song && pos < Mpd.song.pos) {
                   return
                 }
                 Mpd.playQueueId(qid, root.screenId)

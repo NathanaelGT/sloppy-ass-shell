@@ -361,6 +361,9 @@ Singleton {
         root.localQueuePending = false
         root.localOrderApplied = false
       }
+      if (failed.onError) {
+        failed.onError()
+      }
       console.warn("mpd:" + (failed.command || "") + " failed:" + line)
       root.pump()
     } else {
@@ -368,10 +371,11 @@ Singleton {
     }
   }
 
-  function send(command, callback) {
+  function send(command, callback, onError) {
     root.sendQueue.push({
       command: command,
-      callback: callback
+      callback: callback,
+      onError: onError
     })
     if (root.idleInFlight) {
       root.write("noidle\n")
@@ -389,6 +393,7 @@ Singleton {
       root.awaiting = {
         command: next.command,
         callback: next.callback,
+        onError: next.onError,
         lines: []
       }
       root.write(next.command + "\n")
@@ -976,6 +981,16 @@ Singleton {
     const collected = []
     const seen = {}
     let remaining = fields.length
+    let done = false
+    const finish = () => {
+      if (done) {
+        return
+      }
+      done = true
+      if (cb) {
+        cb(collected)
+      }
+    }
     for (let i = 0; i < fields.length; i++) {
       const field = fields[i]
       const cond = '(' + field + ' contains "' + root.esc(q) + '")'
@@ -1000,10 +1015,10 @@ Singleton {
           })
         }
         remaining -= 1
-        if (remaining === 0 && cb) {
-          cb(collected)
+        if (remaining === 0) {
+          finish()
         }
-      })
+      }, finish)
     }
   }
 
