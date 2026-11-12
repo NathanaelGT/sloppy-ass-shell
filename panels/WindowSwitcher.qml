@@ -105,8 +105,9 @@ PanelBase {
   }
 
   onKeyPressed: event => {
-    if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
-      root.activate(event.key - Qt.Key_1)
+    const key = event.key >= Qt.Key_Keypad_1 && event.key <= Qt.Key_Keypad_9 ? Qt.Key_1 + (event.key - Qt.Key_Keypad_1) : event.key
+    if (key >= Qt.Key_1 && key <= Qt.Key_9) {
+      root.activate(key - Qt.Key_1)
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       root.activate(root.selected)
     } else if (event.key === Qt.Key_Down) {
@@ -179,7 +180,7 @@ PanelBase {
           anchors.right: parent.right
           anchors.rightMargin: Math.round(12 * Theme.scale)
           anchors.verticalCenter: parent.verticalCenter
-          text: entry.index + 1
+          text: entry.index < 9 ? entry.index + 1 : ""
           color: Theme.overlay
           font.family: Theme.fontFamily
           font.pixelSize: Theme.fontSizeSmall
@@ -190,9 +191,17 @@ PanelBase {
 
           anchors.fill: parent
           hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
           onClicked: root.activate(entry.index)
         }
       }
     }
+  }
+
+  PlaceholderCard {
+    shown: root.items.length === 0
+    instant: true
+    icon: "app-window"
+    text: "No windows on this workspace"
   }
 }
