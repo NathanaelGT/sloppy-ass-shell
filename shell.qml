@@ -98,7 +98,7 @@ ShellRoot {
     }
 
     function windowSwitcher(): void {
-      Panels.toggle("window-switcher", Hypr.focusedScreenName)
+      Panels.cycle("window-switcher", Hypr.focusedScreenName)
     }
 
     function close(): void {
@@ -910,6 +910,40 @@ ShellRoot {
         cardX: panel.cardX,
         cardWidth: panel.cardWidth
       })
+    }
+
+    function switcherState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("window-switcher")
+      if (!panel) {
+        return JSON.stringify({
+          enabled: true,
+          open: false
+        })
+      }
+      return JSON.stringify({
+        enabled: true,
+        open: panel.open,
+        screen: panel.screenId,
+        selected: panel.selected,
+        count: panel.items.length,
+        items: panel.items.map(function (t) {
+          return {
+            address: t.address,
+            title: panel.displayName(t)
+          }
+        })
+      })
+    }
+
+    function switcherStep(): string {
+      if (!TestDriver.active) {
+        return "false"
+      }
+      Panels.cycle("window-switcher", "eDP-1")
+      return "true"
     }
 
     function musicState(): string {

@@ -15,6 +15,7 @@ Singleton {
   property var closingScreens: ({})
   property var trayItem: null
   property int trayAnchorX: -1
+  property int cycleCount: 0
 
   function isClosing(screen) {
     return closingScreens[screen] === true
@@ -60,6 +61,17 @@ Singleton {
   function toggle(name, screen) {
     if (openOn(name, screen)) {
       close()
+    } else {
+      open(name, screen)
+    }
+  }
+
+  function cycle(name, screen) {
+    if (LockState.sessionLocked) {
+      return
+    }
+    if (openOn(name, screen)) {
+      cycleCount = cycleCount + 1
     } else {
       open(name, screen)
     }

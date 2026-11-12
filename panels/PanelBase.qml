@@ -22,6 +22,7 @@ PanelWindow {
   property bool externalRequested: false
   property bool exclusiveFocus: false
   property bool exclusiveKeyboard: false
+  property bool forceKeyboard: false
   property bool ownerFocused: false
   property bool dismissOnBackdrop: true
   property bool autoFocusKeyCatcher: true
@@ -113,7 +114,7 @@ PanelWindow {
   }
 
   WlrLayershell.layer: exclusiveFocus || topDocked ? WlrLayer.Overlay : WlrLayer.Top
-  WlrLayershell.keyboardFocus: (root.exclusiveFocus || root.exclusiveKeyboard) && root.ownerFocused ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
+  WlrLayershell.keyboardFocus: (root.exclusiveFocus || root.exclusiveKeyboard) && (root.ownerFocused || root.forceKeyboard) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.OnDemand
 
   readonly property int shadowPad: Theme.shadowPad
   readonly property int contentPad: Math.round(14 * Theme.scale)
