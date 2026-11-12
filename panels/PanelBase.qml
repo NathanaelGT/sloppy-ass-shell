@@ -46,6 +46,17 @@ PanelWindow {
   property alias gutterData: gutterStrip.data
 
   signal opened
+  property bool openedFired: false
+  function maybeOpened() {
+    if (root.openedFired) {
+      return
+    }
+    root.openedFired = true
+    if (root.autoFocusKeyCatcher) {
+      keyCatcher.forceActiveFocus()
+    }
+    root.opened()
+  }
   signal scrolled
   signal keyPressed(var event)
   signal keyReleased(var event)
@@ -245,7 +256,11 @@ PanelWindow {
       } else {
         root.slideUnlocked = true
       }
+      if (visible) {
+        root.maybeOpened()
+      }
     } else {
+      root.openedFired = false
       open = false
       root.ownerFocused = false
       if (root.attached && root.panelName !== "") {
@@ -316,10 +331,7 @@ PanelWindow {
 
   onVisibleChanged: {
     if (visible) {
-      if (autoFocusKeyCatcher) {
-        keyCatcher.forceActiveFocus()
-      }
-      root.opened()
+      root.maybeOpened()
     } else if (root.scrollDriver) {
       root.scrollDriver.snap()
       root.scrollDriver.dragActive = false

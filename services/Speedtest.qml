@@ -1,4 +1,5 @@
 pragma Singleton
+import QtQuick
 import Quickshell
 import Quickshell.Io
 
@@ -54,6 +55,7 @@ Singleton {
     speedProc.command = ["speedtest", "-f", "jsonl", "--progress-update-interval=100"].concat(pinned && root.serverId > 0 ? ["-s", String(root.serverId)] : []).concat(root.iface !== "" ? ["-I", root.iface] : [])
     root.pinnedRun = pinned && root.serverId > 0
     speedProc.running = true
+    speedWatchdog.restart()
   }
 
   function preload() {
@@ -229,6 +231,16 @@ Singleton {
       onRead: data => root.handleLine(data)
     }
     onExited: code => root.finish(code)
+  }
+
+  Timer {
+    id: speedWatchdog
+
+    interval: 15000
+    running: false
+    onTriggered: if (root.running && !speedProc.running) {
+      root.finish(1)
+    }
   }
 
   Process {

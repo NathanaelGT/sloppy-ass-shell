@@ -29,6 +29,10 @@ PanelBase {
   property bool availableExpanded: true
   property var sortStrength: ({})
   property double confirmArmedAt: 0
+  property bool queryPending: false
+  property bool scanInFlight: false
+  property bool modifyInFlight: false
+  property bool pskInFlight: false
 
   readonly property bool interacting: pending !== "" || expanded !== "" || confirmForget !== "" || sharing !== "" || activating !== ""
 
@@ -159,7 +163,7 @@ PanelBase {
   }
 
   onEnabledChanged: {
-    if (!root.enabled) {
+    if (!root.enabled || !root.open) {
       return
     }
     root.maybeRescan()
@@ -251,13 +255,15 @@ PanelBase {
   }
 
   function rescan() {
-    if (!device || scanProc.running) {
+    if (!device || !root.open || scanProc.running) {
       return
     }
     root.device.scannerEnabled = true
     root.scanning = true
+    root.scanInFlight = true
     scanProc.command = ["nmcli", "device", "wifi", "list", "ifname", device.name, "--rescan", "yes"]
     scanProc.running = true
+    scanWatchdog.restart()
   }
 
   function lastRefreshAge() {
@@ -322,8 +328,10 @@ PanelBase {
 
   function queryAutoConnect() {
     if (queryProc.running) {
+      root.queryPending = true
       return
     }
+    root.queryPending = false
     queryProc.command = ["nmcli", "-t", "-f", "NAME,AUTOCONNECT", "connection", "show"]
     queryProc.running = true
   }
@@ -346,6 +354,8 @@ PanelBase {
     const job = root.modifyQueue.shift()
     modifyProc.command = ["nmcli", "connection", "modify", job[0], "connection.autoconnect", job[1]]
     modifyProc.running = true
+    root.modifyInFlight = true
+    modifyWatchdog.restart()
   }
 
   function qrHasPassword(network) {
@@ -421,6 +431,20 @@ PanelBase {
     root.pumpPsk()
   }
 
+  function pskProperty(name) {
+    const network = root.findNetwork(name)
+    if (!network) {
+      return "802-11-wireless-security.psk"
+    }
+    if (network.security === WifiSecurityType.Leap) {
+      return "802-11-wireless-security.leap-password"
+    }
+    if (root.qrKind(network) === "WEP") {
+      return "802-11-wireless-security.wep-key0"
+    }
+    return "802-11-wireless-security.psk"
+  }
+
   function pumpPsk() {
     if (pskProc.running || root.pskQueue.length === 0) {
       return
@@ -428,8 +452,10 @@ PanelBase {
     const name = root.pskQueue.shift()
     pskProc.target = name
     pskProc.output = ""
-    pskProc.command = ["nmcli", "-s", "-g", "802-11-wireless-security.psk", "connection", "show", name]
+    pskProc.command = ["nmcli", "-s", "-g", root.pskProperty(name), "connection", "show", name]
     pskProc.running = true
+    root.pskInFlight = true
+    pskWatchdog.restart()
   }
 
   function storePsk(name, output) {
@@ -477,7 +503,20 @@ PanelBase {
     running: false
     onExited: {
       root.scanning = false
+      root.scanInFlight = false
       root.lastRefresh = Date.now()
+      root.rebuildSortStrength()
+    }
+  }
+
+  Timer {
+    id: scanWatchdog
+
+    interval: 10000
+    running: false
+    onTriggered: if (root.scanInFlight && !scanProc.running) {
+      root.scanning = false
+      root.scanInFlight = false
       root.rebuildSortStrength()
     }
   }
@@ -509,6 +548,12 @@ PanelBase {
         root.autoConnect = next
       }
     }
+    onExited: {
+      if (root.queryPending) {
+        root.queryPending = false
+        root.queryAutoConnect()
+      }
+    }
   }
 
   Process {
@@ -516,7 +561,19 @@ PanelBase {
 
     running: false
     onExited: {
+      root.modifyInFlight = false
       root.pumpModify()
+      root.queryAutoConnect()
+    }
+  }
+
+  Timer {
+    id: modifyWatchdog
+
+    interval: 10000
+    running: false
+    onTriggered: if (root.modifyInFlight && !modifyProc.running) {
+      root.modifyInFlight = false
       root.queryAutoConnect()
     }
   }
@@ -531,7 +588,19 @@ PanelBase {
       onStreamFinished: pskProc.output = text
     }
     onExited: {
+      root.pskInFlight = false
       root.storePsk(pskProc.target, pskProc.output)
+      root.pumpPsk()
+    }
+  }
+
+  Timer {
+    id: pskWatchdog
+
+    interval: 10000
+    running: false
+    onTriggered: if (root.pskInFlight && !pskProc.running) {
+      root.pskInFlight = false
       root.pumpPsk()
     }
   }
