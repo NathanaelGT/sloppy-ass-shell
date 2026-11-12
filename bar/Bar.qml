@@ -48,7 +48,7 @@ PanelWindow {
       autoHide: autoHide,
       revealed: revealed,
       menuOpen: menuOpen,
-      closingScreen: Panels.closingScreen === screen.name,
+      closingScreen: Panels.isClosing(screen.name),
       shown: shown,
       tilelessShown: tilelessShown,
       fullscreen: Hypr.fullscreen(screen.name),
@@ -70,7 +70,7 @@ PanelWindow {
   readonly property bool floatingPanel: Panels.panel === "window-switcher"
   readonly property bool menuOpen: Panels.panel !== "" && !floatingPanel && Panels.screenName === screen.name && !Hypr.fullscreen(screen.name) || (Polkit.active && Polkit.pinScreen === screen.name && !Hypr.fullscreen(screen.name))
   readonly property bool tilelessShown: autoHide && Hypr.tileless(screen.name) && !Hypr.fullscreen(screen.name)
-  readonly property bool shown: !autoHide || revealed || menuOpen || (Panels.closingScreen === screen.name && !Hypr.fullscreen(screen.name)) || notifWidget.merging || tilelessShown
+  readonly property bool shown: !autoHide || revealed || menuOpen || (Panels.isClosing(screen.name) && !Hypr.fullscreen(screen.name)) || notifWidget.merging || tilelessShown
   readonly property bool maskFull: shown || visual.y > root.hiddenY + 0.5
 
   mask: Region {

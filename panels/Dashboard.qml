@@ -598,6 +598,16 @@ PanelBase {
     }
   }
 
+  Connections {
+    target: root
+
+    function onOpenChanged() {
+      if (!root.open) {
+        playerPopup.close()
+      }
+    }
+  }
+
   Popup {
     id: playerPopup
 

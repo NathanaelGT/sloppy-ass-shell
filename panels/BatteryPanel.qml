@@ -1475,6 +1475,16 @@ PanelBase {
     onPositionChanged: mouse => procMenu.trackHover(mouse.x, mouse.y)
   }
 
+  Connections {
+    target: root
+
+    function onOpenChanged() {
+      if (!root.open) {
+        procMenu.close()
+      }
+    }
+  }
+
   ContextMenu {
     id: procMenu
 

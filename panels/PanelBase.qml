@@ -63,7 +63,7 @@ PanelWindow {
   property bool cardHovered: false
   property bool popupOpen: false
   readonly property bool exitCloseActive: open && dismissOnBackdrop && !exclusiveFocus
-  readonly property bool keepOpen: cardHovered || Panels.barHoverScreen === screenId || popupOpen || (root.scrollDriver ? root.scrollDriver.dragActive : false)
+  readonly property bool keepOpen: cardHovered || Panels.barHoverScreen === screenId || popupOpen || (root.scrollDriver ? root.scrollDriver.dragActive : false) || ((root.exclusiveKeyboard || root.exclusiveFocus) && root.ownerFocused)
 
   color: "transparent"
   visible: requested || closeDelay.running
@@ -84,9 +84,9 @@ PanelWindow {
   Region {
     id: cardMask
 
-    x: root.cardX
+    x: root.cardX - root.cornerRadius
     y: clipFrame.y + visual.y + root.shadowPad
-    width: root.cardWidth
+    width: root.cardWidth + root.cornerRadius * 2
     height: root.cardHeight
     radius: root.cornerRadius
   }
@@ -229,8 +229,8 @@ PanelWindow {
       closeDelay.stop()
       root.ownerFocused = Hypr.focusedScreenName === root.screenId
       open = true
-      if (Panels.closingScreen === root.screenId) {
-        Panels.closingScreen = ""
+      if (Panels.isClosing(root.screenId)) {
+        Panels.setClosing(root.screenId, false)
       }
       stemOutAnim.stop()
       stemInAnim.restart()
@@ -242,8 +242,9 @@ PanelWindow {
       }
     } else {
       open = false
+      root.ownerFocused = false
       if (root.attached && root.panelName !== "") {
-        Panels.closingScreen = root.screenId
+        Panels.setClosing(root.screenId, true)
       }
       closeDelay.restart()
       if (root.stemEnabled && !root.slideUnlocked) {
@@ -324,8 +325,8 @@ PanelWindow {
 
     interval: root.stemEnabled ? 420 : 260
     running: false
-    onTriggered: if (Panels.closingScreen === root.screenId) {
-      Panels.closingScreen = ""
+    onTriggered: if (Panels.isClosing(root.screenId)) {
+      Panels.setClosing(root.screenId, false)
     }
   }
 

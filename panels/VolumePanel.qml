@@ -1516,6 +1516,16 @@ PanelBase {
     }
   }
 
+  Connections {
+    target: root
+
+    function onOpenChanged() {
+      if (!root.open) {
+        routePopup.close()
+      }
+    }
+  }
+
   Popup {
     id: routePopup
 

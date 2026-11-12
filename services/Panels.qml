@@ -5,12 +5,26 @@ Singleton {
   property string panel: ""
   property string screenName: ""
   property string barHoverScreen: ""
-  property string closingScreen: ""
   signal closeCleared(string name, string screen)
   property var clusterWidths: ({})
   property var clusterRights: ({})
+  property var closingScreens: ({})
   property var trayItem: null
   property int trayAnchorX: -1
+
+  function isClosing(screen) {
+    return closingScreens[screen] === true
+  }
+
+  function setClosing(screen, closing) {
+    const next = Object.assign({}, closingScreens)
+    if (closing) {
+      next[screen] = true
+    } else {
+      delete next[screen]
+    }
+    closingScreens = next
+  }
 
   function setMapValue(map, screen, value) {
     const next = Object.assign({}, map)
