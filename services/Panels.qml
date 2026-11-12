@@ -66,6 +66,9 @@ Singleton {
   }
 
   function open(name, screen) {
+    if (LockState.sessionLocked) {
+      return
+    }
     openState = {
       name: name,
       screen: screen

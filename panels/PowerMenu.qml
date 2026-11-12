@@ -49,6 +49,9 @@ PanelBase {
   ]
 
   function run(index) {
+    if (!root.open) {
+      return
+    }
     const action = root.actions[index]
     if (!action) {
       return
@@ -82,6 +85,16 @@ PanelBase {
   onOpened: {
     root.focusRow = 0
     root.cancelHolds()
+  }
+
+  Connections {
+    target: Polkit
+
+    function onActiveChanged() {
+      if (Polkit.active) {
+        root.cancelHolds()
+      }
+    }
   }
 
   onKeyPressed: event => {

@@ -13,7 +13,7 @@ PanelBase {
   exclusiveFocus: true
   dismissOnBackdrop: false
   autoFocusKeyCatcher: false
-  externalRequested: Polkit.active && Polkit.pinScreen === screenId
+  externalRequested: Polkit.active && !LockState.sessionLocked && Polkit.pinScreen === screenId
   property string errorText: ""
   property bool shaking: false
 
@@ -40,7 +40,7 @@ PanelBase {
     }
   }
 
-  onOpened: {
+  function resetPrompt() {
     response.text = ""
     root.errorText = ""
     fieldBox.failTint = false
@@ -49,6 +49,18 @@ PanelBase {
     shakeTranslate.x = 0
     root.shaking = false
     response.forceActiveFocus()
+  }
+
+  onOpened: resetPrompt()
+
+  Connections {
+    target: Polkit
+
+    function onFlowChanged() {
+      if (root.open && Polkit.flow) {
+        root.resetPrompt()
+      }
+    }
   }
 
   Connections {
