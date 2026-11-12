@@ -839,9 +839,23 @@ PanelBase {
     routePopup.close()
   }
 
+  function streamIsLive(stream) {
+    const serial = Audio.streamSerial(stream)
+    for (let i = 0; i < streams.length; i++) {
+      if (Audio.streamSerial(streams[i]) === serial) {
+        return true
+      }
+    }
+    return false
+  }
+
   function routeTo(node) {
     const stream = root.routeStream
     if (!stream) {
+      return
+    }
+    if (!root.streamIsLive(stream)) {
+      closeRoute()
       return
     }
     if (node) {

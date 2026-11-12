@@ -46,7 +46,7 @@ Singleton {
   function save() {
     const data = JSON.stringify(icons)
     const escaped = data.replace(/'/g, "'\\''")
-    Quickshell.execDetached(["bash", "-lc", "mkdir -p \"$(dirname " + file + ")\"; printf '%s' '" + escaped + "' > " + file])
+    Quickshell.execDetached(["bash", "-lc", "mkdir -p \"$(dirname " + file + ")\"; printf '%s' '" + escaped + "' > \"" + file + ".$$\" && mv \"" + file + ".$$\" \"" + file + "\""])
   }
 
   Process {

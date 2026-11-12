@@ -14,6 +14,11 @@ Item {
   property bool waveActive: true
   readonly property alias pressed: slideMouse.pressed
 
+  onNodeChanged: {
+    root.history = []
+    root.live = false
+  }
+
   signal moved(real value)
   signal wheeled(real angleDelta)
 

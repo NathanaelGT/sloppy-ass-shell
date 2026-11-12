@@ -22,8 +22,10 @@ Singleton {
   property var deferredSink: null
   property var deferredSource: null
   property var streamTargets: ({})
+  property var pendingTargets: ({})
   property var streamLastActive: ({})
   property double feedbackAt: 0
+  property bool targetRefreshQueued: false
   property string outputSetSig: ""
   property string inputSetSig: ""
 
@@ -132,6 +134,7 @@ Singleton {
 
   function refreshStreamTargets() {
     if (targetProc.running) {
+      targetRefreshQueued = true
       return
     }
     targetProc.running = true
@@ -159,6 +162,14 @@ Singleton {
       delete next[String(stream.id)]
     }
     root.streamTargets = next
+    if (targetProc.running) {
+      const pending = {}
+      for (const key in root.pendingTargets) {
+        pending[key] = root.pendingTargets[key]
+      }
+      pending[String(stream.id)] = nodeName ? nodeName : ""
+      root.pendingTargets = pending
+    }
   }
 
   function pruneStreamTargets() {
@@ -363,7 +374,23 @@ Singleton {
             next[match[1]] = match[2]
           }
         }
+        let pendingCount = 0
+        for (const key in root.pendingTargets) {
+          pendingCount++
+          if (root.pendingTargets[key]) {
+            next[key] = root.pendingTargets[key]
+          } else {
+            delete next[key]
+          }
+        }
+        root.pendingTargets = {}
         root.streamTargets = next
+        if (pendingCount > 0) {
+          root.refreshStreamTargets()
+        } else if (root.targetRefreshQueued) {
+          root.targetRefreshQueued = false
+          root.refreshStreamTargets()
+        }
       }
     }
   }
