@@ -134,8 +134,13 @@ PanelBase {
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize
         clip: true
-        onAccepted: {
+        Keys.onEscapePressed: {
           if (Polkit.flow) {
+            Polkit.flow.cancelAuthenticationRequest()
+          }
+        }
+        onAccepted: {
+          if (Polkit.flow && text !== "") {
             Polkit.flow.submit(text)
           }
         }
@@ -184,7 +189,7 @@ PanelBase {
         label: "Authenticate"
         active: true
         onClicked: {
-          if (Polkit.flow) {
+          if (Polkit.flow && response.text !== "") {
             Polkit.flow.submit(response.text)
           }
         }

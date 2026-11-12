@@ -14,7 +14,7 @@ Rectangle {
 
   implicitHeight: Math.round(58 * Theme.scale)
   radius: Math.round(15 * Theme.scale)
-  color: active ? accent : Theme.surface
+  color: active ? accent : mouse.containsMouse ? Theme.surfaceHigh : Theme.surface
   antialiasing: true
 
   Behavior on color {
@@ -44,7 +44,11 @@ Rectangle {
   }
 
   MouseArea {
+    id: mouse
+
     anchors.fill: parent
+    hoverEnabled: true
+    cursorShape: Qt.PointingHandCursor
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     onClicked: e => e.button === Qt.LeftButton ? root.clicked() : root.rightClicked()
   }

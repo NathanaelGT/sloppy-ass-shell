@@ -113,7 +113,7 @@ PanelBase {
       if (!event.isAutoRepeat) {
         const row = rowRepeater.itemAt(event.key - Qt.Key_F2 + 1)
         if (row) {
-          row.beginHold()
+          row.beginHold(true)
         }
       }
       event.accepted = true
@@ -125,7 +125,7 @@ PanelBase {
           root.keyboardHoldRow = root.focusRow
           const row = rowRepeater.itemAt(root.focusRow)
           if (row) {
-            row.beginHold()
+            row.beginHold(true)
           }
         }
       }
@@ -140,14 +140,14 @@ PanelBase {
     if (event.key >= Qt.Key_F2 && event.key <= Qt.Key_F4) {
       const row = rowRepeater.itemAt(event.key - Qt.Key_F2 + 1)
       if (row) {
-        row.endHold()
+        row.endHold(true)
       }
       event.accepted = true
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       if (root.keyboardHoldRow >= 0) {
         const row = rowRepeater.itemAt(root.keyboardHoldRow)
         if (row) {
-          row.endHold()
+          row.endHold(true)
         }
         root.keyboardHoldRow = -1
       }
@@ -169,21 +169,32 @@ PanelBase {
       readonly property bool instant: index === 0
       readonly property bool hot: rowMouse.containsMouse || root.focusRow === index
       property real progress: 0
-      property bool holding: false
+      property int pointerHolds: 0
+      property int keyHolds: 0
+      readonly property bool holding: pointerHolds > 0 || keyHolds > 0
 
-      function beginHold() {
+      function beginHold(key) {
         if (!root.open) {
           return
         }
-        holding = true
+        if (key) {
+          keyHolds++
+        } else {
+          pointerHolds++
+        }
       }
 
-      function endHold() {
-        holding = false
+      function endHold(key) {
+        if (key) {
+          keyHolds = Math.max(0, keyHolds - 1)
+        } else {
+          pointerHolds = Math.max(0, pointerHolds - 1)
+        }
       }
 
       function cancelHold() {
-        holding = false
+        pointerHolds = 0
+        keyHolds = 0
         progress = 0
       }
 
@@ -267,16 +278,16 @@ PanelBase {
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         onPressed: mouse => {
           if (mouse.button === Qt.LeftButton && !row.instant) {
-            row.beginHold()
+            row.beginHold(false)
           }
         }
         onReleased: mouse => {
           if (mouse.button === Qt.LeftButton && !row.instant) {
-            row.endHold()
+            row.endHold(false)
           }
         }
         onCanceled: if (!row.instant) {
-          row.endHold()
+          row.endHold(false)
         }
         onClicked: mouse => {
           if (row.instant) {
