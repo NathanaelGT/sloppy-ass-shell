@@ -11,7 +11,7 @@ Column {
 
   spacing: Math.round(6 * Theme.scale)
 
-  readonly property date today: new Date()
+  property date today: new Date()
   readonly property int cellSize: Math.round(30 * Theme.scale)
   readonly property int gridSpacing: Math.round(4 * Theme.scale)
   readonly property int contentWidth: cellSize * 8 + gridSpacing * 7
@@ -61,6 +61,11 @@ Column {
     prevSlideAnim.to = delta > 0 ? -numbersClip.height : numbersClip.height
     prevSlideAnim.restart()
     slideAnim.restart()
+  }
+
+  function returnToToday() {
+    root.today = new Date()
+    root.cursor = new Date(root.today.getFullYear(), root.today.getMonth(), 1)
   }
 
   Row {

@@ -24,6 +24,7 @@ PanelBase {
   property var picked: null
   property var activeEditor: null
   property bool seeking: false
+  property var seekTarget: null
   property real seekPreview: 0
   property real routeDismissedAt: 0
   property real localPosition: 0
@@ -82,6 +83,7 @@ PanelBase {
       return
     }
     root.seeking = true
+    root.seekTarget = root.target
     root.seekPreview = Math.max(0, Math.min(1, fraction))
     seekCommitTimer.restart()
   }
@@ -91,9 +93,11 @@ PanelBase {
       return
     }
     root.seeking = false
-    if (root.target && root.target.length > 0) {
-      root.target.position = root.seekPreview * root.target.length
-      root.localPosition = root.target.position
+    if (root.seekTarget && root.players.indexOf(root.seekTarget) !== -1 && root.seekTarget.length > 0) {
+      root.seekTarget.position = root.seekPreview * root.seekTarget.length
+      if (root.target === root.seekTarget) {
+        root.localPosition = root.seekTarget.position
+      }
     }
   }
 
@@ -165,9 +169,12 @@ PanelBase {
     return calendar.cursor.toLocaleString(Theme.locale, "MMMM yyyy")
   }
 
-  onOpened: {
-    resetPick()
-    syncPosition()
+  onOpenChanged: {
+    if (root.open) {
+      resetPick()
+      syncPosition()
+      calendar.returnToToday()
+    }
   }
 
   onScrolled: root.closePopup(playerPopup)
@@ -377,7 +384,7 @@ PanelBase {
         anchors.left: parent.left
         anchors.top: seekTrack.bottom
         anchors.topMargin: s(4)
-        text: root.fmtTime(root.seeking ? root.seekPreview * root.target.length : root.localPosition)
+        text: root.target ? root.fmtTime(root.seeking ? root.seekPreview * root.target.length : root.localPosition) : ""
         color: Theme.subtext
         font.family: "monospace"
         font.pixelSize: s(10)
@@ -387,7 +394,7 @@ PanelBase {
         anchors.right: parent.right
         anchors.top: seekTrack.bottom
         anchors.topMargin: s(4)
-        text: root.fmtTime(root.target.length)
+        text: root.target ? root.fmtTime(root.target.length) : ""
         color: Theme.subtext
         font.family: "monospace"
         font.pixelSize: s(10)
@@ -716,7 +723,11 @@ PanelBase {
     interval: 250
     repeat: true
     running: root.open && root.target !== null && root.target.isPlaying && !root.seeking
-    onTriggered: root.localPosition += 0.25
+    onTriggered: {
+      const rate = Math.min(Math.max(root.target.rate, 0), 4)
+      const next = root.localPosition + 0.25 * rate
+      root.localPosition = root.target.length > 0 ? Math.min(next, root.target.length) : next
+    }
   }
 
   Timer {
@@ -728,6 +739,7 @@ PanelBase {
     onTriggered: {
       if (root.target) {
         positionProc.command = ["playerctl", "-p", root.target.dbusName, "position"]
+        positionProc.targetName = root.target.dbusName
         positionProc.running = true
       }
     }
@@ -738,10 +750,11 @@ PanelBase {
 
     command: ["true"]
     running: false
+    property string targetName: ""
     stdout: StdioCollector {
       onStreamFinished: {
         const value = parseFloat(text)
-        if (!isNaN(value) && root.target) {
+        if (!isNaN(value) && root.target && root.target.dbusName === positionProc.targetName) {
           root.localPosition = Math.max(0, Math.min(value, root.target.length > 0 ? root.target.length : value))
         }
       }
