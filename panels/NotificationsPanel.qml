@@ -254,7 +254,6 @@ PanelBase {
   property bool undoArmed: false
   property bool restoring: false
   property bool clearing: false
-  property int clearedFrom: 0
   property int closingCount: 0
   readonly property int clearSlideMs: 180
   readonly property int clearStagger: Math.round(clearSlideMs * 0.2)
@@ -299,7 +298,6 @@ PanelBase {
   }
 
   function finalizeClear() {
-    root.clearedFrom = Math.floor(Date.now() / 1000)
     Notifs.dismissAll()
     NotifStore.clearHistory()
     root.restoring = false
@@ -312,7 +310,7 @@ PanelBase {
   function undoClear() {
     root.restoring = true
     undoTimer.stop()
-    NotifStore.undoClear(root.clearedFrom, Math.floor(Date.now() / 1000), () => {
+    NotifStore.undoClear(() => {
       root.restoring = false
       root.undoArmed = false
     })
@@ -333,6 +331,10 @@ PanelBase {
 
   Connections {
     target: notificationList
+
+    function onMovementStarted() {
+      notifScroll.snap()
+    }
 
     function onContentYChanged() {
       if (Date.now() - root.lastPinMs > 200) {
@@ -629,7 +631,7 @@ PanelBase {
         }
 
         width: notificationList.width
-        height: closing ? (keepHeader ? headerSpace + collapse * (implicitHeight - headerSpace + notificationList.spacing) - notificationList.spacing : collapse * (implicitHeight + notificationList.spacing) - notificationList.spacing) : implicitHeight
+        height: closing ? (keepHeader ? Math.max(0, headerSpace + collapse * (implicitHeight - headerSpace + notificationList.spacing) - notificationList.spacing) : Math.max(0, collapse * (implicitHeight + notificationList.spacing) - notificationList.spacing)) : implicitHeight
         spacing: Math.round(8 * Theme.scale)
 
         SectionHeader {
@@ -740,7 +742,8 @@ PanelBase {
                     Image {
                       anchors.fill: parent
                       fillMode: Image.PreserveAspectCrop
-                      source: notificationRow.active ? notificationRow.modelData.imageSource : NotifStore.imageUrlFor(notificationRow.modelData.id)
+                      sourceSize: Qt.size(thumb.width, thumb.height)
+                      source: notificationRow.active ? notificationRow.modelData.imageSource : NotifStore.imageUrlFor(notificationRow.modelData.id) || ""
                       visible: notificationRow.active || source !== ""
                     }
                   }

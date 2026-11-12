@@ -30,9 +30,15 @@ Singleton {
   property var current: null
   property int insertSeq: 0
   property int clearCutoffSeq: 0
+  property real clearStamp: 0
 
   function sqlText(s) {
     return "'" + String(s === undefined || s === null ? "" : s).replace(/'/g, "''") + "'"
+  }
+
+  function blobExpr(path) {
+    const f = "readfile(" + sqlText(path) + ")"
+    return "CASE WHEN length(" + f + ") <= " + root.maxImageBytes + " THEN " + f + " ELSE NULL END"
   }
 
   function run(argv, onDone) {
@@ -162,8 +168,9 @@ Singleton {
   }
 
   function fetchPage(limit, initial, onDone) {
+    const offset = root.history.length
     const cols = "n.id,n.ts,n.app_name,n.app_icon,n.desktop_entry,n.summary,n.body,n.urgency,n.actions,n.transient,CASE WHEN a.image IS NOT NULL THEN 'avatar' WHEN n.image IS NOT NULL THEN 'image' ELSE '' END AS image_kind"
-    run([sqlite, "-json", dbPath, "SELECT " + cols + " FROM notifications n LEFT JOIN avatars a ON a.key = n.app_name || char(31) || n.summary WHERE n.deleted_at IS NULL ORDER BY n.ts DESC, n.id DESC LIMIT " + limit + " OFFSET " + root.history.length], (code, out) => {
+    run([sqlite, "-json", dbPath, "SELECT " + cols + " FROM notifications n LEFT JOIN avatars a ON a.key = n.app_name || char(31) || n.summary WHERE n.deleted_at IS NULL ORDER BY n.ts DESC, n.id DESC LIMIT " + limit + " OFFSET " + offset], (code, out) => {
       let rows = []
       if (code === 0 && out.trim().length > 0) {
         try {
@@ -197,6 +204,13 @@ Singleton {
           hasImage: (r.image_kind || "") !== ""
         })
       }
+      if (!initial && root.history.length !== offset) {
+        loadingMore = false
+        if (onDone) {
+          onDone()
+        }
+        return
+      }
       root.history = initial ? page : root.history.concat(page)
       if (rows.length < limit) {
         exhausted = true
@@ -228,9 +242,9 @@ Singleton {
 
     const insertNotification = () => {
       const avatarReady = key !== "" && root.avatarKeys[key] === true
-      const img = avatarReady || !entry.imageTmp ? "NULL" : "readfile(" + sqlText(entry.imageTmp) + ")"
+      const img = avatarReady || !entry.imageTmp ? "NULL" : blobExpr(entry.imageTmp)
       const delCol = seq <= root.clearCutoffSeq ? ",deleted_at" : ""
-      const delVal = seq <= root.clearCutoffSeq ? ",strftime('%s','now')" : ""
+      const delVal = seq <= root.clearCutoffSeq ? "," + root.clearStamp : ""
       const sql = "INSERT INTO notifications (ts,app_name,app_icon,desktop_entry,summary,body,urgency,actions,transient,image" + delCol + ") VALUES (" + Math.round(entry.ts) + "," + sqlText(entry.appName) + "," + sqlText(entry.appIcon) + "," + sqlText(entry.desktopEntry) + "," + sqlText(entry.summary) + "," + sqlText(entry.body) + "," + Math.round(entry.urgency === undefined ? 1 : entry.urgency) + "," + sqlText(JSON.stringify(entry.actions || [])) + "," + (entry.transient ? 1 : 0) + "," + img + delVal + ") RETURNING id"
       run([sqlite, "-json", dbPath, sql], (code, out) => {
         let id = 0
@@ -263,7 +277,7 @@ Singleton {
     }
 
     if (key !== "" && avatarTmp !== "" && root.avatarKeys[key] !== true) {
-      const avatarSql = "INSERT INTO avatars (key,image,updated_at) SELECT " + sqlText(key) + ",readfile(" + sqlText(avatarTmp) + ")," + Math.floor(Date.now() / 1000) + " WHERE NOT EXISTS (SELECT 1 FROM avatars WHERE key=" + sqlText(key) + ")"
+      const avatarSql = "INSERT INTO avatars (key,image,updated_at) SELECT " + sqlText(key) + "," + blobExpr(avatarTmp) + "," + Math.floor(Date.now() / 1000) + " WHERE NOT EXISTS (SELECT 1 FROM avatars WHERE key=" + sqlText(key) + ")"
       run([sqlite, dbPath, avatarSql], code => {
         if (code === 0) {
           const upd = Object.assign({}, root.avatarKeys)
@@ -289,15 +303,17 @@ Singleton {
 
   function clearHistory() {
     root.clearCutoffSeq = root.insertSeq
-    run([sqlite, dbPath, "UPDATE notifications SET deleted_at=strftime('%s','now') WHERE deleted_at IS NULL"])
+    root.clearStamp = Date.now()
+    run([sqlite, dbPath, "UPDATE notifications SET deleted_at=" + root.clearStamp + " WHERE deleted_at IS NULL"])
     root.history = []
     exhausted = true
     root.unreadCount = 0
     markSeen()
   }
 
-  function undoClear(fromTs, toTs, onDone) {
-    run([sqlite, dbPath, "UPDATE notifications SET deleted_at=NULL WHERE deleted_at IS NOT NULL AND deleted_at >= " + Math.round(fromTs) + " AND deleted_at <= " + Math.round(toTs)], () => {
+  function undoClear(onDone) {
+    run([sqlite, dbPath, "UPDATE notifications SET deleted_at=NULL WHERE deleted_at=" + root.clearStamp], () => {
+      root.clearStamp = 0
       root.history = []
       exhausted = false
       fetchPage(initialCount, true, onDone)
@@ -371,7 +387,7 @@ Singleton {
     imageUrls = reserved
     const avatar = entry.imageKind === "avatar"
     const dst = avatar ? avatarPathFor(entry) : "/tmp/quickshell-notif-img/hist-" + id + ".png"
-    const sql = avatar ? "SELECT writefile(" + sqlText(dst) + ", image) AS n FROM avatars WHERE key=" + sqlText(chatKeyOf(entry)) : "SELECT writefile(" + sqlText(dst) + ", image) AS n FROM notifications WHERE id=" + id + " AND image IS NOT NULL"
+    const sql = avatar ? "SELECT writefile(" + sqlText(dst) + ", image) AS n FROM avatars WHERE key=" + sqlText(chatKeyOf(entry)) + " AND length(image) <= " + root.maxImageBytes : "SELECT writefile(" + sqlText(dst) + ", image) AS n FROM notifications WHERE id=" + id + " AND image IS NOT NULL AND length(image) <= " + root.maxImageBytes
     run([sqlite, "-json", dbPath, sql], (code, out) => {
       let ok = false
       if (code === 0 && out.trim().length > 0) {
@@ -380,7 +396,7 @@ Singleton {
         } catch (e) {}
       }
       const upd = Object.assign({}, root.imageUrls)
-      upd[id] = ok ? "file://" + dst : ""
+      upd[id] = ok ? "file://" + dst : null
       root.imageUrls = upd
     })
   }
