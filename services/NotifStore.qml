@@ -28,7 +28,8 @@ Singleton {
   property var queue: []
   property bool busy: false
   property var current: null
-  property bool clearing: false
+  property int insertSeq: 0
+  property int clearCutoffSeq: 0
 
   function sqlText(s) {
     return "'" + String(s === undefined || s === null ? "" : s).replace(/'/g, "''") + "'"
@@ -144,9 +145,11 @@ Singleton {
               }
             } catch (e) {}
           }
-          root.lastSeen = seen
+          if (seen > root.lastSeen) {
+            root.lastSeen = seen
+          }
           run([sqlite, "-json", dbPath, "SELECT COUNT(*) AS n FROM notifications WHERE deleted_at IS NULL AND ts > " + seen], (c2, out2) => {
-            if (c2 === 0 && out2.trim().length > 0) {
+            if (root.lastSeen <= seen && c2 === 0 && out2.trim().length > 0) {
               try {
                 root.unreadCount = JSON.parse(out2)[0].n || 0
               } catch (e) {}
@@ -218,14 +221,16 @@ Singleton {
   }
 
   function record(entry) {
+    root.insertSeq += 1
+    const seq = root.insertSeq
     const key = entry.avatarKey || ""
     const avatarTmp = entry.avatarTmp || ""
 
     const insertNotification = () => {
       const avatarReady = key !== "" && root.avatarKeys[key] === true
       const img = avatarReady || !entry.imageTmp ? "NULL" : "readfile(" + sqlText(entry.imageTmp) + ")"
-      const delCol = root.clearing ? ",deleted_at" : ""
-      const delVal = root.clearing ? ",strftime('%s','now')" : ""
+      const delCol = seq <= root.clearCutoffSeq ? ",deleted_at" : ""
+      const delVal = seq <= root.clearCutoffSeq ? ",strftime('%s','now')" : ""
       const sql = "INSERT INTO notifications (ts,app_name,app_icon,desktop_entry,summary,body,urgency,actions,transient,image" + delCol + ") VALUES (" + Math.round(entry.ts) + "," + sqlText(entry.appName) + "," + sqlText(entry.appIcon) + "," + sqlText(entry.desktopEntry) + "," + sqlText(entry.summary) + "," + sqlText(entry.body) + "," + Math.round(entry.urgency === undefined ? 1 : entry.urgency) + "," + sqlText(JSON.stringify(entry.actions || [])) + "," + (entry.transient ? 1 : 0) + "," + img + delVal + ") RETURNING id"
       run([sqlite, "-json", dbPath, sql], (code, out) => {
         let id = 0
@@ -234,7 +239,7 @@ Singleton {
             id = JSON.parse(out)[0].id
           } catch (e) {}
         }
-        if (root.clearing) {
+        if (seq <= root.clearCutoffSeq) {
           return
         }
         root.history = [
@@ -283,13 +288,12 @@ Singleton {
   }
 
   function clearHistory() {
-    root.clearing = true
+    root.clearCutoffSeq = root.insertSeq
     run([sqlite, dbPath, "UPDATE notifications SET deleted_at=strftime('%s','now') WHERE deleted_at IS NULL"])
     root.history = []
     exhausted = true
     root.unreadCount = 0
     markSeen()
-    clearFlagTimer.restart()
   }
 
   function undoClear(fromTs, toTs, onDone) {
@@ -394,13 +398,6 @@ Singleton {
   }
 
   Component.onCompleted: open()
-
-  Timer {
-    id: clearFlagTimer
-
-    interval: 500
-    onTriggered: root.clearing = false
-  }
 
   Process {
     id: dbProc

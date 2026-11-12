@@ -98,6 +98,25 @@ PanelBase {
     return out
   }
 
+  property bool modelFrozen: false
+  property var frozenItems: []
+  readonly property var displayItems: root.modelFrozen ? root.frozenItems : root.items
+
+  function freezeModel() {
+    if (root.modelFrozen) {
+      return
+    }
+    root.frozenItems = root.items
+    root.modelFrozen = true
+  }
+
+  function thawModel() {
+    if (!root.modelFrozen) {
+      return
+    }
+    root.modelFrozen = false
+  }
+
   property var rowHeights: ({})
 
   property string scrollAnchorKey: ""
@@ -109,18 +128,21 @@ PanelBase {
     if (!notificationList.visible || notificationList.count === 0) {
       return
     }
-    const idx = notificationList.indexAt(0, notificationList.contentY + 1)
-    if (idx < 0 || idx >= root.items.length) {
+    let idx = -1
+    for (let y = 1; y < 48 && idx < 0; y += 4) {
+      idx = notificationList.indexAt(0, notificationList.contentY + y)
+    }
+    if (idx < 0 || idx >= root.displayItems.length) {
       return
     }
-    root.scrollAnchorKey = root.items[idx].key
+    root.scrollAnchorKey = root.displayItems[idx].key
     root.scrollAnchorIndex = idx
     const last = notificationList.itemAtIndex(notificationList.count - 1)
     root.scrollAnchorAtEnd = last !== null && last !== undefined && last.y + last.height <= notificationList.contentY + notificationList.height + 0.5
   }
 
   function restoreScrollAnchor() {
-    if (root.items.length === 0) {
+    if (root.displayItems.length === 0) {
       return
     }
     if (root.scrollAnchorAtEnd) {
@@ -132,18 +154,18 @@ PanelBase {
       return
     }
     let target = root.scrollAnchorIndex
-    for (let i = 0; i < root.items.length; i++) {
-      if (root.items[i].key === root.scrollAnchorKey) {
+    for (let i = 0; i < root.displayItems.length; i++) {
+      if (root.displayItems[i].key === root.scrollAnchorKey) {
         target = i
         break
       }
     }
     notifScroll.beginDrag()
-    notificationList.positionViewAtIndex(Math.min(target, root.items.length - 1), ListView.Beginning)
+    notificationList.positionViewAtIndex(Math.min(target, root.displayItems.length - 1), ListView.Beginning)
   }
 
   function checkEnd() {
-    if (!NotifStore.ready || NotifStore.exhausted || NotifStore.loadingMore || root.closingCount > 0) {
+    if (!NotifStore.ready || NotifStore.exhausted || NotifStore.loadingMore || root.closingCount > 0 || root.clearing) {
       return
     }
     const last = notificationList.itemAtIndex(notificationList.count - 1)
@@ -164,7 +186,7 @@ PanelBase {
   readonly property var topCardHeights: {
     const out = []
     for (let i = 0; i < root.budgetCount; i++) {
-      const item = root.items[i]
+      const item = root.displayItems[i]
       const cached = item ? root.rowHeights[item.key] : undefined
       out.push(typeof cached === "number" ? cached : root.minCardHeight)
     }
@@ -172,10 +194,10 @@ PanelBase {
   }
 
   readonly property real listBudget: {
-    if (root.items.length === 0) {
+    if (root.displayItems.length === 0) {
       return 0
     }
-    if (root.items.length < root.budgetCount) {
+    if (root.displayItems.length < root.budgetCount) {
       return root.minCardHeight * root.budgetCount + Theme.gap * (root.budgetCount - 1)
     }
     const heights = root.topCardHeights
@@ -251,6 +273,7 @@ PanelBase {
 
   function clearAllInner() {
     root.clearing = true
+    root.freezeModel()
     const visible = []
     for (let i = 0; i < notificationList.count; i++) {
       const d = notificationList.itemAtIndex(i)
@@ -283,6 +306,7 @@ PanelBase {
     root.undoArmed = true
     undoTimer.restart()
     root.clearing = false
+    root.thawModel()
   }
 
   function undoClear() {
@@ -305,7 +329,7 @@ PanelBase {
     }
   }
 
-  onItemsChanged: Qt.callLater(root.restoreScrollAnchor)
+  onDisplayItemsChanged: Qt.callLater(root.restoreScrollAnchor)
 
   Connections {
     target: notificationList
@@ -370,7 +394,7 @@ PanelBase {
       name: root.undoArmed ? "arrow-back-up" : "trash"
       iconColor: Theme.overlay
       bgColor: Theme.surface
-      visible: root.items.length > 0 || root.undoArmed
+      visible: root.displayItems.length > 0 || root.undoArmed
       onClicked: {
         if (root.undoArmed && !root.restoring) {
           root.undoClear()
@@ -382,7 +406,7 @@ PanelBase {
   }
 
   PlaceholderCard {
-    shown: root.items.length === 0
+    shown: root.displayItems.length === 0
     instant: Notifs.dnd
     icon: Notifs.dnd ? "bell-off" : "bell"
     text: !NotifStore.ready ? "Loading" : Notifs.dnd ? "Do not disturb" : "No notifications"
@@ -407,7 +431,7 @@ PanelBase {
 
     ListView {
       id: notificationList
-      visible: root.items.length > 0
+      visible: root.displayItems.length > 0
       anchors.fill: parent
       model: root.items
       spacing: Theme.gap
@@ -470,6 +494,7 @@ PanelBase {
           if (closing || root.closingCount > 0 || root.clearing) {
             return
           }
+          root.freezeModel()
           closing = true
           closeDone = false
           closeTarget = modelData
@@ -504,6 +529,9 @@ PanelBase {
         ListView.onPooled: {
           if (closing) {
             notificationRow.runCloseTarget()
+            if (!root.clearing) {
+              Qt.callLater(root.thawModel)
+            }
             closing = false
             root.closingCount -= 1
           }
@@ -591,7 +619,12 @@ PanelBase {
           }
 
           ScriptAction {
-            script: notificationRow.runCloseTarget()
+            script: {
+              notificationRow.runCloseTarget()
+              if (!root.clearing) {
+                Qt.callLater(root.thawModel)
+              }
+            }
           }
         }
 
