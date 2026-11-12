@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Networking
 import Quickshell.Io
 import "../theme"
@@ -15,11 +16,12 @@ PanelBase {
   property string confirmForget: ""
   property string expanded: ""
   property string activating: ""
+  property string pskAttempt: ""
   property string sharing: ""
   property bool scanning: false
   property double lastRefresh: 0
   property var autoConnect: ({})
-  property var modifyQueue: null
+  property var modifyQueue: []
   property var pskCache: ({})
   property var pskQueue: []
   property bool connectedExpanded: true
@@ -42,7 +44,7 @@ PanelBase {
   }
 
   onDeviceChanged: {
-    if (root.device) {
+    if (root.device && root.open) {
       root.device.scannerEnabled = true
     }
   }
@@ -146,7 +148,10 @@ PanelBase {
     return out
   }
 
-  onAllNetworksChanged: root.rebuildSortStrength()
+  onAllNetworksChanged: {
+    root.pruneFlowState()
+    root.rebuildSortStrength()
+  }
 
   onInteractingChanged: if (!root.interacting) {
     root.rebuildSortStrength()
@@ -181,13 +186,37 @@ PanelBase {
     root.sortStrength = next
   }
 
+  function pruneFlowState() {
+    if (root.pending !== "" && !root.findNetwork(root.pending)) {
+      root.pending = ""
+    }
+    if (root.confirmForget !== "" && !root.findNetwork(root.confirmForget)) {
+      root.confirmForget = ""
+    }
+    if (root.expanded !== "" && !root.findNetwork(root.expanded)) {
+      root.expanded = ""
+    }
+  }
+
   function toggleSection(section) {
     if (section === "connected") {
       root.connectedExpanded = !root.connectedExpanded
+      if (!root.connectedExpanded && root.confirmForget !== "" && root.connectedNetwork && root.confirmForget === root.connectedNetwork.name) {
+        root.confirmForget = ""
+      }
     } else if (section === "saved") {
       root.savedExpanded = !root.savedExpanded
+      if (!root.savedExpanded && root.confirmForget !== "") {
+        const net = root.findNetwork(root.confirmForget)
+        if (!net || !net.connected) {
+          root.confirmForget = ""
+        }
+      }
     } else if (section === "available") {
       root.availableExpanded = !root.availableExpanded
+      if (!root.availableExpanded && root.pending !== "") {
+        root.pending = ""
+      }
     }
     root.sharing = ""
     if (root.pending !== "" || root.confirmForget !== "") {
@@ -297,16 +326,15 @@ PanelBase {
     }
     next[name] = value
     root.autoConnect = next
-    root.modifyQueue = [name, value ? "yes" : "no"]
+    root.modifyQueue.push([name, value ? "yes" : "no"])
     root.pumpModify()
   }
 
   function pumpModify() {
-    if (modifyProc.running || !root.modifyQueue) {
+    if (modifyProc.running || root.modifyQueue.length === 0) {
       return
     }
-    const job = root.modifyQueue
-    root.modifyQueue = null
+    const job = root.modifyQueue.shift()
     modifyProc.command = ["nmcli", "connection", "modify", job[0], "connection.autoconnect", job[1]]
     modifyProc.running = true
   }
@@ -372,11 +400,29 @@ PanelBase {
   }
 
   function storePsk(name, output) {
+    const psk = output.replace(/\n+$/, "")
     const next = {}
     for (const k in root.pskCache) {
-      next[k] = root.pskCache[k]
+      if (k !== name && root.pskCache[k] !== "") {
+        next[k] = root.pskCache[k]
+      }
     }
-    next[name] = output.replace(/\n+$/, "")
+    if (psk !== "") {
+      next[name] = psk
+    }
+    root.pskCache = next
+  }
+
+  function dropPsk(name) {
+    if (!name || root.pskCache[name] === undefined) {
+      return
+    }
+    const next = {}
+    for (const k in root.pskCache) {
+      if (k !== name) {
+        next[k] = root.pskCache[k]
+      }
+    }
     root.pskCache = next
   }
 
@@ -559,6 +605,7 @@ PanelBase {
     if (!network) {
       return false
     }
+    root.pskAttempt = root.pending
     network.connectWithPsk(editor.text)
     root.pending = ""
     return true
@@ -583,6 +630,7 @@ PanelBase {
       return false
     }
     network.forget()
+    root.dropPsk(network.name)
     root.confirmForget = ""
     return true
   }
@@ -687,6 +735,7 @@ PanelBase {
     root.rebuildSortStrength()
     pending = ""
     confirmForget = ""
+    pskAttempt = ""
     expanded = ""
     sharing = ""
     activating = ""
@@ -756,6 +805,18 @@ PanelBase {
       readonly property bool busy: entry.changing || (!entry.isLabel && root.activating !== "" && root.activating === entry.itemKey)
       onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.itemKey) {
         root.activating = ""
+      }
+
+      Connections {
+        target: entry.net
+
+        function onConnectionFailed(reason) {
+          if (root.pskAttempt !== entry.itemKey && root.activating !== entry.itemKey) {
+            return
+          }
+          root.pskAttempt = ""
+          Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", "normal", "opencode", "Wi-Fi: connection to " + entry.itemKey + " failed (" + ConnectionFailReason.toString(reason) + ")"])
+        }
       }
       readonly property var passwordEditor: pwField
       readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || pwHover.containsMouse || eyeBtn.hovered || passCheckBtn.hovered || forgetCancelBtn.hovered || forgetCheckBtn.hovered || trashActionBtn.hovered || qrActionBtn.hovered || toggleActionBtn.hovered || speedActionBtn.hovered || badgeHover.containsMouse
@@ -1017,6 +1078,7 @@ PanelBase {
               onAccepted: {
                 const network = root.findNetwork(root.pending)
                 if (network) {
+                  root.pskAttempt = root.pending
                   network.connectWithPsk(pwField.text)
                 }
                 root.pending = ""
@@ -1065,6 +1127,7 @@ PanelBase {
               onClicked: {
                 const network = root.findNetwork(root.pending)
                 if (network) {
+                  root.pskAttempt = root.pending
                   network.connectWithPsk(pwField.text)
                 }
                 root.pending = ""
@@ -1126,6 +1189,7 @@ PanelBase {
                 const network = root.findNetwork(root.confirmForget)
                 if (network) {
                   network.forget()
+                  root.dropPsk(network.name)
                 }
                 root.confirmForget = ""
               }
