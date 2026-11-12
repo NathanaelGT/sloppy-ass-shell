@@ -26,6 +26,8 @@ Item {
   readonly property int indent: Math.round(14 * Theme.scale)
   readonly property int slotW: Math.round(15 * Theme.scale)
   readonly property int textGap: Math.round(8 * Theme.scale)
+  readonly property int iconSize: Math.round(16 * Theme.scale)
+  readonly property bool hasIcon: !root.separator && entry.icon !== ""
   readonly property string displayText: root.separator ? "" : String(entry.text).replace(/&(.)/g, "$1")
 
   width: parent.width
@@ -39,6 +41,7 @@ Item {
       enabled: root.active,
       buttonType: root.entry.buttonType === QsMenuButtonType.CheckBox ? "checkbox" : root.entry.buttonType === QsMenuButtonType.RadioButton ? "radio" : "none",
       checkState: root.entry.checkState === Qt.Checked ? "checked" : root.entry.checkState === Qt.PartiallyChecked ? "partial" : "unchecked",
+      hasIcon: root.hasIcon,
       hasChildren: root.submenu,
       expanded: root.expanded
     }
@@ -127,9 +130,25 @@ Item {
     }
   }
 
-  Text {
+  Image {
     anchors.left: parent.left
     anchors.leftMargin: root.padX + root.depth * root.indent + root.slotW + root.textGap
+    anchors.verticalCenter: parent.verticalCenter
+    visible: root.hasIcon
+    width: root.iconSize
+    height: root.iconSize
+    sourceSize: Qt.size(width, height)
+    source: root.entry.icon
+    onStatusChanged: {
+      if (status === Image.Error) {
+        source = Quickshell.iconPath("application-x-executable", "")
+      }
+    }
+  }
+
+  Text {
+    anchors.left: parent.left
+    anchors.leftMargin: root.padX + root.depth * root.indent + root.slotW + root.textGap + (root.hasIcon ? root.iconSize + root.textGap : 0)
     anchors.right: parent.right
     anchors.rightMargin: root.submenu ? Math.round(22 * Theme.scale) : root.padX
     anchors.verticalCenter: parent.verticalCenter
@@ -155,9 +174,9 @@ Item {
     id: rowMouse
 
     anchors.fill: parent
-    enabled: root.active
+    acceptedButtons: Qt.LeftButton | Qt.RightButton
     hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
+    cursorShape: root.active && !root.separator ? Qt.PointingHandCursor : Qt.ArrowCursor
     onClicked: root.invoke()
   }
 }

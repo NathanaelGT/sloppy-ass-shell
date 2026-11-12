@@ -83,6 +83,10 @@ Singleton {
   }
 
   function openTray(item, anchorX, screen) {
+    if (openOn("tray", screen) && trayItem === item) {
+      close()
+      return
+    }
     trayItem = item
     trayAnchorX = anchorX
     open("tray", screen)

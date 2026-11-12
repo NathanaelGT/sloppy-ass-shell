@@ -160,6 +160,29 @@ PanelBase {
     }
   }
 
+  Connections {
+    target: Panels
+
+    function onTrayItemChanged() {
+      if (!root.open) {
+        return
+      }
+      opener.menu = Panels.trayItem ? Panels.trayItem.menu : null
+      root.resetMenu()
+    }
+  }
+
+  Connections {
+    target: opener
+
+    function onMenuChanged() {
+      if (root.open && !opener.menu) {
+        Panels.close()
+        Panels.trayItem = null
+      }
+    }
+  }
+
   QsMenuOpener {
     id: opener
   }
