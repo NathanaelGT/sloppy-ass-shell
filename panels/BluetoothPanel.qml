@@ -12,7 +12,10 @@ PanelBase {
 
   property string expanded: ""
   property string confirmRemove: ""
+  property double confirmAt: 0
   property string activating: ""
+  property bool activatingIsConnect: false
+  property string failed: ""
   property double lastRefresh: 0
   property bool connectedExpanded: true
   property bool pairedExpanded: true
@@ -163,8 +166,23 @@ PanelBase {
     return device.state === BluetoothDeviceState.Connecting || device.state === BluetoothDeviceState.Disconnecting
   }
 
+  function failDevice(address) {
+    if (!address) {
+      return
+    }
+    root.failed = address
+    failedTimer.restart()
+  }
+
+  function clearFailure(address) {
+    if (root.failed === address) {
+      root.failed = ""
+      failedTimer.stop()
+    }
+  }
+
   function rescan() {
-    if (!root.adapter || scanProc.running) {
+    if (!root.adapter || !root.enabled || scanProc.running) {
       return
     }
     root.lastRefresh = Date.now()
@@ -184,10 +202,10 @@ PanelBase {
     }
     if (!device.paired && !device.bonded) {
       if (device.pairing) {
-        device.cancelPair()
-      } else {
-        device.pair()
+        return
       }
+      root.clearFailure(device.address)
+      device.pair()
       return
     }
     root.confirmRemove = ""
@@ -199,6 +217,7 @@ PanelBase {
       return
     }
     root.expanded = ""
+    root.confirmAt = Date.now()
     root.confirmRemove = root.confirmRemove === device.address ? "" : device.address
   }
 
@@ -227,6 +246,8 @@ PanelBase {
       return false
     }
     root.activating = device.address
+    root.activatingIsConnect = !device.connected
+    root.clearFailure(device.address)
     activatingTimer.restart()
     if (device.connected) {
       device.disconnect()
@@ -249,6 +270,7 @@ PanelBase {
       expanded: root.expanded,
       confirm: root.confirmRemove,
       activating: root.activating,
+      failed: root.failed,
       scanning: root.scanning,
       lastRefresh: root.lastRefresh,
       connectedExpanded: root.connectedExpanded,
@@ -333,15 +355,31 @@ PanelBase {
     return root.toggleConnected(root.findDevice(address))
   }
 
-  onOpened: {
-    root.expanded = ""
-    root.confirmRemove = ""
-    root.activating = ""
-    root.maybeRescan()
+  onOpenChanged: {
+    if (root.open) {
+      root.expanded = ""
+      root.confirmRemove = ""
+      root.activating = ""
+      root.failed = ""
+      root.maybeRescan()
+    } else {
+      scanProc.running = false
+    }
   }
 
-  onOpenChanged: if (!root.open) {
-    scanProc.running = false
+  Connections {
+    target: root
+
+    function onEnabledChanged() {
+      if (!root.open) {
+        return
+      }
+      if (root.enabled) {
+        root.maybeRescan()
+      } else {
+        scanProc.running = false
+      }
+    }
   }
 
   Process {
@@ -349,6 +387,10 @@ PanelBase {
 
     running: false
     command: ["bash", "-lc", "exec bluetoothctl --timeout 3600 scan on >/dev/null 2>&1"]
+
+    onExited: if (root.open && root.enabled) {
+      root.maybeRescan()
+    }
   }
 
   Timer {
@@ -356,6 +398,13 @@ PanelBase {
 
     interval: 30000
     onTriggered: root.activating = ""
+  }
+
+  Timer {
+    id: failedTimer
+
+    interval: 4000
+    onTriggered: root.failed = ""
   }
 
   PanelHeader {
@@ -372,6 +421,8 @@ PanelBase {
 
     Switch {
       anchors.verticalCenter: parent.verticalCenter
+      enabled: root.adapter !== null
+      opacity: root.adapter ? 1 : 0.4
       checked: root.enabled
       onToggled: if (root.adapter) {
         root.adapter.enabled = !root.adapter.enabled
@@ -416,9 +467,9 @@ PanelBase {
   PlaceholderCard {
     shown: !root.enabled || root.rows.length === 0
     instant: !root.enabled
-    icon: !root.enabled ? "bluetooth-off" : "bluetooth"
-    text: !root.enabled ? "Bluetooth is off" : "Scanning"
-    rolling: root.enabled && root.rows.length === 0
+    icon: root.enabled ? "bluetooth" : "bluetooth-off"
+    text: !root.enabled ? (root.adapter ? "Bluetooth is off" : "No Bluetooth adapter found") : root.scanning ? "Scanning" : "No devices found"
+    rolling: root.enabled && root.rows.length === 0 && root.scanning
   }
 
   SectionList {
@@ -463,9 +514,46 @@ PanelBase {
       readonly property color strongText: entry.isConnected ? Theme.primary : Theme.text
       readonly property color mutedText: Theme.subtext
       readonly property color hoverText: Theme.text
+      readonly property bool failed: !entry.isLabel && root.failed === entry.itemKey
+      property bool sawBusy: false
+      property bool pairCancelled: false
 
-      onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.itemKey) {
+      onChangingChanged: {
+        if (entry.isLabel) {
+          return
+        }
+        if (entry.changing) {
+          entry.sawBusy = true
+          return
+        }
+        if (!entry.sawBusy || root.activating !== entry.itemKey) {
+          return
+        }
+        entry.sawBusy = false
         root.activating = ""
+        if (entry.device.connected !== root.activatingIsConnect) {
+          root.failDevice(entry.itemKey)
+        }
+      }
+
+      onPairingChanged: {
+        if (entry.isLabel || entry.pairing) {
+          return
+        }
+        if (entry.pairCancelled) {
+          entry.pairCancelled = false
+          return
+        }
+        pairFailCheck.restart()
+      }
+
+      Timer {
+        id: pairFailCheck
+
+        interval: 500
+        onTriggered: if (entry.device && !entry.device.pairing && !entry.device.paired && !entry.device.bonded) {
+          root.failDevice(entry.itemKey)
+        }
       }
 
       width: list.width
@@ -611,6 +699,16 @@ PanelBase {
               font.pixelSize: Theme.fontSizeSmall
             }
 
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              visible: entry.failed
+              text: "Failed"
+              color: Theme.red
+              font.family: Theme.fontFamily
+              font.pixelSize: Theme.fontSizeSmall
+              font.bold: true
+            }
+
             Spinner {
               anchors.verticalCenter: parent.verticalCenter
               visible: entry.busy && !entry.actionsOpen
@@ -629,6 +727,7 @@ PanelBase {
               iconColor: cancelPairBtn.hovered ? Theme.text : Theme.overlay
               hoverColor: Theme.surfaceHigher
               onClicked: if (entry.device) {
+                entry.pairCancelled = true
                 entry.device.cancelPair()
               }
             }
@@ -672,7 +771,9 @@ PanelBase {
               name: "x"
               iconColor: confirmCancelBtn.hovered ? Theme.text : Theme.overlay
               hoverColor: Theme.surfaceHigher
-              onClicked: root.confirmRemove = ""
+              onClicked: if (Date.now() - root.confirmAt >= 300) {
+                root.confirmRemove = ""
+              }
             }
 
             IconButton {
@@ -685,6 +786,9 @@ PanelBase {
               iconColor: Theme.red
               hoverColor: Theme.surfaceHigher
               onClicked: {
+                if (Date.now() - root.confirmAt < 300) {
+                  return
+                }
                 const device = root.findDevice(root.confirmRemove)
                 root.confirmRemove = ""
                 if (device) {
