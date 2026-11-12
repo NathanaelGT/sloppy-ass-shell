@@ -378,6 +378,7 @@ Singleton {
       onError: onError
     })
     if (root.idleInFlight) {
+      root.idleInFlight = false
       root.write("noidle\n")
     } else {
       root.pump()

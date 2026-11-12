@@ -15,11 +15,12 @@ Rectangle {
 
   readonly property string glyphIcon: root.activeSource ? "check" : root.kind === "pinned" ? "pin-filled" : root.kind === "favorites" ? "heart-filled" : "folder"
   readonly property color glyphColor: root.kind === "pinned" ? Theme.yellow : root.kind === "favorites" ? Theme.red : root.activeSource ? Theme.text : Theme.subtext
+  readonly property bool rowHovered: rowHover.containsMouse || playHover.containsMouse
 
   width: parent ? parent.width : 0
   height: s(31)
   radius: s(8)
-  color: root.activeSource ? Qt.rgba(Theme.mauve.r, Theme.mauve.g, Theme.mauve.b, 0.18) : rowHover.containsMouse ? Theme.surface : Theme.base
+  color: root.activeSource ? Qt.rgba(Theme.mauve.r, Theme.mauve.g, Theme.mauve.b, 0.18) : root.rowHovered ? Theme.surface : Theme.base
 
   function s(n) {
     return Math.round(n * Theme.scale)
@@ -92,8 +93,8 @@ Rectangle {
     width: s(24)
     height: s(24)
     radius: s(6)
-    visible: rowHover.containsMouse
-    opacity: rowHover.containsMouse ? 1 : 0
+    visible: root.rowHovered
+    opacity: root.rowHovered ? 1 : 0
     color: playHover.containsMouse ? Theme.surfaceHigher : "transparent"
 
     Text {
@@ -108,7 +109,8 @@ Rectangle {
       id: playHover
 
       anchors.fill: parent
-      enabled: rowHover.containsMouse
+      hoverEnabled: true
+      enabled: root.rowHovered
       cursorShape: Qt.PointingHandCursor
       onClicked: root.playRow(root.path)
     }

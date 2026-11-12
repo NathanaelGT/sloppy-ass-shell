@@ -1936,9 +1936,10 @@ PanelBase {
         verticalAlignment: TextInput.AlignVCenter
         text: root.searchText
         onTextChanged: root.searchText = text
-        Keys.onEscapePressed: {
+        Keys.onEscapePressed: event => {
           text = ""
           focus = false
+          event.accepted = true
         }
 
         Text {
@@ -2535,6 +2536,12 @@ PanelBase {
               swipeX = open ? -revealWidth : 0
             }
 
+            function gestureCancel() {
+              gestureActive = false
+              wasGesture = false
+              swipeX = revealed ? -revealWidth : 0
+            }
+
             Behavior on swipeX {
               enabled: !queueRow.gestureActive
               NumberAnimation {
@@ -2577,7 +2584,6 @@ PanelBase {
 
               anchors.fill: parent
               hoverEnabled: true
-              preventStealing: true
               onPressed: mouse => queueRow.gesturePress(qHover.mapToItem(null, mouse.x, mouse.y).x)
               onPositionChanged: mouse => {
                 if (pressed) {
@@ -2585,6 +2591,7 @@ PanelBase {
                 }
               }
               onReleased: queueRow.gestureRelease()
+              onCanceled: queueRow.gestureCancel()
               onClicked: {
                 if (queueRow.wasGesture || queueRow.revealed) {
                   return

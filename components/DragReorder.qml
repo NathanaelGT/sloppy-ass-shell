@@ -158,7 +158,13 @@ Item {
       return
     }
     root.lastSceneY = sceneY
-    const dragged = root.listView.itemAtIndex(root.dragFrom)
+    const idx = root.indexOfKey(root.dragKey)
+    if (idx < 0) {
+      root.finish(false)
+      return
+    }
+    root.dragFrom = idx
+    const dragged = root.listView.itemAtIndex(idx)
     const top = dragged ? dragged.y : 0
     const height = dragged ? dragged.height : 0
     const raw = sceneY - root.dragStartY + root.scrollShift
@@ -207,9 +213,9 @@ Item {
     }
     const key = root.dragKey
     const target = root.dragTarget
-    const from = root.dragFrom
-    const changed = commit && key !== "" && target >= 0 && target !== from
-    const dragged = root.listView.itemAtIndex(from)
+    const from = key === "" ? -1 : root.indexOfKey(key)
+    const changed = commit && from >= 0 && target >= 0 && target !== from
+    const dragged = from >= 0 ? root.listView.itemAtIndex(from) : null
     const visualY = (dragged ? dragged.y : 0) + root.dragDelta
     const newTop = changed ? root.movedTop(from, target) : (dragged ? dragged.y : 0)
     root.suppressMove = true
