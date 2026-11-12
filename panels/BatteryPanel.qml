@@ -48,6 +48,7 @@ PanelBase {
   property var procExpanded: ({})
   property var procMetaCache: ({})
   property var procGames: ({})
+  property var procGroupPids: ({})
   property double procTs: 0
   property string procSort: "mem"
   property bool procAsc: false
@@ -457,9 +458,33 @@ PanelBase {
     gpuProc.running = true
   }
 
+  function resetState() {
+    root.primed = false
+    root.refresh()
+    root.procPrev = ({})
+    root.procTs = 0
+    root.procRaw = []
+    root.procGpu = ({})
+    root.procGroupPids = ({})
+    root.procExpanded = ({})
+    root.procGames = ({})
+    root.procNcpu = 1
+    root.gpuUsage = 0
+    root.gpuTemp = 0
+    root.gpuWatt = 0
+    root.gpuVramUsed = 0
+    root.gpuVramTotal = 0
+    root.gpuClock = ""
+    filterInput.text = ""
+    root.procFilter = ""
+    root.refreshProcs()
+    root.refreshGpu()
+  }
+
   function parseGpu(text) {
     const lines = text.split("\n")
     const per = {}
+    let reported = false
     for (let i = 0; i < lines.length; i++) {
       const f = lines[i].split("\t")
       if (f[0] === "N" && f.length >= 4) {
@@ -468,6 +493,7 @@ PanelBase {
           m: parseFloat(f[3])
         }
       } else if (f[0] === "D" && f.length >= 8) {
+        reported = true
         const u = parseFloat(f[1])
         const t = parseFloat(f[2])
         const w = parseFloat(f[3])
@@ -481,6 +507,14 @@ PanelBase {
         root.gpuClock = f[6] !== undefined ? f[6].replace(/ MHz/, "") : ""
         root.gpuName = f[7] !== undefined ? f[7] : ""
       }
+    }
+    if (!reported) {
+      root.gpuUsage = 0
+      root.gpuTemp = 0
+      root.gpuWatt = 0
+      root.gpuVramUsed = 0
+      root.gpuVramTotal = 0
+      root.gpuClock = ""
     }
     root.procGpu = per
     if (root.procRaw.length === 0) {
@@ -735,6 +769,7 @@ PanelBase {
       g.procs.push(r)
     }
     const terms = root.procFilter.trim().toLowerCase().split(/\s+/).filter(t => t !== "")
+    const pids = {}
     for (let i = 0; i < groups.length; i++) {
       const g = groups[i]
       let dispProc = byPid[g.leader]
@@ -781,7 +816,9 @@ PanelBase {
       g.ivram = procAgg(members, "ivram", false)
       g.count = members.length
       g.members = members
+      pids[g.leader] = members.map(p => p.pid)
     }
+    root.procGroupPids = pids
     const shown = groups.filter(g => g.skip !== true)
     shown.sort(procCompare)
     if (shown.length > root.procMax) {
@@ -854,6 +891,10 @@ PanelBase {
   }
 
   function procGroupMembers(key) {
+    const shown = root.procGroupPids[key]
+    if (shown !== undefined && shown.length > 0) {
+      return shown
+    }
     const pids = []
     for (let i = 0; i < root.procRaw.length; i++) {
       const r = procRaw[i]
@@ -918,6 +959,7 @@ PanelBase {
     procMenu.title = item.name
     if (item.kind === "group" && item.count > 1) {
       const key = item.key
+      const pids = root.procGroupMembers(key)
       entries.push({
         label: item.expanded ? "Collapse" : "Expand",
         action: () => root.toggleProcGroup(key)
@@ -933,7 +975,7 @@ PanelBase {
         label: "Kill all",
         danger: true,
         confirm: true,
-        action: () => root.procSignal(root.procGroupMembers(key), "TERM", item.name)
+        action: () => root.procSignal(pids, "TERM", item.name)
       })
     } else {
       const pid = item.key
@@ -971,6 +1013,7 @@ PanelBase {
         action: () => root.procCopyCmdline(pid)
       })
       if (item.kind === "proc") {
+        const groupPids = root.procGroupMembers(leader)
         entries.push({
           separator: true
         })
@@ -978,7 +1021,7 @@ PanelBase {
           label: "Kill all in group",
           danger: true,
           confirm: true,
-          action: () => root.procSignal(root.procGroupMembers(leader), "TERM", item.name)
+          action: () => root.procSignal(groupPids, "TERM", item.name)
         })
       }
     }
@@ -986,7 +1029,7 @@ PanelBase {
     const h = procMenuHeight(entries)
     const inset = Math.round(4 * Theme.scale)
     const cardX = root.cardX
-    const cardY = root.attached ? 0 : root.restingY
+    const cardY = root.attached ? root.dockY : root.restingY
     let px = x
     let py = y
     if (py + h > cardY + root.cardHeight - inset) {
@@ -1479,7 +1522,9 @@ PanelBase {
     target: root
 
     function onOpenChanged() {
-      if (!root.open) {
+      if (root.open) {
+        root.resetState()
+      } else {
         procMenu.close()
       }
     }
@@ -1509,7 +1554,7 @@ PanelBase {
     running: false
     onExited: code => {
       if (code !== 0) {
-        Quickshell.execDetached(["dunstify", "-a", "quickshell", "-u", "normal", "Quickshell", procKillProc.target.length > 0 ? "Failed to signal " + procKillProc.target : "Failed to signal process"])
+        Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", "normal", "opencode", procKillProc.target.length > 0 ? "Failed to signal " + procKillProc.target : "Failed to signal process"])
       }
     }
   }
@@ -1524,16 +1569,6 @@ PanelBase {
         if (t.length > 0) {
           root.procCopy(t)
         }
-      }
-    }
-  }
-
-  Connections {
-    target: root
-
-    function onOpenChanged() {
-      if (!root.open && procMenu.opened) {
-        procMenu.close()
       }
     }
   }
@@ -1580,22 +1615,6 @@ PanelBase {
     running: root.open
     repeat: true
     onTriggered: root.refresh()
-  }
-
-  onOpened: {
-    root.primed = false
-    root.refresh()
-    root.procPrev = ({})
-    root.procTs = 0
-    root.procRaw = []
-    root.procGpu = ({})
-    root.procExpanded = ({})
-    root.procGames = ({})
-    root.procNcpu = 1
-    filterInput.text = ""
-    root.procFilter = ""
-    root.refreshProcs()
-    root.refreshGpu()
   }
 
   onContentClicked: pos => {
