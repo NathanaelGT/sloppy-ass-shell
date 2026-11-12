@@ -21,6 +21,9 @@ Singleton {
   property bool pinnedRun: false
   property bool retried: false
   property int resultId: -1
+  property double finishedAt: 0
+
+  readonly property int staleMs: 300000
 
   function toMbps(bytesPerSec) {
     return bytesPerSec / 125000
@@ -39,6 +42,9 @@ Singleton {
 
   function visibleFor(name) {
     if (name === "" || root.target !== name) {
+      return false
+    }
+    if (!root.running && root.finishedAt > 0 && Date.now() - root.finishedAt > root.staleMs) {
       return false
     }
     return root.running || root.down >= 0 || root.up >= 0 || root.error !== ""
@@ -107,6 +113,7 @@ Singleton {
     root.running = true
     root.retried = false
     root.resultId = -1
+    root.finishedAt = 0
     root.runSpeedtest(true)
     return true
   }
@@ -170,6 +177,7 @@ Singleton {
       return
     }
     root.running = false
+    root.finishedAt = Date.now()
     if (failed) {
       root.error = "Failed"
     } else if (root.down >= 0 && root.down > root.baseline) {
@@ -194,6 +202,7 @@ Singleton {
     root.up = up
     root.error = ""
     root.running = phase !== "" && phase !== "done"
+    root.finishedAt = Date.now()
     return true
   }
 
@@ -206,7 +215,8 @@ Singleton {
       error: root.error,
       target: root.target,
       server: root.serverId,
-      iface: root.iface
+      iface: root.iface,
+      finishedAt: root.finishedAt
     }
   }
 

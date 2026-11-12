@@ -28,8 +28,9 @@ PanelBase {
   property bool savedExpanded: true
   property bool availableExpanded: true
   property var sortStrength: ({})
+  property double confirmArmedAt: 0
 
-  readonly property bool interacting: pending !== "" || expanded !== "" || confirmForget !== "" || sharing !== ""
+  readonly property bool interacting: pending !== "" || expanded !== "" || confirmForget !== "" || sharing !== "" || activating !== ""
 
   readonly property bool enabled: Networking.wifiEnabled
 
@@ -179,6 +180,11 @@ PanelBase {
     if (root.interacting) {
       return
     }
+    for (let i = 0; i < allNetworks.length; i++) {
+      if (allNetworks[i].stateChanging) {
+        return
+      }
+    }
     const next = {}
     for (let i = 0; i < allNetworks.length; i++) {
       next[allNetworks[i].name] = allNetworks[i].signalStrength || 0
@@ -293,6 +299,9 @@ PanelBase {
     }
     root.pending = ""
     root.sharing = ""
+    if (root.confirmForget !== network.name) {
+      root.confirmArmedAt = Date.now()
+    }
     root.confirmForget = root.confirmForget === network.name ? "" : network.name
   }
 
@@ -356,6 +365,30 @@ PanelBase {
 
   function qrEscape(value) {
     return String(value).replace(/([\\;,":])/g, "\\$1")
+  }
+
+  function pskValid(network, text) {
+    if (!network || text.length === 0) {
+      return false
+    }
+    return root.qrKind(network) === "WEP" || text.length >= 8
+  }
+
+  function submitPsk() {
+    const network = root.findNetwork(root.pending)
+    if (!network) {
+      root.pending = ""
+      return false
+    }
+    const editor = root.editorForName(root.pending)
+    const text = editor ? editor.text : ""
+    if (!root.pskValid(network, text)) {
+      return false
+    }
+    root.pskAttempt = root.pending
+    network.connectWithPsk(text)
+    root.pending = ""
+    return true
   }
 
   function pskLoaded(name) {
@@ -597,18 +630,10 @@ PanelBase {
   }
 
   function testSubmitPassword() {
-    const editor = root.editorForName(root.pending)
-    if (!editor || !root.pending) {
+    if (!root.pending) {
       return false
     }
-    const network = root.findNetwork(root.pending)
-    if (!network) {
-      return false
-    }
-    root.pskAttempt = root.pending
-    network.connectWithPsk(editor.text)
-    root.pending = ""
-    return true
+    return root.submitPsk()
   }
 
   function testAskForget(name) {
@@ -803,8 +828,13 @@ PanelBase {
       readonly property bool actionsOpen: !entry.isLabel && root.expanded !== "" && root.expanded === entry.itemKey && !entry.pwOpen && !entry.confirmOpen
       readonly property bool changing: entry.net ? entry.net.stateChanging : false
       readonly property bool busy: entry.changing || (!entry.isLabel && root.activating !== "" && root.activating === entry.itemKey)
-      onChangingChanged: if (entry.changing && !entry.isLabel && root.activating === entry.itemKey) {
-        root.activating = ""
+      onChangingChanged: {
+        if (entry.changing && !entry.isLabel && root.activating === entry.itemKey) {
+          root.activating = ""
+        }
+        if (!entry.changing && !root.interacting) {
+          root.rebuildSortStrength()
+        }
       }
 
       Connections {
@@ -815,6 +845,8 @@ PanelBase {
             return
           }
           root.pskAttempt = ""
+          root.activating = ""
+          activatingTimer.stop()
           Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", "normal", "opencode", "Wi-Fi: connection to " + entry.itemKey + " failed (" + ConnectionFailReason.toString(reason) + ")"])
         }
       }
@@ -1051,8 +1083,18 @@ PanelBase {
           height: visible ? Math.round(34 * Theme.scale) : 0
           clip: true
 
+          Keys.onPressed: event => {
+            if (event.key === Qt.Key_Escape) {
+              root.pending = ""
+              event.accepted = true
+            }
+          }
+
           onVisibleChanged: if (visible) {
+            pwField.text = ""
             pwField.forceActiveFocus()
+          } else if (root.pending === "") {
+            root.focusKeyCatcher()
           }
 
           Row {
@@ -1075,14 +1117,7 @@ PanelBase {
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSize
               clip: true
-              onAccepted: {
-                const network = root.findNetwork(root.pending)
-                if (network) {
-                  root.pskAttempt = root.pending
-                  network.connectWithPsk(pwField.text)
-                }
-                root.pending = ""
-              }
+              onAccepted: root.submitPsk()
 
               MouseArea {
                 id: pwHover
@@ -1124,14 +1159,7 @@ PanelBase {
               name: "check"
               iconColor: Theme.primary
               hoverColor: Theme.surfaceHigher
-              onClicked: {
-                const network = root.findNetwork(root.pending)
-                if (network) {
-                  root.pskAttempt = root.pending
-                  network.connectWithPsk(pwField.text)
-                }
-                root.pending = ""
-              }
+              onClicked: root.submitPsk()
             }
           }
         }
@@ -1173,7 +1201,9 @@ PanelBase {
               name: "x"
               iconColor: forgetCancelBtn.hovered ? Theme.text : Theme.overlay
               hoverColor: Theme.surfaceHigher
-              onClicked: root.confirmForget = ""
+              onClicked: if (Date.now() - root.confirmArmedAt >= 250) {
+                root.confirmForget = ""
+              }
             }
 
             IconButton {
@@ -1185,7 +1215,7 @@ PanelBase {
               name: "check"
               iconColor: Theme.red
               hoverColor: Theme.surfaceHigher
-              onClicked: {
+              onClicked: if (Date.now() - root.confirmArmedAt >= 250) {
                 const network = root.findNetwork(root.confirmForget)
                 if (network) {
                   network.forget()
