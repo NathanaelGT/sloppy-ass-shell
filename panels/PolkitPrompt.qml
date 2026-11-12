@@ -15,7 +15,7 @@ PanelBase {
   autoFocusKeyCatcher: false
   externalRequested: Polkit.active && !LockState.sessionLocked && Polkit.pinScreen === screenId
   property string errorText: ""
-  property bool shaking: false
+  readonly property bool shaking: shakeAnim.running
 
   function failAttempt() {
     const flow = Polkit.flow
@@ -24,7 +24,6 @@ PanelBase {
     fieldBox.failTint = true
     tintTimer.restart()
     response.forceActiveFocus()
-    root.shaking = true
     shakeAnim.restart()
   }
 
@@ -47,7 +46,6 @@ PanelBase {
     tintTimer.stop()
     shakeAnim.stop()
     shakeTranslate.x = 0
-    root.shaking = false
     response.forceActiveFocus()
   }
 
@@ -237,7 +235,5 @@ PanelBase {
       to: 0
       duration: 75
     }
-
-    onStopped: root.shaking = false
   }
 }

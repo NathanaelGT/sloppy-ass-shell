@@ -38,13 +38,13 @@ PanelBase {
       icon: "restart",
       label: "Reboot",
       tint: Theme.yellow,
-      command: ["bash", "-lc", "hyprshutdown -p 'setterm --blank force && systemctl reboot'"]
+      command: ["bash", "-lc", "hyprshutdown -p 'setterm --blank force && systemctl reboot' || notify-send -a opencode -u critical opencode 'Reboot failed'"]
     },
     {
       icon: "shutdown",
       label: "Shutdown",
       tint: Theme.red,
-      command: ["bash", "-lc", "hyprshutdown -p 'setterm --blank force && systemctl poweroff'"]
+      command: ["bash", "-lc", "hyprshutdown -p 'setterm --blank force && systemctl poweroff' || notify-send -a opencode -u critical opencode 'Shutdown failed'"]
     }
   ]
 
@@ -65,7 +65,9 @@ PanelBase {
       LockState.lockAndSuspend()
       return
     }
-    Quickshell.execDetached(action.command)
+    if (!Quickshell.execDetached(action.command)) {
+      Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", "critical", "opencode", "Failed to spawn " + action.label])
+    }
   }
 
   function moveFocus(delta) {
@@ -169,6 +171,7 @@ PanelBase {
       readonly property bool instant: index === 0
       readonly property bool hot: rowMouse.containsMouse || root.focusRow === index
       property real progress: 0
+      property real lastTick: 0
       property int pointerHolds: 0
       property int keyHolds: 0
       readonly property bool holding: pointerHolds > 0 || keyHolds > 0
@@ -205,19 +208,27 @@ PanelBase {
         interval: 16
         repeat: true
         running: row.holding || row.progress > 0
+        onRunningChanged: {
+          if (running) {
+            row.lastTick = Date.now()
+          }
+        }
         onTriggered: {
+          const now = Date.now()
+          const delta = Math.max(0, now - row.lastTick)
+          row.lastTick = now
           if (!root.open) {
             row.cancelHold()
             return
           }
           if (row.holding) {
-            row.progress = Math.min(1, row.progress + interval / root.holdMs)
+            row.progress = Math.min(1, row.progress + delta / root.holdMs)
             if (row.progress >= 1) {
               row.cancelHold()
               root.run(row.index)
             }
           } else {
-            row.progress = Math.max(0, row.progress - interval / root.drainMs)
+            row.progress = Math.max(0, row.progress - delta / root.drainMs)
           }
         }
       }

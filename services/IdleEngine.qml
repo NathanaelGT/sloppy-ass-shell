@@ -7,8 +7,10 @@ Singleton {
   id: root
 
   property var applied: ({})
-  property real startedAt: 0
+  property real elapsedMs: 0
+  property real silenceAccMs: Number.MAX_VALUE
   property real lastAudioAt: 0
+  property real lastTickAt: 0
 
   readonly property bool audioPlaying: {
     const list = Media.players
@@ -37,11 +39,11 @@ Singleton {
   }
 
   function elapsedSeconds() {
-    return startedAt > 0 ? (Date.now() - startedAt) / 1000 : 0
+    return elapsedMs / 1000
   }
 
   function silenceMs() {
-    return lastAudioAt > 0 ? Date.now() - lastAudioAt : Number.MAX_VALUE
+    return silenceAccMs
   }
 
   function gateSatisfied(stage) {
@@ -101,12 +103,19 @@ Singleton {
   }
 
   function tick() {
-    if (startedAt <= 0) {
+    if (lastTickAt <= 0) {
       return
     }
+    const now = Date.now()
+    const delta = Math.min(Math.max(now - lastTickAt, 0), 5000)
+    lastTickAt = now
     if (audioPlaying) {
-      lastAudioAt = Date.now()
+      lastAudioAt = now
+      silenceAccMs = 0
+    } else if (silenceAccMs < Number.MAX_VALUE) {
+      silenceAccMs += delta
     }
+    elapsedMs += delta
     const elapsed = elapsedSeconds()
     const stages = IdleConfig.stages
     for (let i = 0; i < stages.length; i++) {
@@ -124,8 +133,10 @@ Singleton {
   }
 
   function restartBaseline() {
-    startedAt = Date.now() - IdleConfig.idleSeconds * 1000
+    elapsedMs = IdleConfig.idleSeconds * 1000
+    silenceAccMs = Number.MAX_VALUE
     lastAudioAt = 0
+    lastTickAt = Date.now()
   }
 
   Timer {
@@ -139,7 +150,8 @@ Singleton {
         root.restartBaseline()
       } else {
         root.revertAll()
-        root.startedAt = 0
+        root.elapsedMs = 0
+        root.lastTickAt = 0
       }
     }
     onTriggered: root.tick()

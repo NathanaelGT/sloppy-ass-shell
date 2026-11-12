@@ -108,7 +108,9 @@ Singleton {
       root.readCaps()
       root.engage()
     }
-    Quickshell.execDetached(["systemctl", "suspend"])
+    if (!Quickshell.execDetached(["bash", "-lc", "systemctl suspend || notify-send -a opencode -u critical opencode 'Suspend refused or failed'"])) {
+      Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", "critical", "opencode", "Failed to spawn suspend"])
+    }
   }
 
   function engage() {
