@@ -99,6 +99,7 @@ PanelBase {
 
   property var providerSessions: ({})
   property var providerProcs: ({})
+  property var providerStaleRuns: ({})
 
   readonly property bool providerLocal: root.currentProvider !== null && root.currentProvider.local === true
   readonly property var providerSession: root.providerLocal ? root.localSession() : root.sessionFor(root.activeProviderKey)
@@ -116,11 +117,11 @@ PanelBase {
     if (root.providerTerm.length === 0 && !(root.currentProvider && root.currentProvider.listOnEmpty === true)) {
       return "hint"
     }
-    if (root.providerDirty) {
-      return "search"
-    }
     if (root.providerSession.loading) {
       return "loading"
+    }
+    if (root.providerDirty) {
+      return "search"
     }
     return ""
   }
@@ -1105,7 +1106,7 @@ PanelBase {
   }
 
   function paramsReady() {
-    return root.missingParams().length === 0 && root.clashingParams().length === 0
+    return root.invalidParams().length === 0 && root.clashingParams().length === 0
   }
 
   function missingLabel() {
@@ -1282,8 +1283,11 @@ PanelBase {
       const matched = Providers.matchOf(param, text)
       if (matched) {
         root.writeParam(key, Providers.valueOf(matched), text, "", true)
-      } else {
+      } else if (text.length === 0) {
         root.writeParam(key, current, text, "", wasSet)
+      } else {
+        const result = Providers.validate(param, text)
+        root.writeParam(key, current, text, result.error, wasSet)
       }
       root.refreshCandidates()
       root.paramCandidateIndex = matched ? 0 : -1
@@ -1356,6 +1360,10 @@ PanelBase {
     }
     if (root.paramCandidateIndex >= 0 && root.paramCandidateIndex < root.paramCandidates.length) {
       root.onParamPicked(root.focusTarget, Providers.valueOf(root.paramCandidates[root.paramCandidateIndex]))
+      return true
+    }
+    if (root.paramCandidates.length > 0) {
+      root.onParamPicked(root.focusTarget, Providers.valueOf(root.paramCandidates[0]))
       return true
     }
     const state = root.paramState(root.focusTarget)
@@ -1449,7 +1457,7 @@ PanelBase {
       return
     }
     if (root.atModeQuery()) {
-      const next = "@" + text
+      const next = text.charAt(0) === "@" ? text : "@" + text
       if (root.query !== next) {
         root.query = next
       } else {
@@ -1535,6 +1543,7 @@ PanelBase {
       return false
     }
     if (proc.running) {
+      root.markProcStale(key, true)
       proc.running = false
     }
     proc.command = provider.requestArgs(provider.buildUrl(ctx))
@@ -1543,6 +1552,9 @@ PanelBase {
   }
 
   function handleProviderOutput(key, text) {
+    if (root.procStale(key)) {
+      return
+    }
     const session = root.sessionFor(key)
     if (!session.loading) {
       return
@@ -1560,6 +1572,10 @@ PanelBase {
   }
 
   function handleProviderExit(key, code) {
+    if (root.procStale(key)) {
+      root.markProcStale(key, false)
+      return
+    }
     const session = root.sessionFor(key)
     if (!session.loading) {
       return
@@ -1585,6 +1601,11 @@ PanelBase {
     const parsed = provider.mock(payload)
     if (!parsed || parsed.error.length > 0) {
       return false
+    }
+    const proc = root.providerProc(key)
+    if (proc && proc.running) {
+      root.markProcStale(key, true)
+      proc.running = false
     }
     root.updateSession(key, {
       searchedTerm: root.providerTerm,
@@ -1620,6 +1641,25 @@ PanelBase {
     }
     procs[String(key)] = proc
     root.providerProcs = procs
+  }
+
+  function procStale(key) {
+    return root.providerStaleRuns[String(key)] === true
+  }
+
+  function markProcStale(key, stale) {
+    const k = String(key)
+    const next = {}
+    const keys = Object.keys(root.providerStaleRuns)
+    for (let i = 0; i < keys.length; i++) {
+      next[keys[i]] = root.providerStaleRuns[keys[i]]
+    }
+    if (stale) {
+      next[k] = true
+    } else {
+      delete next[k]
+    }
+    root.providerStaleRuns = next
   }
 
   function kittyArgv(command) {
@@ -2112,6 +2152,7 @@ PanelBase {
   onQueryChanged: {
     selectedIndex = 0
     root.syncInputToQuery()
+    root.scrollToTop()
   }
 
   onActiveProviderKeyChanged: {
