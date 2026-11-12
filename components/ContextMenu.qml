@@ -49,16 +49,6 @@ Popup {
     root.open()
   }
 
-  function trackHover(wx, wy) {
-    if (!root.opened) {
-      return
-    }
-    const pad = Math.round(3 * Theme.scale)
-    if (wx < root.x - pad || wx > root.x + root.width + pad || wy < root.y - pad || wy > root.y + root.height + pad) {
-      root.close()
-    }
-  }
-
   function invoke(index) {
     const entry = root.entries[index]
     if (!entry || entry.separator === true) {
@@ -95,6 +85,12 @@ Popup {
     id: menuColumn
 
     spacing: Math.round(1 * Theme.scale)
+
+    HoverHandler {
+      onHoveredChanged: if (!hovered) {
+        root.close()
+      }
+    }
 
     Text {
       width: menuColumn.width

@@ -169,6 +169,11 @@ PanelWindow {
     scroller.contentY = Math.max(0, Math.min(maxY, target))
   }
 
+  function ensureVisibleItem(item, margin) {
+    const p = item.mapToItem(scroller.contentItem, 0, 0)
+    ensureVisible(p.y, item.height, margin)
+  }
+
   function scrollToTop() {
     scrollerScroll.snap()
     scroller.contentY = 0

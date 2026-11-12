@@ -65,6 +65,7 @@ PanelBase {
   property string procMenuKind: ""
   property int procMenuKey: 0
   property string procMenuName: ""
+  property int procMenuPid: 0
   property bool procMenuStopped: false
   readonly property int procMax: 40
   readonly property var procCols: [
@@ -135,6 +136,10 @@ PanelBase {
     }
     for (let i = order.length - 1; i >= 0; i--) {
       if (!wanted[order[i]]) {
+        const it = procModel.get(i)
+        if (procMenu.opened && it.kind === root.procMenuKind && it.key === root.procMenuKey) {
+          procMenu.close()
+        }
         procModel.remove(i, 1)
         order.splice(i, 1)
       }
@@ -928,8 +933,11 @@ PanelBase {
 
   function procStateQuery(pid) {
     if (procStateProc.running) {
+      procStateProc.queuedPid = pid
       return
     }
+    procStateProc.queuedPid = 0
+    procStateProc.queriedPid = pid
     procStateProc.command = ["ps", "-o", "stat=", "-p", String(pid)]
     procStateProc.running = true
   }
@@ -955,6 +963,7 @@ PanelBase {
     root.procMenuKind = item.kind
     root.procMenuKey = item.key
     root.procMenuName = item.name
+    root.procMenuPid = item.key
     root.procMenuStopped = false
     procMenu.title = item.name
     if (item.kind === "group" && item.count > 1) {
@@ -978,8 +987,15 @@ PanelBase {
         action: () => root.procSignal(pids, "TERM", item.name)
       })
     } else {
-      const pid = item.key
+      let pid = item.key
+      if (item.kind === "group") {
+        const members = root.procGroupMembers(item.key)
+        if (members.length === 1) {
+          pid = members[0]
+        }
+      }
       const leader = root.procLeaderOf(pid)
+      root.procMenuPid = pid
       root.procStateQuery(pid)
       entries.push({
         label: "Kill",
@@ -995,7 +1011,7 @@ PanelBase {
       })
       entries.push({
         labelFn: () => root.procMenuStopped ? "Resume" : "Stop",
-        action: () => root.procSignal([root.procMenuKey], root.procMenuStopped ? "CONT" : "STOP", root.procMenuName)
+        action: () => root.procSignal([root.procMenuPid], root.procMenuStopped ? "CONT" : "STOP", root.procMenuName)
       })
       entries.push({
         separator: true
@@ -1050,6 +1066,7 @@ PanelBase {
   function focusProcFilter() {
     filterInput.forceActiveFocus()
     filterInput.cursorPosition = filterInput.text.length
+    root.ensureVisibleItem(procFilterBox)
   }
 
   function releaseProcFilter() {
@@ -1506,18 +1523,6 @@ PanelBase {
     }
   }
 
-  MouseArea {
-    id: procMenuHover
-
-    parent: root.contentItem
-    z: 100
-    anchors.fill: parent
-    acceptedButtons: Qt.NoButton
-    enabled: procMenu.opened
-    hoverEnabled: procMenu.opened
-    onPositionChanged: mouse => procMenu.trackHover(mouse.x, mouse.y)
-  }
-
   Connections {
     target: root
 
@@ -1527,6 +1532,10 @@ PanelBase {
       } else {
         procMenu.close()
       }
+    }
+
+    function onScrolled() {
+      procMenu.close()
     }
   }
 
@@ -1540,9 +1549,17 @@ PanelBase {
   Process {
     id: procStateProc
 
+    property int queriedPid: 0
+    property int queuedPid: 0
+
     running: false
+    onExited: if (procStateProc.queuedPid !== 0) {
+      Qt.callLater(() => root.procStateQuery(procStateProc.queuedPid))
+    }
     stdout: StdioCollector {
-      onStreamFinished: root.procMenuStopped = root.procStateStopped(text)
+      onStreamFinished: if (procStateProc.queriedPid === root.procMenuPid) {
+        root.procMenuStopped = root.procStateStopped(text)
+      }
     }
   }
 
