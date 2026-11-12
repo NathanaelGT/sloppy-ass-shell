@@ -20,10 +20,12 @@ PanelBase {
   property bool connectedExpanded: true
   property bool pairedExpanded: true
   property bool availableExpanded: true
+  property var sortNames: ({})
 
   readonly property var adapter: Bluetooth.defaultAdapter
   readonly property bool enabled: root.adapter ? root.adapter.enabled : false
   readonly property bool scanning: scanProc.running
+  readonly property bool interacting: root.expanded !== "" || root.confirmRemove !== "" || root.activating !== ""
 
   readonly property var allDevices: {
     if (!root.adapter || !root.adapter.devices) {
@@ -40,6 +42,14 @@ PanelBase {
   readonly property var connectedDevices: root.matchingDevices(d => d.connected)
   readonly property var pairedDevices: root.matchingDevices(d => !d.connected && (d.paired || d.bonded))
   readonly property var availableDevices: root.matchingDevices(d => !d.connected && !d.paired && !d.bonded)
+
+  onAllDevicesChanged: root.rebuildSortNames()
+  onInteractingChanged: if (!root.interacting) {
+    root.rebuildSortNames()
+  }
+  onScanningChanged: if (!root.scanning) {
+    root.rebuildSortNames()
+  }
 
   readonly property var rows: {
     const out = []
@@ -92,8 +102,24 @@ PanelBase {
         out.push(root.allDevices[i])
       }
     }
-    out.sort((a, b) => root.nameOf(a).localeCompare(root.nameOf(b)))
+    out.sort((a, b) => root.sortNameOf(a).localeCompare(root.sortNameOf(b)))
     return out
+  }
+
+  function sortNameOf(device) {
+    const s = root.sortNames[device.address]
+    return s === undefined ? root.nameOf(device) : s
+  }
+
+  function rebuildSortNames() {
+    if (root.interacting) {
+      return
+    }
+    const next = {}
+    for (let i = 0; i < root.allDevices.length; i++) {
+      next[root.allDevices[i].address] = root.nameOf(root.allDevices[i])
+    }
+    root.sortNames = next
   }
 
   function nameOf(device) {
@@ -377,8 +403,24 @@ PanelBase {
       if (root.enabled) {
         root.maybeRescan()
       } else {
+        root.expanded = ""
+        root.confirmRemove = ""
+        root.activating = ""
+        activatingTimer.stop()
         scanProc.running = false
       }
+    }
+  }
+
+  Connections {
+    target: root.adapter
+
+    function onDiscoveringChanged() {
+      if (!root.open || !root.enabled || root.adapter.discovering || !scanProc.running) {
+        return
+      }
+      scanProc.running = false
+      scanProc.running = true
     }
   }
 
@@ -398,6 +440,17 @@ PanelBase {
 
     interval: 30000
     onTriggered: root.activating = ""
+  }
+
+  Timer {
+    id: scanWatchdog
+
+    interval: 5000
+    running: scanProc.running
+    onTriggered: if (root.open && root.enabled && root.adapter && !root.adapter.discovering && scanProc.running) {
+      scanProc.running = false
+      scanProc.running = true
+    }
   }
 
   Timer {
@@ -518,6 +571,10 @@ PanelBase {
       property bool sawBusy: false
       property bool pairCancelled: false
 
+      function revealRow() {
+        root.ensureVisible(list.y + entry.y, Math.round(44 * Theme.scale) + entry.extraHeight)
+      }
+
       onChangingChanged: {
         if (entry.isLabel) {
           return
@@ -554,6 +611,23 @@ PanelBase {
         onTriggered: if (entry.device && !entry.device.pairing && !entry.device.paired && !entry.device.bonded) {
           root.failDevice(entry.itemKey)
         }
+      }
+
+      Timer {
+        id: revealTimer
+
+        interval: 240
+        onTriggered: entry.revealRow()
+      }
+
+      onActionsOpenChanged: if (entry.actionsOpen) {
+        Qt.callLater(entry.revealRow)
+        revealTimer.restart()
+      }
+
+      onConfirmOpenChanged: if (entry.confirmOpen) {
+        Qt.callLater(entry.revealRow)
+        revealTimer.restart()
       }
 
       width: list.width
