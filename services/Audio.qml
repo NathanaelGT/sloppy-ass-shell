@@ -161,6 +161,29 @@ Singleton {
     root.streamTargets = next
   }
 
+  function pruneStreamTargets() {
+    const seen = {}
+    for (let i = 0; i < nodes.length; i++) {
+      const cls = mediaClass(nodes[i])
+      if (cls !== "Stream/Output/Audio" && cls !== "Stream/Input/Audio") {
+        continue
+      }
+      seen[String(nodes[i].id)] = true
+    }
+    let changed = false
+    const next = {}
+    for (const key in root.streamTargets) {
+      if (seen[key]) {
+        next[key] = root.streamTargets[key]
+      } else {
+        changed = true
+      }
+    }
+    if (changed) {
+      root.streamTargets = next
+    }
+  }
+
   function mediaClass(node) {
     if (!node || !node.properties) {
       return ""
@@ -298,7 +321,10 @@ Singleton {
     touchActiveStreams()
   }
 
-  onNodesChanged: priorityDebounce.restart()
+  onNodesChanged: {
+    priorityDebounce.restart()
+    pruneStreamTargets()
+  }
 
   Connections {
     target: Priority

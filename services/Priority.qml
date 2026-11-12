@@ -59,6 +59,20 @@ Singleton {
     return true
   }
 
+  function promote(kind, name) {
+    const current = list(kind).slice()
+    const index = current.indexOf(name)
+    if (index === 0) {
+      return false
+    }
+    if (index > 0) {
+      current.splice(index, 1)
+    }
+    current.unshift(name)
+    assign(kind, current)
+    return true
+  }
+
   function topPresent(kind, present) {
     const current = list(kind)
     for (let i = 0; i < current.length; i++) {

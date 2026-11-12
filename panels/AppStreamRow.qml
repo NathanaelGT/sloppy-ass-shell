@@ -159,6 +159,11 @@ Column {
       }
       onWheeled: angleDelta => root.wheeled(angleDelta)
       onEditingChanged: root.percentEditing(editing ? percentInput : null)
+      Component.onDestruction: {
+        if (editing) {
+          editing = false
+        }
+      }
     }
 
     MuteButton {

@@ -222,6 +222,9 @@ PanelBase {
     } else {
       Audio.deferredSource = node
     }
+    if (Priority.promote(kind, node.name)) {
+      Audio.applyPriority()
+    }
   }
 
   function pruneSticky(kind) {
@@ -300,7 +303,7 @@ PanelBase {
   }
 
   function streamTarget(stream) {
-    const name = Audio.streamTargetName(stream)
+    const name = streamRouteTarget(stream)
     if (!name) {
       return null
     }
@@ -311,6 +314,20 @@ PanelBase {
       }
     }
     return null
+  }
+
+  function targetLabel(node) {
+    const raw = streamRouteTarget(node)
+    if (!raw) {
+      return "Default"
+    }
+    const list = routeTargets(streamKind(node))
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].name === raw) {
+        return Aliases.displayName(list[i])
+      }
+    }
+    return Aliases.aliasFor(raw) || raw
   }
 
   function targetName(node) {
@@ -1427,7 +1444,7 @@ PanelBase {
               sectionVisible: root.appExpanded
               animate: !root.measuring
               routeStream: root.routeStream
-              targetFor: node => root.targetName(root.streamTarget(node))
+              targetFor: node => root.targetLabel(node)
               maxVolume: Audio.maxVolume
               dragging: appDragger.dragging && appDragger.dragKey === groupData.name
               settling: appDragger.settling && appDragger.settleKey === groupData.name
@@ -1522,6 +1539,7 @@ PanelBase {
     function onOpenChanged() {
       if (!root.open) {
         routePopup.close()
+        root.appPercentEditor = null
       }
     }
   }
@@ -1596,7 +1614,7 @@ PanelBase {
 
             Icon {
               anchors.centerIn: parent
-              visible: !routeOption.separator && (routeOption.optionNode ? root.streamTarget(root.routeStream) === routeOption.optionNode : root.streamTarget(root.routeStream) === null)
+              visible: !routeOption.separator && (routeOption.optionNode ? root.streamTarget(root.routeStream) === routeOption.optionNode : root.streamRouteTarget(root.routeStream) === "")
               name: "check"
               color: Theme.primary
               font.pixelSize: Math.round(9 * Theme.scale)
