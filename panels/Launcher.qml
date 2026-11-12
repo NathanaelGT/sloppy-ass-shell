@@ -2148,7 +2148,7 @@ PanelBase {
     id: providerWatchdog
 
     interval: 15000
-    singleShot: true
+    repeat: false
     onTriggered: root.providerWatchdogFired()
   }
 
