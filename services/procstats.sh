@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 tmp=$(mktemp -d) || exit 0
 trap 'rm -rf "$tmp"' EXIT
+up=$(cut -d ' ' -f1 /proc/uptime 2>/dev/null)
 t1=$tmp/c
 t4=$tmp/g
 t5=$tmp/w
@@ -326,7 +327,7 @@ ss -tinp state established 2>/dev/null | awk '
   }
 ' > "$t5"
 
-echo "H	$(nproc 2>/dev/null || echo 1)"
+echo "H	$(nproc 2>/dev/null || echo 1)	${up:-0}"
 
 awk -F'\t' '
   $1 == "C" { nm[$2] = $3; tk[$2] = $4 + 0; rs[$2] = $5 + 0; io[$2] = $6 + 0; ld[$2] = $7 + 0; next }
@@ -344,4 +345,4 @@ awk -F'\t' '
       print "M\t" pid "\t" gn[pid] "\t" gi[pid]
     }
   }
-' "$t1" "$t2" "$t3" "$t4" "$t5"
+' "$t1" "$t4" "$t5"

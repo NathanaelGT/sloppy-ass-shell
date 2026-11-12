@@ -180,6 +180,7 @@ PanelBase {
 
   readonly property int animMs: 500
   property bool primed: false
+  property int procGen: 0
   readonly property int memSpeed: {
     if (root.spdTck <= 0) {
       return 0
@@ -204,8 +205,11 @@ PanelBase {
 
   function refresh() {
     if (collectProc.running) {
+      collectProc.requeue = true
       return
     }
+    collectProc.gen = root.procGen
+    collectProc.requeue = false
     collectProc.command = ["bash", "-lc", collectScript()]
     collectProc.running = true
   }
@@ -449,21 +453,28 @@ PanelBase {
 
   function refreshProcs() {
     if (procProc.running) {
+      procProc.requeue = true
       return
     }
+    procProc.gen = root.procGen
+    procProc.requeue = false
     procProc.command = ["bash", Quickshell.shellDir + "/services/procstats.sh", String(Quickshell.processId)]
     procProc.running = true
   }
 
   function refreshGpu() {
     if (gpuProc.running) {
+      gpuProc.requeue = true
       return
     }
+    gpuProc.gen = root.procGen
+    gpuProc.requeue = false
     gpuProc.command = ["bash", Quickshell.shellDir + "/services/nvstats.sh"]
     gpuProc.running = true
   }
 
   function resetState() {
+    root.procGen++
     root.primed = false
     root.refresh()
     root.procPrev = ({})
@@ -546,7 +557,7 @@ PanelBase {
   }
 
   function procRate(cur, old, dt, p) {
-    if (p === undefined || dt <= 0) {
+    if (p === undefined || dt <= 0 || old < 0) {
       return 0
     }
     const d = cur - old
@@ -554,20 +565,30 @@ PanelBase {
   }
 
   function parseProcs(text) {
-    const now = Date.now() / 1000
+    const lines = text.split("\n")
+    let ncpu = 0
+    let ts = NaN
+    for (let i = 0; i < lines.length; i++) {
+      const h = lines[i].split("\t")
+      if (h[0] === "H") {
+        ncpu = Math.max(1, parseInt(h[1]) || 1)
+        ts = parseFloat(h[2])
+        break
+      }
+    }
+    if (ncpu === 0) {
+      return
+    }
+    root.procNcpu = ncpu
+    const now = !isNaN(ts) && ts > 0 ? ts : Date.now() / 1000
     const first = root.procTs === 0
     const dt = root.procTs > 0 ? now - root.procTs : 0
     const prev = root.procPrev
     const next = {}
     const games = {}
     const rows = []
-    const lines = text.split("\n")
     for (let i = 0; i < lines.length; i++) {
       const f = lines[i].split("\t")
-      if (f[0] === "H") {
-        root.procNcpu = Math.max(1, parseInt(f[1]) || 1)
-        continue
-      }
       if (f[0] === "M" && f.length >= 4) {
         games[f[1]] = {
           name: f[2],
@@ -604,6 +625,9 @@ PanelBase {
         e: eng,
         n: net
       }
+    }
+    if (rows.length === 0) {
+      return
     }
     root.procPrev = next
     root.procTs = now
@@ -1444,9 +1468,18 @@ PanelBase {
   Process {
     id: collectProc
 
+    property int gen: 0
+    property bool requeue: false
+
     running: false
+    onExited: if (collectProc.requeue) {
+      collectProc.requeue = false
+      if (root.open) {
+        Qt.callLater(() => root.refresh())
+      }
+    }
     stdout: StdioCollector {
-      onStreamFinished: {
+      onStreamFinished: if (collectProc.gen === root.procGen) {
         const lines = text.split("\n")
         for (let i = 0; i < lines.length; i++) {
           const m = lines[i].match(/^(\w+)=(.*)$/)
@@ -1508,18 +1541,40 @@ PanelBase {
   Process {
     id: procProc
 
+    property int gen: 0
+    property bool requeue: false
+
     running: false
+    onExited: if (procProc.requeue) {
+      procProc.requeue = false
+      if (root.open) {
+        Qt.callLater(() => root.refreshProcs())
+      }
+    }
     stdout: StdioCollector {
-      onStreamFinished: root.parseProcs(text)
+      onStreamFinished: if (procProc.gen === root.procGen) {
+        root.parseProcs(text)
+      }
     }
   }
 
   Process {
     id: gpuProc
 
+    property int gen: 0
+    property bool requeue: false
+
     running: false
+    onExited: if (gpuProc.requeue) {
+      gpuProc.requeue = false
+      if (root.open) {
+        Qt.callLater(() => root.refreshGpu())
+      }
+    }
     stdout: StdioCollector {
-      onStreamFinished: root.parseGpu(text)
+      onStreamFinished: if (gpuProc.gen === root.procGen) {
+        root.parseGpu(text)
+      }
     }
   }
 
