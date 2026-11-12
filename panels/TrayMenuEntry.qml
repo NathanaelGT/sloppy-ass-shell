@@ -8,6 +8,7 @@ Item {
   id: root
 
   required property var modelData
+  property bool interactive: true
 
   readonly property var entry: modelData.entry
   readonly property int depth: modelData.depth
@@ -48,7 +49,7 @@ Item {
   }
 
   function invoke() {
-    if (root.separator || !root.active) {
+    if (!root.interactive || root.separator || !root.active) {
       return "disabled"
     }
     if (root.submenu) {
@@ -174,6 +175,7 @@ Item {
     id: rowMouse
 
     anchors.fill: parent
+    enabled: root.interactive
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     hoverEnabled: true
     cursorShape: root.active && !root.separator ? Qt.PointingHandCursor : Qt.ArrowCursor

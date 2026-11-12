@@ -9,10 +9,14 @@ PanelBase {
   panelName: "tray"
   align: "right"
   cardWidth: Math.round(240 * Theme.scale)
-  contentOuterPad: Math.round(6 * Theme.scale)
+  contentOuterPad: Math.max(Math.round(6 * Theme.scale), Theme.scrollThumbStrip)
+  animateCardHeight: true
 
   readonly property var entries: opener.children ? opener.children.values : []
   property var expandedEntries: []
+  property var kidOpeners: []
+  property var loadedItem: null
+  property var revealEntry: null
   property var rows: []
   property int rowsRevision: 0
 
@@ -39,10 +43,39 @@ PanelBase {
       const next = root.expandedEntries.slice()
       next.splice(index, 1)
       root.expandedEntries = next
+      root.closeKidOpener(entry)
       return false
     }
+    root.openKidOpener(entry)
     root.expandedEntries = root.expandedEntries.concat([entry])
     return true
+  }
+
+  function openKidOpener(entry) {
+    const opener = kidOpenerComponent.createObject(root, {
+      menu: entry
+    })
+    opener.childrenChanged.connect(() => root.hookKidOpener(opener))
+    root.hookKidOpener(opener)
+    root.kidOpeners.push(opener)
+  }
+
+  function hookKidOpener(opener) {
+    if (opener.children) {
+      opener.children.valuesChanged.connect(root.bumpRevision)
+      root.bumpRevision()
+    }
+  }
+
+  function closeKidOpener(entry) {
+    for (let i = 0; i < root.kidOpeners.length; i++) {
+      const opener = root.kidOpeners[i]
+      if (opener.forEntry === entry) {
+        root.kidOpeners.splice(i, 1)
+        opener.destroy()
+        return
+      }
+    }
   }
 
   function buildRows() {
@@ -66,12 +99,13 @@ PanelBase {
   }
 
   function kidValues(entry) {
-    const index = root.expandedEntries.indexOf(entry)
-    const opener = kidsInstantiator.objectAt(index)
-    if (!opener || !opener.children) {
-      return []
+    for (let i = 0; i < root.kidOpeners.length; i++) {
+      const opener = root.kidOpeners[i]
+      if (opener.forEntry === entry) {
+        return opener.children ? opener.children.values : []
+      }
     }
-    return opener.children.values
+    return []
   }
 
   function rebuildRows() {
@@ -84,7 +118,22 @@ PanelBase {
 
   function resetMenu() {
     root.expandedEntries = []
+    for (let i = 0; i < root.kidOpeners.length; i++) {
+      root.kidOpeners[i].destroy()
+    }
+    root.kidOpeners = []
     root.rows = []
+  }
+
+  function revealExpandedRow(entry) {
+    const items = rowItems()
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].entry === entry) {
+        const next = items[i + 1]
+        ensureVisibleItem(next || items[i])
+        return
+      }
+    }
   }
 
   function rowItems() {
@@ -152,8 +201,16 @@ PanelBase {
 
     function onOpenChanged() {
       if (root.open) {
+        if (Panels.trayItem !== root.loadedItem) {
+          root.resetMenu()
+        }
         opener.menu = Panels.trayItem ? Panels.trayItem.menu : null
-      } else {
+        root.loadedItem = Panels.trayItem
+      }
+    }
+
+    function onVisibleChanged() {
+      if (!root.visible) {
         opener.menu = null
         root.resetMenu()
       }
@@ -168,6 +225,7 @@ PanelBase {
         return
       }
       opener.menu = Panels.trayItem ? Panels.trayItem.menu : null
+      root.loadedItem = Panels.trayItem
       root.resetMenu()
     }
   }
@@ -187,29 +245,23 @@ PanelBase {
     id: opener
   }
 
-  Instantiator {
-    id: kidsInstantiator
+  Component {
+    id: kidOpenerComponent
 
-    model: root.expandedEntries
-
-    delegate: QsMenuOpener {
-      menu: modelData
-    }
-
-    onObjectAdded: (index, object) => {
-      if (object.children) {
-        object.children.valuesChanged.connect(root.bumpRevision)
-      }
+    QsMenuOpener {
+      property var forEntry: menu
     }
   }
 
-  Connections {
-    target: kidsInstantiator
+  Timer {
+    id: revealTimer
 
-    function onObjectRemoved(index, object) {
-      if (object.children) {
-        object.children.valuesChanged.disconnect(root.bumpRevision)
+    interval: 240
+    onTriggered: {
+      if (root.revealEntry) {
+        root.revealExpandedRow(root.revealEntry)
       }
+      root.revealEntry = null
     }
   }
 
@@ -229,7 +281,15 @@ PanelBase {
         model: root.rows
 
         delegate: TrayMenuEntry {
-          onExpandToggled: entry => root.toggleExpanded(entry)
+          interactive: root.open
+
+          onExpandToggled: entry => {
+            if (root.toggleExpanded(entry)) {
+              root.revealEntry = entry
+              Qt.callLater(() => root.revealExpandedRow(entry))
+              revealTimer.restart()
+            }
+          }
         }
       }
     }
