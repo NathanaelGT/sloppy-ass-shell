@@ -40,8 +40,8 @@ PanelBase {
   }
 
   readonly property var connectedDevices: root.matchingDevices(d => d.connected)
-  readonly property var pairedDevices: root.matchingDevices(d => !d.connected && (d.paired || d.bonded))
-  readonly property var availableDevices: root.matchingDevices(d => !d.connected && !d.paired && !d.bonded)
+  readonly property var pairedDevices: root.matchingDevices(d => !d.connected && root.pairedOrBonded(d))
+  readonly property var availableDevices: root.matchingDevices(d => !d.connected && !root.pairedOrBonded(d))
 
   onAllDevicesChanged: root.rebuildSortNames()
   onInteractingChanged: if (!root.interacting) {
@@ -222,20 +222,25 @@ PanelBase {
     root.rescan()
   }
 
+  function pairedOrBonded(device) {
+    return !!device && (device.paired || device.bonded)
+  }
+
   function activate(device) {
-    if (!device) {
-      return
-    }
-    if (!device.paired && !device.bonded) {
-      if (device.pairing) {
-        return
-      }
-      root.clearFailure(device.address)
-      device.pair()
-      return
+    if (!root.pairedOrBonded(device)) {
+      return false
     }
     root.confirmRemove = ""
     root.expanded = root.expanded === device.address ? "" : device.address
+    return true
+  }
+
+  function requestPair(device) {
+    if (!device || root.pairedOrBonded(device) || device.pairing) {
+      return
+    }
+    root.clearFailure(device.address)
+    device.pair()
   }
 
   function requestRemove(device) {
@@ -247,16 +252,53 @@ PanelBase {
     root.confirmRemove = root.confirmRemove === device.address ? "" : device.address
   }
 
-  function toggleSection(section) {
-    if (section === "connected") {
-      root.connectedExpanded = !root.connectedExpanded
-    } else if (section === "paired") {
-      root.pairedExpanded = !root.pairedExpanded
-    } else if (section === "available") {
-      root.availableExpanded = !root.availableExpanded
+  function rowSection(address) {
+    const device = root.findDevice(address)
+    if (!device) {
+      return ""
     }
-    root.expanded = ""
-    root.confirmRemove = ""
+    if (device.connected) {
+      return "connected"
+    }
+    return root.pairedOrBonded(device) ? "paired" : "available"
+  }
+
+  function applySection(section, value) {
+    if (section === "connected") {
+      root.connectedExpanded = value
+    } else if (section === "paired") {
+      root.pairedExpanded = value
+    } else if (section === "available") {
+      root.availableExpanded = value
+    } else {
+      return false
+    }
+    if (!value) {
+      if (root.expanded !== "" && root.rowSection(root.expanded) === section) {
+        root.expanded = ""
+      }
+      if (root.confirmRemove !== "" && root.rowSection(root.confirmRemove) === section) {
+        root.confirmRemove = ""
+      }
+    }
+    return true
+  }
+
+  function toggleSection(section) {
+    return root.applySection(section, !root.sectionExpanded(section))
+  }
+
+  function sectionExpanded(section) {
+    if (section === "connected") {
+      return root.connectedExpanded
+    }
+    if (section === "paired") {
+      return root.pairedExpanded
+    }
+    if (section === "available") {
+      return root.availableExpanded
+    }
+    return false
   }
 
   function toggleTrusted(device) {
@@ -311,27 +353,11 @@ PanelBase {
   }
 
   function testToggleSection(section) {
-    if (section !== "connected" && section !== "paired" && section !== "available") {
-      return false
-    }
-    root.toggleSection(section)
-    return true
+    return root.toggleSection(section)
   }
 
   function testSetSection(section, state) {
-    const value = state === true
-    if (section === "connected") {
-      root.connectedExpanded = value
-    } else if (section === "paired") {
-      root.pairedExpanded = value
-    } else if (section === "available") {
-      root.availableExpanded = value
-    } else {
-      return false
-    }
-    root.expanded = ""
-    root.confirmRemove = ""
-    return true
+    return root.applySection(section, state === true)
   }
 
   function testToggleExpanded(address) {
@@ -339,8 +365,7 @@ PanelBase {
     if (!device) {
       return false
     }
-    root.activate(device)
-    return true
+    return root.activate(device)
   }
 
   function testAskRemove(address) {
@@ -553,13 +578,13 @@ PanelBase {
       readonly property var device: entry.isLabel ? null : root.findDevice(entry.itemKey)
       readonly property bool isLabel: entry.kind === "label"
       readonly property bool isConnected: entry.device ? entry.device.connected : entry.active
-      readonly property bool isPaired: entry.device ? (entry.device.paired || entry.device.bonded) : true
+      readonly property bool isPaired: entry.device ? root.pairedOrBonded(entry.device) : true
       readonly property bool pairing: entry.device ? entry.device.pairing : false
       readonly property bool changing: entry.device ? root.busy(entry.device) && !entry.device.pairing : false
       readonly property bool busy: entry.device ? root.busy(entry.device) || (root.activating !== "" && root.activating === entry.itemKey) : false
       readonly property bool confirmOpen: !entry.isLabel && root.confirmRemove === entry.itemKey
       readonly property bool actionsOpen: !entry.isLabel && entry.isPaired && !entry.confirmOpen && root.expanded === entry.itemKey
-      readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || confirmCancelBtn.hovered || confirmCheckBtn.hovered || trashActionBtn.hovered || toggleActionBtn.hovered || trustHover.containsMouse || cancelPairBtn.hovered
+      readonly property bool highlighted: entry.isConnected || headerMouse.containsMouse || cardHover.containsMouse || confirmCancelBtn.hovered || confirmCheckBtn.hovered || trashActionBtn.hovered || toggleActionBtn.hovered || trustHover.containsMouse || cancelPairBtn.hovered || pairBtn.hovered
       readonly property bool shown: entry.isLabel ? true : list.isExpanded(entry.section)
       readonly property int extraHeight: entry.confirmOpen || entry.actionsOpen ? Math.round(34 * Theme.scale) : 0
       readonly property color cardColor: entry.highlighted ? Theme.surfaceHigh : Theme.surface
@@ -588,7 +613,7 @@ PanelBase {
         }
         entry.sawBusy = false
         root.activating = ""
-        if (entry.device.connected !== root.activatingIsConnect) {
+        if (entry.device && entry.device.connected !== root.activatingIsConnect) {
           root.failDevice(entry.itemKey)
         }
       }
@@ -608,7 +633,7 @@ PanelBase {
         id: pairFailCheck
 
         interval: 500
-        onTriggered: if (entry.device && !entry.device.pairing && !entry.device.paired && !entry.device.bonded) {
+        onTriggered: if (entry.device && !entry.device.pairing && !root.pairedOrBonded(entry.device)) {
           root.failDevice(entry.itemKey)
         }
       }
@@ -691,7 +716,7 @@ PanelBase {
           anchors.top: parent.top
           height: Math.round(44 * Theme.scale)
           hoverEnabled: true
-          cursorShape: Qt.PointingHandCursor
+          cursorShape: entry.isPaired ? Qt.PointingHandCursor : Qt.ArrowCursor
           onClicked: if (entry.device) {
             root.activate(entry.device)
           }
@@ -788,6 +813,19 @@ PanelBase {
               visible: entry.busy && !entry.actionsOpen
               running: visible
               color: entry.strongText
+            }
+
+            IconButton {
+              id: pairBtn
+
+              visible: entry.device ? !entry.isPaired && !entry.pairing : false
+              anchors.verticalCenter: parent.verticalCenter
+              size: Math.round(24 * Theme.scale)
+              glyphSize: Math.round(14 * Theme.scale)
+              name: "bluetooth-connected"
+              iconColor: pairBtn.hovered ? Theme.text : Theme.overlay
+              hoverColor: Theme.surfaceHigher
+              onClicked: root.requestPair(entry.device)
             }
 
             IconButton {
