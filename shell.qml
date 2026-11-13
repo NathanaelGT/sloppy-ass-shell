@@ -1430,8 +1430,7 @@ ShellRoot {
       if (!panel || !panel.open) {
         return false
       }
-      panel.toggleSection(section)
-      return true
+      return panel.toggleSection(section)
     }
 
     function wifiSectionSet(section: string, state: bool): bool {

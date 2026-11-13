@@ -208,30 +208,60 @@ PanelBase {
     }
   }
 
-  function toggleSection(section) {
+  function rowSection(name) {
+    const net = root.findNetwork(name)
+    if (!net) {
+      return ""
+    }
+    if (net.connected) {
+      return root.connectedNetwork && name === root.connectedNetwork.name ? "connected" : ""
+    }
+    return net.known ? "saved" : "available"
+  }
+
+  function applySection(section, value) {
     if (section === "connected") {
-      root.connectedExpanded = !root.connectedExpanded
-      if (!root.connectedExpanded && root.confirmForget !== "" && root.connectedNetwork && root.confirmForget === root.connectedNetwork.name) {
+      root.connectedExpanded = value
+    } else if (section === "saved") {
+      root.savedExpanded = value
+    } else if (section === "available") {
+      root.availableExpanded = value
+    } else {
+      return false
+    }
+    if (!value) {
+      if (root.pending !== "" && root.rowSection(root.pending) === section) {
+        root.pending = ""
+      }
+      if (root.confirmForget !== "" && root.rowSection(root.confirmForget) === section) {
         root.confirmForget = ""
       }
-    } else if (section === "saved") {
-      root.savedExpanded = !root.savedExpanded
-      if (!root.savedExpanded && root.confirmForget !== "") {
-        const net = root.findNetwork(root.confirmForget)
-        if (!net || !net.connected) {
-          root.confirmForget = ""
-        }
-      }
-    } else if (section === "available") {
-      root.availableExpanded = !root.availableExpanded
-      if (!root.availableExpanded && root.pending !== "") {
-        root.pending = ""
+      if (root.expanded !== "" && root.rowSection(root.expanded) === section) {
+        root.expanded = ""
       }
     }
     root.sharing = ""
     if (root.pending !== "" || root.confirmForget !== "") {
       root.focusKeyCatcher()
     }
+    return true
+  }
+
+  function toggleSection(section) {
+    return root.applySection(section, !root.sectionExpanded(section))
+  }
+
+  function sectionExpanded(section) {
+    if (section === "connected") {
+      return root.connectedExpanded
+    }
+    if (section === "saved") {
+      return root.savedExpanded
+    }
+    if (section === "available") {
+      return root.availableExpanded
+    }
+    return false
   }
 
   function signalPct(network) {
@@ -755,18 +785,7 @@ PanelBase {
   }
 
   function testSetSection(section, state) {
-    const value = state === true
-    if (section === "connected") {
-      root.connectedExpanded = value
-    } else if (section === "saved") {
-      root.savedExpanded = value
-    } else if (section === "available") {
-      root.availableExpanded = value
-    } else {
-      return false
-    }
-    root.sharing = ""
-    return true
+    return root.applySection(section, state === true)
   }
 
   function testToggleSharing(name) {
