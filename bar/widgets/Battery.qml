@@ -14,6 +14,7 @@ BarButton {
   implicitWidth: timeLabel.visible ? edgePad + icon.implicitWidth + Math.round(5 * Theme.scale) + timeLabel.implicitWidth + edgePad : edgePad + icon.implicitWidth + edgePad
   active: Panels.openOn("battery", root.screen.name)
   onClicked: Panels.toggle("battery", root.screen.name)
+  onRightClicked: Panels.open("battery", root.screen.name)
 
   readonly property var device: UPower.displayDevice
   readonly property real pct: device ? device.percentage : 1

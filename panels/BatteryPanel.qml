@@ -14,7 +14,7 @@ PanelBase {
   popupOpen: procMenu.opened
 
   property real cpuUsage: 0
-  property real cpuTemp: 0
+  property real cpuTemp: -1
   property real cpuWatt: 0
   property real cpuClock: 0
   property string cpuName: ""
@@ -53,6 +53,7 @@ PanelBase {
   property string procSort: "mem"
   property bool procAsc: false
   property string procFilter: ""
+  readonly property bool procFiltered: root.procFilter.trim() !== ""
   readonly property var procAvatarPalette: [Theme.primary, Theme.mauve, Theme.teal, Theme.green, Theme.yellow, Theme.red]
   readonly property var procIconAliases: ({
       hyprland: "file://" + Quickshell.env("HOME") + "/.local/share/icons/Wallbash-Icon/distro/hyprland.png",
@@ -200,7 +201,7 @@ PanelBase {
   }
 
   function collectScript() {
-    return ["c1=$(grep '^cpu ' /proc/stat)", "p1=$(grep '^cpu[0-9]' /proc/stat)", "sleep 0.2", "c2=$(grep '^cpu ' /proc/stat)", "p2=$(grep '^cpu[0-9]' /proc/stat)", "set -- $c1; u1=$2; n1=$3; s1=$4; i1=$5; io1=$6; irq1=$7; si1=$8; st1=$9", "set -- $c2; u2=$2; n2=$3; s2=$4; i2=$5; io2=$6; irq2=$7; si2=$8; st2=$9", "total1=$((u1+n1+s1+i1+io1+irq1+si1+st1))", "total2=$((u2+n2+s2+i2+io2+irq2+si2+st2))", "idle1=$((i1+io1))", "idle2=$((i2+io2))", "core_pcts=$(paste <(echo \"$p1\") <(echo \"$p2\") | awk '{a=$2+$3+$4+$7+$8+$9; b=$5+$6; ta=a+b; c=$13+$14+$15+$18+$19+$20; d=$16+$17; tc=c+d; dt=tc-ta; di=d-b; v=(dt>0)?(dt-di)/dt*100:0; printf \"%s%.1f\", (NR>1?\" \":\"\"), v}')", "cpu_threads=$(nproc)", "cpu_usage=$(awk -v t1=$total1 -v t2=$total2 -v i1=$idle1 -v i2=$idle2 'BEGIN{dt=t2-t1; di=i2-i1; if(dt>0) printf \"%.1f\", (dt-di)/dt*100; else print 0}')", "cpu_watt=$(cat /run/cpu-watt 2>/dev/null || echo 0)", "cpu_temp=$(awk '{printf \"%.1f\", $1/1000}' /sys/class/hwmon/hwmon4/temp1_input)", "cpu_name=$(grep -m1 'model name' /proc/cpuinfo | cut -d':' -f2 | sed 's/^ *//')", "cpu_clock=$(awk '/^cpu MHz/ {s+=$4; n++} END {if(n>0) printf \"%.2f\", s/n/1000; else print 0}' /proc/cpuinfo)", "mem_line=$(free -b | awk '/^Mem:/ {print $3, $2}')", "set -- $mem_line; mem_used=$1; mem_total=$2", "zram_used=$(cat /sys/block/zram*/mm_stat 2>/dev/null | awk '{sum+=$3} END{print sum+0}')", "zswap_pool=$(awk '/^Zswap:/ {print $2*1024}' /proc/meminfo)", "swapfile_used=$(awk '/swapfile/ {sum+=$4} END{print sum*1024+0}' /proc/swaps)", "spd_file=$(ls /sys/bus/i2c/devices/*/eeprom 2>/dev/null | head -n1)", "spd_type=$(dd if=\"$spd_file\" bs=1 skip=2 count=1 2>/dev/null | od -A n -t u1 | awk '{print int($1/16)}')", "spd_tck=$(dd if=\"$spd_file\" bs=1 skip=20 count=2 2>/dev/null | od -A n -t u1 | awk '{print $1+$2*256}')", "igpu_card=$(for c in /sys/class/drm/card[0-9]*; do [ \"$(basename $(readlink $c/device/driver 2>/dev/null))\" = \"amdgpu\" ] && echo $c && break; done)", "igpu_usage=$(cat \"$igpu_card/device/gpu_busy_percent\" 2>/dev/null || echo 0)", "igpu_hwmon=$(for h in /sys/class/hwmon/hwmon*; do [ \"$(cat $h/name 2>/dev/null)\" = \"amdgpu\" ] && echo $h && break; done)", "igpu_temp=$(awk '{printf \"%.1f\", $1/1000}' \"$igpu_hwmon/temp1_input\" 2>/dev/null || echo 0)", "igpu_watt=$(awk '{printf \"%.2f\", $1/1000000}' \"$igpu_hwmon/power1_average\" 2>/dev/null || echo 0)", "igpu_freq=$(cat \"$igpu_hwmon/freq1_input\" 2>/dev/null | awk '{printf \"%.0f\", $1/1000000}')", "igpu_vram_used=$(cat \"$igpu_card/device/mem_info_vram_used\" 2>/dev/null || echo 0)", "igpu_vram_total=$(cat \"$igpu_card/device/mem_info_vram_total\" 2>/dev/null || echo 0)", "igpu_name=$(cat \"$igpu_card/device/product_name\" 2>/dev/null || echo \"$cpu_name\" | sed -n 's/.*Radeon \\(.*\\) Graphics.*/AMD Radeon \\1/p')", "cpu_name=$(echo \"$cpu_name\" | sed 's/ w\\/ .*//')", "echo \"cpu_usage=$cpu_usage\"", "echo \"cpu_temp=$cpu_temp\"", "echo \"cpu_watt=$cpu_watt\"", "echo \"cpu_name=$cpu_name\"", "echo \"cpu_clock=$cpu_clock\"", "echo \"cpu_cores=$core_pcts\"", "echo \"cpu_threads=$cpu_threads\"", "echo \"mem_used=$mem_used\"", "echo \"mem_total=$mem_total\"", "echo \"zram_used=$zram_used\"", "echo \"zswap_pool=$zswap_pool\"", "echo \"swapfile_used=$swapfile_used\"", "echo \"spd_type=$spd_type\"", "echo \"spd_tck=$spd_tck\"", "echo \"igpu_usage=$igpu_usage\"", "echo \"igpu_temp=$igpu_temp\"", "echo \"igpu_watt=$igpu_watt\"", "echo \"igpu_freq=$igpu_freq\"", "echo \"igpu_name=$igpu_name\"", "echo \"igpu_vram_used=$igpu_vram_used\"", "echo \"igpu_vram_total=$igpu_vram_total\""].join("\n")
+    return ["hwmon_find() { for n in \"$@\"; do for h in /sys/class/hwmon/hwmon*; do [ \"$(cat $h/name 2>/dev/null)\" = \"$n\" ] && echo $h && return; done; done; }", "c1=$(grep '^cpu ' /proc/stat)", "p1=$(grep '^cpu[0-9]' /proc/stat)", "sleep 0.2", "c2=$(grep '^cpu ' /proc/stat)", "p2=$(grep '^cpu[0-9]' /proc/stat)", "set -- $c1; u1=$2; n1=$3; s1=$4; i1=$5; io1=$6; irq1=$7; si1=$8; st1=$9", "set -- $c2; u2=$2; n2=$3; s2=$4; i2=$5; io2=$6; irq2=$7; si2=$8; st2=$9", "total1=$((u1+n1+s1+i1+io1+irq1+si1+st1))", "total2=$((u2+n2+s2+i2+io2+irq2+si2+st2))", "idle1=$((i1+io1))", "idle2=$((i2+io2))", "core_pcts=$(paste <(echo \"$p1\") <(echo \"$p2\") | awk '{a=$2+$3+$4+$7+$8+$9; b=$5+$6; ta=a+b; c=$13+$14+$15+$18+$19+$20; d=$16+$17; tc=c+d; dt=tc-ta; di=d-b; v=(dt>0)?(dt-di)/dt*100:0; printf \"%s%.1f\", (NR>1?\" \":\"\"), v}')", "cpu_threads=$(nproc)", "cpu_usage=$(awk -v t1=$total1 -v t2=$total2 -v i1=$idle1 -v i2=$idle2 'BEGIN{dt=t2-t1; di=i2-i1; if(dt>0) printf \"%.1f\", (dt-di)/dt*100; else print 0}')", "cpu_watt=$(cat /run/cpu-watt 2>/dev/null || echo 0)", "cpu_temp=$(awk '{printf \"%.1f\", $1/1000}' \"$(hwmon_find k10temp coretemp)/temp1_input\" 2>/dev/null)", "cpu_name=$(grep -m1 'model name' /proc/cpuinfo | cut -d':' -f2 | sed 's/^ *//')", "cpu_clock=$(awk '/^cpu MHz/ {s+=$4; n++} END {if(n>0) printf \"%.2f\", s/n/1000; else print 0}' /proc/cpuinfo)", "mem_line=$(free -b | awk '/^Mem:/ {print $3, $2}')", "set -- $mem_line; mem_used=$1; mem_total=$2", "zram_used=$(cat /sys/block/zram*/mm_stat 2>/dev/null | awk '{sum+=$3} END{print sum+0}')", "zswap_pool=$(awk '/^Zswap:/ {print $2*1024}' /proc/meminfo)", "swapfile_used=$(awk '/swapfile/ {sum+=$4} END{print sum*1024+0}' /proc/swaps)", "spd_file=$(ls /sys/bus/i2c/devices/*/eeprom 2>/dev/null | head -n1)", "spd_type=$(dd if=\"$spd_file\" bs=1 skip=2 count=1 2>/dev/null | od -A n -t u1 | awk '{print int($1/16)}')", "spd_tck=$(dd if=\"$spd_file\" bs=1 skip=20 count=2 2>/dev/null | od -A n -t u1 | awk '{print $1+$2*256}')", "igpu_card=$(for c in /sys/class/drm/card[0-9]*; do [ \"$(basename $(readlink $c/device/driver 2>/dev/null))\" = \"amdgpu\" ] && echo $c && break; done)", "igpu_usage=$(cat \"$igpu_card/device/gpu_busy_percent\" 2>/dev/null || echo 0)", "igpu_hwmon=$(hwmon_find amdgpu)", "igpu_temp=$(awk '{printf \"%.1f\", $1/1000}' \"$igpu_hwmon/temp1_input\" 2>/dev/null || echo 0)", "igpu_watt=$(awk '{printf \"%.2f\", $1/1000000}' \"$igpu_hwmon/power1_average\" 2>/dev/null || echo 0)", "igpu_freq=$(cat \"$igpu_hwmon/freq1_input\" 2>/dev/null | awk '{printf \"%.0f\", $1/1000000}')", "igpu_vram_used=$(cat \"$igpu_card/device/mem_info_vram_used\" 2>/dev/null || echo 0)", "igpu_vram_total=$(cat \"$igpu_card/device/mem_info_vram_total\" 2>/dev/null || echo 0)", "igpu_name=$(cat \"$igpu_card/device/product_name\" 2>/dev/null || echo \"$cpu_name\" | sed -n 's/.*Radeon \\(.*\\) Graphics.*/AMD Radeon \\1/p')", "cpu_name=$(echo \"$cpu_name\" | sed 's/ w\\/ .*//')", "echo \"cpu_usage=$cpu_usage\"", "echo \"cpu_temp=$cpu_temp\"", "echo \"cpu_watt=$cpu_watt\"", "echo \"cpu_name=$cpu_name\"", "echo \"cpu_clock=$cpu_clock\"", "echo \"cpu_cores=$core_pcts\"", "echo \"cpu_threads=$cpu_threads\"", "echo \"mem_used=$mem_used\"", "echo \"mem_total=$mem_total\"", "echo \"zram_used=$zram_used\"", "echo \"zswap_pool=$zswap_pool\"", "echo \"swapfile_used=$swapfile_used\"", "echo \"spd_type=$spd_type\"", "echo \"spd_tck=$spd_tck\"", "echo \"igpu_usage=$igpu_usage\"", "echo \"igpu_temp=$igpu_temp\"", "echo \"igpu_watt=$igpu_watt\"", "echo \"igpu_freq=$igpu_freq\"", "echo \"igpu_name=$igpu_name\"", "echo \"igpu_vram_used=$igpu_vram_used\"", "echo \"igpu_vram_total=$igpu_vram_total\""].join("\n")
   }
 
   function refresh() {
@@ -285,8 +286,8 @@ PanelBase {
         },
         {
           label: "Temperature",
-          value: Math.round(root.cpuTemp),
-          unit: "°C"
+          value: root.cpuTemp >= 0 ? Math.round(root.cpuTemp) : "N/A",
+          unit: root.cpuTemp >= 0 ? "°C" : undefined
         },
         root.cpuWatt > 0 ? {
           label: "Power",
@@ -424,7 +425,7 @@ PanelBase {
   function fmtBytesParts(b) {
     if (b > 999 * 1048576) {
       return {
-        num: (Math.floor(b / 1073741824 * 10) / 10).toFixed(1),
+        num: (Math.round(b / 1073741824 * 10) / 10).toFixed(1),
         unit: "GB"
       }
     }
@@ -436,7 +437,7 @@ PanelBase {
     }
     if (b > 999) {
       return {
-        num: (Math.floor(b / 1024 * 10) / 10).toFixed(1),
+        num: (Math.round(b / 1024 * 10) / 10).toFixed(1),
         unit: "KB"
       }
     }
@@ -774,6 +775,22 @@ PanelBase {
     return ""
   }
 
+  function procRowFor(c) {
+    return {
+      kind: "proc",
+      key: c.pid,
+      name: c.name,
+      cpu: c.cpu,
+      mem: c.mem,
+      disk: c.disk,
+      net: c.net,
+      dgpu: c.dgpu,
+      dvram: c.dvram,
+      igpu: c.igpu,
+      ivram: c.ivram
+    }
+  }
+
   function buildProcDisplay() {
     const raw = root.procRaw
     const topClasses = procToplevelClasses()
@@ -834,6 +851,9 @@ PanelBase {
           g.skip = true
           continue
         }
+        if (members.length === 1 && g.procs.length > 1) {
+          g.narrowed = members[0]
+        }
       }
       g.cpu = procAgg(members, "cpu", false)
       g.mem = procAgg(members, "mem", false)
@@ -857,6 +877,10 @@ PanelBase {
     const disp = []
     for (let i = 0; i < shown.length; i++) {
       const g = shown[i]
+      if (g.narrowed !== undefined) {
+        disp.push(procRowFor(g.narrowed))
+        continue
+      }
       const expanded = filtered || root.procExpanded[g.leader] === true
       disp.push({
         kind: "group",
@@ -881,19 +905,7 @@ PanelBase {
         const sorted = kids.slice().sort(procCompare)
         for (let j = 0; j < sorted.length; j++) {
           const c = sorted[j]
-          disp.push({
-            kind: "proc",
-            key: c.pid,
-            name: c.name,
-            cpu: c.cpu,
-            mem: c.mem,
-            disk: c.disk,
-            net: c.net,
-            dgpu: c.dgpu,
-            dvram: c.dvram,
-            igpu: c.igpu,
-            ivram: c.ivram
-          })
+          disp.push(procRowFor(c))
         }
       }
     }
@@ -901,6 +913,9 @@ PanelBase {
   }
 
   function toggleProcGroup(key) {
+    if (root.procFiltered) {
+      return
+    }
     const next = Object.assign({}, root.procExpanded)
     if (next[key] === true) {
       delete next[key]
@@ -993,10 +1008,12 @@ PanelBase {
     if (item.kind === "group" && item.count > 1) {
       const key = item.key
       const pids = root.procGroupMembers(key)
-      entries.push({
-        label: item.expanded ? "Collapse" : "Expand",
-        action: () => root.toggleProcGroup(key)
-      })
+      if (!root.procFiltered) {
+        entries.push({
+          label: item.expanded ? "Collapse" : "Expand",
+          action: () => root.toggleProcGroup(key)
+        })
+      }
       entries.push({
         label: "Copy app name",
         action: () => root.procCopy(item.name)
@@ -1005,7 +1022,7 @@ PanelBase {
         separator: true
       })
       entries.push({
-        label: "Kill all",
+        label: root.procFiltered ? "Kill all shown" : "Kill all",
         danger: true,
         confirm: true,
         action: () => root.procSignal(pids, "TERM", item.name)
@@ -1052,7 +1069,7 @@ PanelBase {
         label: "Copy command line",
         action: () => root.procCopyCmdline(pid)
       })
-      if (item.kind === "proc") {
+      if (item.kind === "proc" && !root.procFiltered) {
         const groupPids = root.procGroupMembers(leader)
         entries.push({
           separator: true
@@ -1075,15 +1092,11 @@ PanelBase {
     if (py + h > cardY + root.cardHeight - inset) {
       py = y - h
     }
-    if (py < cardY + inset) {
-      py = cardY + inset
-    }
     if (px + w > cardX + root.cardWidth - inset) {
       px = x - w
     }
-    if (px < cardX + inset) {
-      px = cardX + inset
-    }
+    py = Math.max(cardY + inset, Math.min(py, cardY + root.cardHeight - inset - h))
+    px = Math.max(cardX + inset, Math.min(px, cardX + root.cardWidth - inset - w))
     procMenu.openAt(px, py, entries)
   }
 
@@ -1120,7 +1133,7 @@ PanelBase {
   function testProcFilterState() {
     return {
       focus: filterInput.activeFocus,
-      keys: filterInput.Window.window.activeFocusItem !== null,
+      keys: filterInput.Window.window !== null && filterInput.Window.window.activeFocusItem === filterInput,
       text: filterInput.text,
       cursor: filterInput.cursorPosition
     }
@@ -1297,7 +1310,7 @@ PanelBase {
 
       MouseArea {
         anchors.fill: parent
-        enabled: prow.isGroup && prow.item.count > 1
+        enabled: prow.isGroup && prow.item.count > 1 && !root.procFiltered
         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: root.toggleProcGroup(prow.item.key)
       }
@@ -1337,7 +1350,7 @@ PanelBase {
 
       MouseArea {
         anchors.fill: parent
-        enabled: prow.isGroup && prow.item.count > 1
+        enabled: prow.isGroup && prow.item.count > 1 && !root.procFiltered
         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: root.toggleProcGroup(prow.item.key)
       }
@@ -1378,7 +1391,7 @@ PanelBase {
 
       MouseArea {
         anchors.fill: parent
-        enabled: prow.header || (prow.isGroup && prow.item.count > 1)
+        enabled: prow.header || (prow.isGroup && prow.item.count > 1 && !root.procFiltered)
         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: {
           if (prow.header) {
@@ -1492,7 +1505,7 @@ PanelBase {
           if (key === "cpu_usage") {
             root.cpuUsage = isNaN(num) ? 0 : num
           } else if (key === "cpu_temp") {
-            root.cpuTemp = isNaN(num) ? 0 : num
+            root.cpuTemp = val.length > 0 && !isNaN(num) ? num : -1
           } else if (key === "cpu_watt") {
             root.cpuWatt = isNaN(num) ? 0 : num
           } else if (key === "cpu_name") {
