@@ -11,6 +11,7 @@ Singleton {
   property var inputs: []
   property var streams: []
   property var apps: []
+  property bool loaded: false
 
   function isPinned(kind, name) {
     const list = kind === "output" ? outputs : inputs
@@ -79,12 +80,14 @@ Singleton {
       list.push(key)
     }
     streams = list
+    save()
   }
 
   function save() {
     const data = JSON.stringify({
       outputs: outputs,
       inputs: inputs,
+      streams: streams,
       apps: apps
     })
     const escaped = data.replace(/'/g, "'\\''")
@@ -102,8 +105,10 @@ Singleton {
           const data = JSON.parse(text)
           root.outputs = data.outputs ? data.outputs : []
           root.inputs = data.inputs ? data.inputs : []
+          root.streams = Array.isArray(data.streams) ? data.streams : []
           root.apps = data.apps ? data.apps : []
         } catch (e) {}
+        root.loaded = true
       }
     }
   }

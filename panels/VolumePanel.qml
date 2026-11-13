@@ -76,14 +76,21 @@ PanelBase {
     return direct !== undefined && direct !== null && String(direct) !== "" ? String(direct) : Audio.streamTargetName(stream)
   }
 
+  function routeTargetMatches(node, target) {
+    if (!node || !target) {
+      return false
+    }
+    const serial = node.properties ? node.properties["object.serial"] : undefined
+    return target === node.name || (serial !== undefined && String(serial) === target)
+  }
+
   function streamTargetsNode(stream, node) {
     const target = streamRouteTarget(stream)
     if (target === "") {
       const fallback = deviceDefault(streamKind(stream))
       return !!(fallback && fallback.name === node.name)
     }
-    const serial = node.properties ? node.properties["object.serial"] : undefined
-    return target === node.name || (serial !== undefined && String(serial) === target)
+    return routeTargetMatches(node, target)
   }
 
   function nodeHasStreamSignal(kind, node) {
@@ -309,7 +316,7 @@ PanelBase {
     }
     const list = routeTargets(streamKind(stream))
     for (let i = 0; i < list.length; i++) {
-      if (list[i].name === name) {
+      if (routeTargetMatches(list[i], name)) {
         return list[i]
       }
     }
@@ -323,7 +330,7 @@ PanelBase {
     }
     const list = routeTargets(streamKind(node))
     for (let i = 0; i < list.length; i++) {
-      if (list[i].name === raw) {
+      if (routeTargetMatches(list[i], raw)) {
         return Aliases.displayName(list[i])
       }
     }

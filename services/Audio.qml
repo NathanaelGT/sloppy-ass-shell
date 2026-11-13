@@ -253,7 +253,7 @@ Singleton {
     const inputDefault = Pipewire.defaultAudioSource ? Pipewire.defaultAudioSource.name : ""
     Priority.merge("output", output, outputDefault)
     Priority.merge("input", input, inputDefault)
-    if (Pipewire.ready) {
+    if (Pipewire.ready && Pins.loaded) {
       Priority.prune("output", output, Pins.outputs)
       Priority.prune("input", input, Pins.inputs)
     }
@@ -342,6 +342,16 @@ Singleton {
 
     function onLoadedChanged() {
       if (Priority.loaded) {
+        root.refreshPriority()
+      }
+    }
+  }
+
+  Connections {
+    target: Pins
+
+    function onLoadedChanged() {
+      if (Pins.loaded) {
         root.refreshPriority()
       }
     }
