@@ -213,10 +213,7 @@ Singleton {
         })
       }
       if (!initial && root.history.length !== offset) {
-        loadingMore = false
-        if (onDone) {
-          onDone()
-        }
+        root.fetchPage(limit, initial, onDone)
         return
       }
       root.history = initial ? page : root.history.concat(page)

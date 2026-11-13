@@ -70,6 +70,13 @@ Item {
     root.swapOpacity = 1
   }
 
+  function sameDisplay(a, b) {
+    if (a === null || b === null) {
+      return false
+    }
+    return a.n === b.n && a.appName === b.appName && a.appIcon === b.appIcon && a.desktopEntry === b.desktopEntry && a.summary === b.summary && a.body === b.body && a.urgency === b.urgency && String(a.image) === String(b.image) && a.actions.join("\u001f") === b.actions.join("\u001f")
+  }
+
   function syncSelected() {
     if (!root.open || Notifs.bannerSelected === null) {
       return
@@ -78,7 +85,7 @@ Item {
       root.setDisplayed(Notifs.bannerSelected)
       return
     }
-    if (root.displayed.n === Notifs.bannerSelected.n) {
+    if (root.sameDisplay(root.displayed, root.snapshot(Notifs.bannerSelected))) {
       return
     }
     replaceAnim.restart()
@@ -255,6 +262,10 @@ Item {
     target: Notifs
 
     function onBannerSelectedChanged() {
+      root.syncSelected()
+    }
+
+    function onBannerRevisionChanged() {
       root.syncSelected()
     }
 

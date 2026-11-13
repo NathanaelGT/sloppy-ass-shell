@@ -31,10 +31,11 @@ Singleton {
   property bool bannerDeferred: false
   property bool bannerReplayPending: false
   property bool bannerHold: false
+  property int bannerRevision: 0
 
   readonly property int bannerCap: 15000
   readonly property int bannerSession: 5000
-  readonly property int bannerCompactDwell: 250
+  readonly property int bannerCompactDwell: 600
   readonly property int bannerStepMs: 50
   readonly property int bannerRetreatMs: 360
   readonly property int bannerRowLimit: 3
@@ -202,7 +203,7 @@ Singleton {
     root.bannerManual = false
   }
 
-  function startBanner(instant) {
+  function startBanner() {
     if (root.locked || root.bannerSuppressed() || root.bannerGroup.length === 0) {
       return
     }
@@ -211,8 +212,8 @@ Singleton {
     root.bannerReplayPending = false
     root.bannerManual = false
     root.bannerSelected = root.bannerGroup[0]
-    root.bannerPhase = instant === true ? "expanded" : "compact"
-    root.bannerCompactRemaining = instant === true ? 0 : root.bannerCompactDwell
+    root.bannerPhase = "compact"
+    root.bannerCompactRemaining = root.bannerCompactDwell
     root.bannerRemaining = root.bannerSession
     root.bannerRetreatRemaining = 0
     root.bannerElapsed = 0
@@ -236,7 +237,7 @@ Singleton {
       return
     }
     if (root.bannerPhase === "hidden") {
-      root.startBanner(true)
+      root.startBanner()
       return
     }
     root.bannerAcknowledged = false
@@ -441,6 +442,31 @@ Singleton {
     }
   }
 
+  function snapshotFor(n, ts) {
+    return {
+      ts: ts,
+      appName: n.appName,
+      appIcon: n.appIcon,
+      desktopEntry: n.desktopEntry,
+      summary: n.summary,
+      body: n.body,
+      urgency: n.urgency,
+      actions: n.actions.map(a => a.text),
+      transient: n.transient,
+      avatarKey: root.avatarKeyOf(n),
+      image: String(n.image || "")
+    }
+  }
+
+  function refreshSnapshot(n) {
+    const record = root.findRecord(n)
+    if (!record) {
+      return
+    }
+    record.snap = root.snapshotFor(n, record.snap.ts)
+    root.bannerRevision += 1
+  }
+
   function arrive(n) {
     try {
       arriveInner(n)
@@ -454,6 +480,7 @@ Singleton {
     if (existing) {
       existing.remaining = root.timeoutFor(n)
       existing.sticky = existing.sticky || root.stickyOf(n)
+      root.refreshSnapshot(n)
       if (!n.lastGeneration && root.shouldToast(n) && !root.bannerSuppressed()) {
         root.presentArrival(existing)
       }
@@ -468,19 +495,10 @@ Singleton {
       NotifStore.stageImage(img, staged)
     }
     n.closed.connect(reason => root.closed(n, reason))
-    const snap = {
-      ts: Math.floor(Date.now() / 1000),
-      appName: n.appName,
-      appIcon: n.appIcon,
-      desktopEntry: n.desktopEntry,
-      summary: n.summary,
-      body: n.body,
-      urgency: n.urgency,
-      actions: n.actions.map(a => a.text),
-      transient: n.transient,
-      avatarKey: root.avatarKeyOf(n),
-      image: String(n.image || "")
-    }
+    n.summaryChanged.connect(() => root.refreshSnapshot(n))
+    n.bodyChanged.connect(() => root.refreshSnapshot(n))
+    n.actionsChanged.connect(() => root.refreshSnapshot(n))
+    const snap = root.snapshotFor(n, Math.floor(Date.now() / 1000))
     const record = {
       n: n,
       remaining: root.locked ? 0 : root.timeoutFor(n),
@@ -512,6 +530,10 @@ Singleton {
       return
     }
     root.records = root.records.filter(x => x.n !== n)
+    if (r.snap.transient) {
+      Quickshell.execDetached(["rm", "-f", r.imageTmp, r.avatarTmp].filter(p => p && p.length > 0))
+      return
+    }
     NotifStore.record({
       ts: r.snap.ts,
       appName: r.snap.appName,
