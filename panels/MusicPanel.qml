@@ -60,10 +60,22 @@ PanelBase {
   property int navDirection: 1
   property var activeEditor: null
   readonly property bool bulkQueueSync: queueModel.count > 150
+  readonly property int queueMatchCount: {
+    let n = 0
+    for (let i = 0; i < queueModel.count; i++) {
+      if (root.queueRowHeight(i) > 0) {
+        n += 1
+      }
+    }
+    return n
+  }
 
   onSearchTextChanged: {
     searchTimer.stop()
-    if (root.searchText.trim().length > 0 && !(root.browsePath === "pinned" || root.browsePath === "favorites")) {
+    root.searchSeq = root.searchSeq + 1
+    if (root.searchText.trim().length > 0 && !root.inCollection) {
+      root.searchResults = []
+      root.searchPending = true
       searchTimer.restart()
     } else {
       root.searchResults = []
@@ -746,6 +758,16 @@ PanelBase {
     }
   }
 
+  function canPlayCurrent() {
+    if (root.searching) {
+      return root.trackRows.length > 0
+    }
+    if (root.inCollection) {
+      return root.collectionEntries.length > 0
+    }
+    return true
+  }
+
   function playCurrent() {
     if (root.searching) {
       const uris = root.trackRows.map(e => e.path)
@@ -766,16 +788,20 @@ PanelBase {
     Mpd.playTracks(uris, root.browsePath, entry.path, root.screenId)
   }
 
+  function trackCountText(n) {
+    return n + (n === 1 ? " track" : " tracks")
+  }
+
   function metaText() {
     if (root.searching) {
-      return root.trackRows.length + " tracks"
+      return root.searchPending ? "Searching…" : root.trackCountText(root.trackRows.length)
     }
     if (root.inCollection) {
-      return root.collectionEntries.length + " tracks"
+      return root.trackCountText(root.collectionEntries.length)
     }
     const c = Mpd.counts[root.browsePath]
     if (c) {
-      return c.songs + " tracks · " + Mpd.fmtTime(c.playtime)
+      return root.trackCountText(c.songs) + " · " + Mpd.fmtTime(c.playtime)
     }
     return ""
   }
@@ -793,6 +819,13 @@ PanelBase {
     return "Play"
   }
 
+  function searchPlaceholder() {
+    if (root.currentTab !== 0 || root.inCollection) {
+      return "Title or artist…"
+    }
+    return "Title, artist, album or file…"
+  }
+
   function runSearch() {
     const q = root.searchText.trim()
     root.searchSeq = root.searchSeq + 1
@@ -803,6 +836,7 @@ PanelBase {
       return
     }
     root.searchPending = true
+    root.searchResults = []
     Mpd.searchSubtree(root.browsePath, q, entries => {
       if (tag !== root.searchSeq) {
         return
@@ -1957,7 +1991,7 @@ PanelBase {
         Text {
           anchors.fill: parent
           visible: searchInput.text === ""
-          text: "Search title or artist…"
+          text: root.searchPlaceholder()
           color: Theme.subtext
           font.family: Theme.fontFamily
           font.pixelSize: s(10)
@@ -2063,6 +2097,7 @@ PanelBase {
             radius: s(7)
             anchors.verticalCenter: parent.verticalCenter
             color: Theme.mauve
+            opacity: root.canPlayCurrent() ? 1 : 0.45
 
             Row {
               id: playRow
@@ -2090,7 +2125,8 @@ PanelBase {
 
             MouseArea {
               anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
+              enabled: root.canPlayCurrent()
+              cursorShape: root.canPlayCurrent() ? Qt.PointingHandCursor : Qt.ArrowCursor
               onClicked: root.playCurrent()
             }
           }
@@ -2329,8 +2365,8 @@ PanelBase {
       Text {
         width: foldersPage.width
         height: visible ? s(24) : 0
-        visible: root.collectionRows.length === 0 && root.folderRows.length === 0 && root.trackRows.length === 0 && !root.searchPending
-        text: root.searching ? "No matches" : "Empty folder"
+        visible: root.searchPending || (root.collectionRows.length === 0 && root.folderRows.length === 0 && root.trackRows.length === 0)
+        text: root.searchPending ? "Searching…" : (root.searching ? "No matches" : "Empty folder")
         horizontalAlignment: Text.AlignHCenter
         color: Theme.subtext
         font.family: Theme.fontFamily
@@ -2749,8 +2785,8 @@ PanelBase {
       }
 
       Text {
-        visible: Mpd.queue.length === 0
-        text: "Queue is empty"
+        visible: Mpd.queue.length === 0 || root.queueMatchCount === 0
+        text: Mpd.queue.length === 0 ? "Queue is empty" : "No matches"
         color: Theme.subtext
         font.family: Theme.fontFamily
         font.pixelSize: s(10)
