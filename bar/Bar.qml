@@ -33,12 +33,27 @@ PanelWindow {
   readonly property bool musicMerged: musicWidget.showingTitle && !(root.laptop && Notifs.bannerVisible)
   readonly property int clusterWidth: (musicWidget.visible ? centerGap + musicWidget.width : 0) + clockWidget.fullWidth + centerGap + notifWidget.width
   readonly property int clusterRight: Math.round(bellRestX + clusterWidth)
+  readonly property var bannerMetrics: ({
+      bellRestX: Math.round(bellRestX),
+      clockWidth: clockWidget.fullWidth,
+      bellWidth: notifWidget.width,
+      hovered: clockWidget.hovered || notifWidget.hovered
+    })
+  readonly property var bellDefaults: ({
+      hovered: false,
+      separation: 1,
+      expand: 0,
+      lobeOpacity: 0
+    })
+  readonly property var bellInfo: root.laptop && Notifs.bannerVisible && Panels.bannerBellFor(screen.name) || root.bellDefaults
 
   onClusterWidthChanged: Panels.setClusterWidth(screen.name, clusterWidth)
   onClusterRightChanged: Panels.setClusterRight(screen.name, clusterRight)
+  onBannerMetricsChanged: Panels.setBannerMetrics(screen.name, bannerMetrics)
   Component.onCompleted: {
     Panels.setClusterWidth(screen.name, clusterWidth)
     Panels.setClusterRight(screen.name, clusterRight)
+    Panels.setBannerMetrics(screen.name, bannerMetrics)
     TestDriver.registerBar(screen.name, root)
   }
 
@@ -78,13 +93,6 @@ PanelWindow {
     y: 0
     width: root.maskFull ? root.barWidth : screen.width
     height: root.maskFull ? Theme.barThickness : Math.round(4 * Theme.scale)
-
-    Region {
-      x: bannerWidget.x
-      y: Theme.barThickness
-      width: root.laptop && Notifs.bannerPhase === "expanded" ? Math.round(bannerWidget.restWidth) : 0
-      height: root.laptop && Notifs.bannerPhase === "expanded" ? Math.max(0, bannerWidget.pillY + Theme.capsuleThickness + bannerWidget.expandTarget - Theme.barThickness) : 0
-    }
   }
 
   Process {
@@ -151,6 +159,29 @@ PanelWindow {
       width: screen.width
       height: Theme.barThickness
 
+      Rectangle {
+        id: bannerLobe
+
+        x: root.bellRestX
+        y: (Theme.barThickness - Theme.capsuleThickness) / 2
+        width: notifWidget.width + root.centerGap * (1 - root.bellInfo.separation)
+        height: Theme.capsuleThickness + Math.max(0, root.bellInfo.expand)
+        radius: Theme.capsuleRadius
+        topRightRadius: Theme.capsuleRadius * root.bellInfo.separation
+        bottomRightRadius: Theme.capsuleRadius * root.bellInfo.separation
+        color: root.bellInfo.hovered ? Theme.capsuleHover : Theme.capsuleFill
+        opacity: root.bellInfo.lobeOpacity
+        visible: root.laptop && Notifs.bannerVisible && opacity > 0
+        antialiasing: true
+        z: -1
+
+        Behavior on color {
+          ColorAnimation {
+            duration: 120
+          }
+        }
+      }
+
       Workspaces {
         x: root.edgeMargin + Math.round(6 * Theme.scale)
         anchors.verticalCenter: parent.verticalCenter
@@ -163,7 +194,7 @@ PanelWindow {
         x: root.clockRestX
         anchors.verticalCenter: parent.verticalCenter
         screen: root.screen
-        merged: root.laptop && Notifs.bannerVisible
+        merged: root.laptop && (Notifs.bannerPhase === "compact" || Notifs.bannerPhase === "expanded")
       }
 
       Music {
@@ -179,26 +210,10 @@ PanelWindow {
       Notifications {
         id: notifWidget
 
-        x: root.laptop && Notifs.bannerVisible ? bannerWidget.x : root.bellRestX
+        x: root.bellRestX
         anchors.verticalCenter: parent.verticalCenter
         screen: root.screen
-        merged: root.laptop && Notifs.bannerVisible
-        bannerIcon: bannerWidget.appIconSource
-        bannerIconLeft: bannerWidget.pad
-        bannerIconDrop: bannerWidget.headerDrop
-      }
-
-      Banner {
-        id: bannerWidget
-
-        x: root.bellRestX
-        y: 0
-        z: -1
-        clockWidth: clockWidget.fullWidth
-        bellWidth: notifWidget.width
-        centerGap: root.centerGap
-        lobeHovered: clockWidget.hovered || notifWidget.hovered
-        screen: root.screen
+        merged: root.laptop && (Notifs.bannerPhase === "compact" || Notifs.bannerPhase === "expanded")
       }
 
       Row {

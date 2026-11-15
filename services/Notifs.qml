@@ -212,8 +212,8 @@ Singleton {
     root.bannerReplayPending = false
     root.bannerManual = false
     root.bannerSelected = root.bannerGroup[0]
-    root.bannerPhase = "compact"
-    root.bannerCompactRemaining = root.bannerCompactDwell
+    root.bannerPhase = "expanded"
+    root.bannerCompactRemaining = 0
     root.bannerRemaining = root.bannerSession
     root.bannerRetreatRemaining = 0
     root.bannerElapsed = 0
@@ -409,6 +409,13 @@ Singleton {
       return
     }
     const paused = root.bannerHold || root.bannerHover || (root.idle && !root.locked)
+    if (root.bannerPhase === "compact") {
+      root.bannerCompactRemaining -= delta
+      if (root.bannerCompactRemaining <= 0) {
+        root.bannerCompactRemaining = 0
+        root.bannerPhase = "expanded"
+      }
+    }
     if (paused) {
       return
     }
@@ -421,13 +428,6 @@ Singleton {
     }
     root.bannerElapsed += delta
     root.bannerRemaining -= delta
-    if (root.bannerPhase === "compact") {
-      root.bannerCompactRemaining -= delta
-      if (root.bannerCompactRemaining <= 0) {
-        root.bannerCompactRemaining = 0
-        root.bannerPhase = "expanded"
-      }
-    }
     if (root.bannerRemaining <= 0 || (root.bannerCritical && root.bannerElapsed >= root.bannerCap) || root.bannerGroup.length === 0) {
       root.startRetreat()
     }

@@ -168,7 +168,9 @@ into one blob that keeps their combined resting width and shows a
 Notification group, then separate again when the display ends. The bell
 anchors the blob's left edge and wears the Selected notification's app
 icon while merged; the clock hides, freeing its slot for the notification.
-eDP-1 only.
+It renders in its own overlay-layer window (`bar/BannerWindow.qml`) so it
+always draws above open panel windows; the bell pill stays in the bar
+window beneath it. eDP-1 only.
 _Avoid_: toast (retired top-right stack), notification OSD — OSD is the
 volume/brightness pill
 
@@ -184,9 +186,10 @@ expired. _Avoid_: unread (an archive concept)
 
 **Compact state**:
 The Banner's bar-height state: the clock, the latest notification's app
-identity or the group count, and the latest summary. It precedes the
-Expanded state; the Expanded state collapses back through it when the
-display ends. _Avoid_: mini banner, peek
+identity or the group count, and the latest summary. Sessions open directly
+in Expanded (the blob merges and expands in one motion), so Compact is
+retained in the state machine but not entered on arrival. _Avoid_: mini
+banner, peek
 
 **Expanded state**:
 The Banner's state below the bar: the Selected notification in full,

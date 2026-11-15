@@ -34,13 +34,15 @@ notifications panel. N and the list are the live active group, not the Unread
 archive. A new arrival takes the Selected slot and extends the Banner session
 unless the user has promoted another row or is hovering.
 
-A Banner session runs about five seconds (600 ms compact, then expanded) with an
+A Banner session runs about five seconds (sessions open directly in Expanded —
+the blob merges and expands in the same motion, superseding the earlier
+compact-dwell request) with an
 absolute 15 s cap when any active notification is Critical; group members'
 expiry pauses while the Banner is up and resumes on retreat. Critical gets a red
 border and row dot. Hover pauses the session. The existing suppression rules
 stay: any center or floating panel on eDP-1 suppresses the Banner, side panels
 do not; if the group is still active when an unrelated center panel closes, the
-Banner replays from compact. Opening the notifications panel by any route
+Banner replays expanded. Opening the notifications panel by any route
 during the session, or using the clock lobe to open the Dashboard, acknowledges
 the group and cancels replay.
 
@@ -76,7 +78,9 @@ driven from the phase change, not Behaviors.
 - Full stacked cards or an accordion list: rejected — it turns the Banner into a
   panel and loses the single-focus glance.
 - Manual-only expansion: rejected — arrivals should be readable without a
-  click; the compact-then-expand sequence is the requested behavior.
+  click; arrivals expand in the same motion as the merge (an earlier request
+  wanted a 600 ms compact dwell first; the user superseded it — expansion must
+  not wait).
 
 ## Consequences
 

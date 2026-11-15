@@ -597,6 +597,7 @@ ShellRoot {
       if (!pill) {
         return "{\"enabled\":true,\"found\":false}"
       }
+      const banner = TestDriver.panel("banner", screen)
       return JSON.stringify({
         enabled: true,
         screen: screen,
@@ -606,7 +607,7 @@ ShellRoot {
         badgeOpacity: pill.badgeOpacity,
         x: pill.x,
         width: pill.width,
-        iconDock: pill.bannerIconDock,
+        iconDock: banner ? banner.iconDock : 0,
         bannerScreen: pill.bannerScreen,
         phase: Notifs.bannerPhase
       })
@@ -2498,6 +2499,13 @@ ShellRoot {
     model: Quickshell.screens
     delegate: Component {
       Bar {}
+    }
+  }
+
+  Variants {
+    model: Quickshell.screens
+    delegate: Component {
+      BannerWindow {}
     }
   }
 

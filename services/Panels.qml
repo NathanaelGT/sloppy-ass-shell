@@ -12,6 +12,8 @@ Singleton {
   signal closeCleared(string name, string screen)
   property var clusterWidths: ({})
   property var clusterRights: ({})
+  property var bannerMetrics: ({})
+  property var bannerBell: ({})
   property var closingScreens: ({})
   property var trayItem: null
   property int trayAnchorX: -1
@@ -56,6 +58,22 @@ Singleton {
 
   function clusterRight(screen) {
     return mapNumber(clusterRights, screen)
+  }
+
+  function setBannerMetrics(screen, metrics) {
+    bannerMetrics = setMapValue(bannerMetrics, screen, metrics)
+  }
+
+  function bannerMetricsFor(screen) {
+    return bannerMetrics[screen] || null
+  }
+
+  function setBannerBell(screen, bell) {
+    bannerBell = setMapValue(bannerBell, screen, bell)
+  }
+
+  function bannerBellFor(screen) {
+    return bannerBell[screen] || null
   }
 
   function toggle(name, screen) {

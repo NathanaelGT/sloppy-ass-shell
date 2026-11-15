@@ -227,16 +227,27 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `PersistentProperties` only survives reloads. Exception: notification history is
   `~/.local/state/quickshell/notifications.db`, SQLite driven through the `sqlite3` CLI
   (docs/adr/0004) — the one state file that is not JSON.
-- Arrivals display as the Banner (docs/adr/0005), pinned to eDP-1 on purpose: the user works
+- Arrivals display as the Banner (docs/adr/0005, docs/adr/0012), pinned to eDP-1 on purpose: the user works
   on HDMI-A-1 and does not want interruption there — they hear the chime and glance at eDP-1
-  if they care. The banner is an overlay pill (`bar/widgets/Banner.qml`) that emerges from
-  the bell and covers the clock widget — the underlying widgets keep their geometry, hover
-  handlers and the cluster metrics the notifications panel attaches to (the bell's badge,
-  DND and dismiss-all stay live throughout; the pill's travel is one `travel` scalar so the
-  geometry stays bound to the clock's live, proportional-font width). The bar window is constant-height
-  (`Theme.bannerMaxExpand` headroom) and `aboveWindows: true` — layer windows never re-render
-  below their initial height, and the old below-toplevels layer hid the expansion behind
-  tiled windows (docs/adr/0005). Banner state (latest active
+  if they care. The banner is an overlay pill (`bar/widgets/Banner.qml`) hosted in its own
+  overlay-layer window (`bar/BannerWindow.qml`, mapped only while the banner is up) so it
+  renders above panel windows: panels and the bar share the top layer and Hyprland stacks
+  same-layer surfaces by map order, so an open panel would otherwise cover the banner's
+  expansion. It emerges from the bell and covers the clock widget — the underlying widgets
+  keep their geometry, hover handlers and the cluster metrics the notifications panel attaches
+  to (the bell's badge, DND and dismiss-all stay live throughout; the bell-area lobe — pill
+  surface plus its expansion slice — renders in the bar window behind the bell widget via
+  `bannerLobe`, driven per-frame by `Panels.bannerBell` (`hovered/separation/expand/lobeOpacity`)
+  so the rounded left column never splits across windows, while bar→banner geometry flows
+  through `Panels.bannerMetrics`; the docked app icon renders in the banner window above the
+  clock-side lobe because it overhangs the bell pill's right edge — from the bar window the
+  lobe would cover it — and carries its own dock/show/shake animations). Both the bar window
+  and the banner window are constant-height (`barThickness + shadowPad + bannerMaxExpand` and
+  `barThickness + bannerMaxExpand`) — layer windows never re-render below their initial height
+  — and the banner window's input mask covers only the compact strip and the expanded detail,
+  so bell clicks fall through to the bar window; the bar window's mask has no banner region
+  (docs/adr/0005, docs/adr/0012). Banner
+  state (latest active
   notification only, 15 s sticky cap, center-panel suppression, panel-open collapse) lives in
   `services/Notifs.qml`; expiry is owned by its 250 ms tick, not the widget: DND and locked
   arrivals still expire into history, and the countdown pauses while idle, hovered, or for

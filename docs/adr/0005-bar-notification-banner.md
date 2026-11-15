@@ -3,8 +3,9 @@
 ## Status
 
 accepted; the single travel-pill geometry and latest-only display are
-superseded by ADR-0006, while eDP-1 pinning, suppression and the bar-window
-rules still hold.
+superseded by ADR-0006, and the bar-window rules (constant headroom, banner
+input region, banner inside the bar window) are superseded by ADR-0012.
+eDP-1 pinning, suppression and the above-windows rule still hold.
 
 ## Context
 

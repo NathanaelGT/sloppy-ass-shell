@@ -19,7 +19,6 @@ Item {
   property real expand: 0
   property real swapOpacity: 1
   readonly property bool separated: Notifs.bannerPhase === "hidden" || Notifs.bannerPhase === "retreating"
-  property real gapSplit: 1
   property real separation: 1
   property real lobeOpacity: 0
   readonly property real innerRadius: Theme.capsuleRadius * root.separation
@@ -44,7 +43,15 @@ Item {
   readonly property bool hasBody: root.displayed !== null && String(root.displayed.body).length > 0
   readonly property bool hasImage: root.displayed !== null && String(root.displayed.image).length > 0
   readonly property string appIconSource: root.displayed !== null ? Quickshell.iconPath(AppIcons.forNotification(root.displayed.appIcon, root.displayed.desktopEntry, root.displayed.appName), "dialog-information") : ""
+  property string lastIcon: ""
+  property real iconDock: 0
+  property real iconOpacity: 0
+  readonly property real iconRestLeft: (root.bellWidth - Theme.bannerIconSize) / 2
   readonly property int actionCount: Math.min(3, root.displayed !== null ? root.displayed.actions.length : 0)
+
+  onAppIconSourceChanged: if (root.appIconSource !== "") {
+    root.lastIcon = root.appIconSource
+  }
 
   width: blobWidth
   height: Theme.barThickness + Theme.bannerMaxExpand
@@ -91,11 +98,32 @@ Item {
     replaceAnim.restart()
   }
 
-  function syncGapSplit() {
+  function syncIcon() {
+    if (Notifs.bannerPhase === "compact" || Notifs.bannerPhase === "expanded") {
+      iconHideAnim.stop()
+      dockOutAnim.stop()
+      iconRetreatFadeAnim.stop()
+      iconShowAnim.restart()
+      dockInAnim.restart()
+      return
+    }
+    dockInAnim.stop()
+    dockOutAnim.restart()
+    if (Notifs.bannerPhase === "retreating") {
+      iconHideAnim.stop()
+      iconRetreatFadeAnim.restart()
+      return
+    }
+    if (Notifs.bannerPhase === "hidden") {
+      iconHideAnim.restart()
+    }
+  }
+
+  function syncSeparation() {
     if (Notifs.bannerPhase === "hidden") {
       closeAnim.stop()
       lobeShowAnim.stop()
-      if (!splitAnim.running && root.gapSplit < 0.999) {
+      if (!splitAnim.running && root.separation < 0.999) {
         splitAnim.restart()
       }
       if (!lobeHideAnim.running && root.lobeOpacity > 0.001) {
@@ -106,7 +134,7 @@ Item {
     if (root.separated) {
       closeAnim.stop()
       lobeHideAnim.stop()
-      if (!splitAnim.running && root.gapSplit < 0.999) {
+      if (!splitAnim.running && root.separation < 0.999) {
         splitAnim.restart()
       }
       if (!lobeShowAnim.running && root.lobeOpacity < 0.999) {
@@ -207,9 +235,7 @@ Item {
       displayed: root.displayed !== null,
       bodyVisible: bodyLabel.visible,
       bodyHeight: Math.round(bodyLabel.height),
-      leftLobeOpacity: Math.round(leftLobe.opacity * 100) / 100,
       rightLobeOpacity: Math.round(rightLobe.opacity * 100) / 100,
-      gapSplit: Math.round(root.gapSplit * 100) / 100,
       separation: Math.round(root.separation * 100) / 100
     }
   }
@@ -261,6 +287,10 @@ Item {
   Connections {
     target: Notifs
 
+    function onArrivalsChanged() {
+      iconShakeAnim.restart()
+    }
+
     function onBannerSelectedChanged() {
       root.syncSelected()
     }
@@ -270,7 +300,8 @@ Item {
     }
 
     function onBannerPhaseChanged() {
-      root.syncGapSplit()
+      root.syncSeparation()
+      root.syncIcon()
       if (!Notifs.bannerVisible) {
         replaceAnim.stop()
         root.displayed = null
@@ -310,54 +341,24 @@ Item {
     }
   }
 
-  SequentialAnimation {
+  NumberAnimation {
     id: splitAnim
 
-    ParallelAnimation {
-      NumberAnimation {
-        target: root
-        property: "gapSplit"
-        to: 2.0
-        duration: 240
-        easing.type: Easing.OutCubic
-      }
-
-      NumberAnimation {
-        target: root
-        property: "separation"
-        to: 1
-        duration: 240
-        easing.type: Easing.OutCubic
-      }
-    }
-
-    NumberAnimation {
-      target: root
-      property: "gapSplit"
-      to: 1
-      duration: 220
-      easing.type: Easing.InOutCubic
-    }
+    target: root
+    property: "separation"
+    to: 1
+    duration: 240
+    easing.type: Easing.OutCubic
   }
 
-  ParallelAnimation {
+  NumberAnimation {
     id: closeAnim
 
-    NumberAnimation {
-      target: root
-      property: "gapSplit"
-      to: 0
-      duration: 140
-      easing.type: Easing.OutCubic
-    }
-
-    NumberAnimation {
-      target: root
-      property: "separation"
-      to: 0
-      duration: 140
-      easing.type: Easing.OutCubic
-    }
+    target: root
+    property: "separation"
+    to: 0
+    duration: 140
+    easing.type: Easing.OutCubic
   }
 
   NumberAnimation {
@@ -368,6 +369,108 @@ Item {
     to: 1
     duration: 120
     easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: iconShowAnim
+
+    target: root
+    property: "iconOpacity"
+    to: 1
+    duration: 140
+    easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: iconHideAnim
+
+    target: root
+    property: "iconOpacity"
+    to: 0
+    duration: 280
+    easing.type: Easing.InOutSine
+  }
+
+  NumberAnimation {
+    id: iconRetreatFadeAnim
+
+    target: root
+    property: "iconOpacity"
+    to: 0
+    duration: 120
+    easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: dockInAnim
+
+    target: root
+    property: "iconDock"
+    to: 1
+    duration: 140
+    easing.type: Easing.OutCubic
+  }
+
+  NumberAnimation {
+    id: dockOutAnim
+
+    target: root
+    property: "iconDock"
+    to: 0
+    duration: 320
+    easing.type: Easing.OutCubic
+  }
+
+  SequentialAnimation {
+    id: iconShakeAnim
+
+    NumberAnimation {
+      target: dockIcon
+      property: "rotation"
+      to: -13
+      duration: 60
+      easing.type: Easing.OutCubic
+    }
+
+    NumberAnimation {
+      target: dockIcon
+      property: "rotation"
+      to: 11
+      duration: 90
+      easing.type: Easing.InOutSine
+    }
+
+    NumberAnimation {
+      target: dockIcon
+      property: "rotation"
+      to: -8
+      duration: 90
+      easing.type: Easing.InOutSine
+    }
+
+    NumberAnimation {
+      target: dockIcon
+      property: "rotation"
+      to: 5
+      duration: 85
+      easing.type: Easing.InOutSine
+    }
+
+    NumberAnimation {
+      target: dockIcon
+      property: "rotation"
+      to: -2
+      duration: 75
+      easing.type: Easing.InOutSine
+    }
+
+    NumberAnimation {
+      target: dockIcon
+      property: "rotation"
+      to: 0
+      duration: 60
+      easing.type: Easing.OutCubic
+    }
   }
 
   SequentialAnimation {
@@ -393,32 +496,11 @@ Item {
   }
 
   Rectangle {
-    id: leftLobe
-
-    x: 0
-    y: root.pillY
-    width: root.bellWidth
-    height: Theme.capsuleThickness + root.expand
-    radius: Theme.capsuleRadius
-    topRightRadius: root.innerRadius
-    bottomRightRadius: root.innerRadius
-    color: root.hovered ? Theme.capsuleHover : Theme.capsuleFill
-    opacity: root.lobeOpacity
-    antialiasing: true
-
-    Behavior on color {
-      ColorAnimation {
-        duration: 120
-      }
-    }
-  }
-
-  Rectangle {
     id: rightLobe
 
-    x: root.bellWidth + root.centerGap * root.gapSplit
+    x: root.bellWidth + root.centerGap
     y: root.pillY
-    width: Math.max(0, root.blobWidth - root.bellWidth - root.centerGap * root.gapSplit)
+    width: Math.max(0, root.blobWidth - root.bellWidth - root.centerGap)
     height: Theme.capsuleThickness + root.expand
     radius: Theme.capsuleRadius
     topLeftRadius: root.innerRadius
@@ -430,6 +512,37 @@ Item {
     Behavior on color {
       ColorAnimation {
         duration: 120
+      }
+    }
+  }
+
+  ClockFace {
+    id: retreatClock
+
+    x: root.bellWidth + root.centerGap
+    y: root.pillY
+    width: root.clockWidth
+    height: Theme.capsuleThickness
+    visible: Notifs.bannerPhase === "retreating"
+    opacity: root.separation
+  }
+
+  Image {
+    id: dockIcon
+
+    x: root.iconRestLeft + (root.pad - root.iconRestLeft) * root.iconDock
+    y: root.pillY + (Theme.capsuleThickness - Theme.bannerIconSize) / 2 + root.headerDrop
+    width: Theme.bannerIconSize
+    height: width
+    opacity: root.iconOpacity
+    visible: opacity > 0
+    sourceSize: Qt.size(width, height)
+    source: root.appIconSource !== "" ? root.appIconSource : root.lastIcon
+
+    Behavior on y {
+      NumberAnimation {
+        duration: 320
+        easing.type: Easing.OutCubic
       }
     }
   }
