@@ -102,14 +102,15 @@ Singleton {
     return Qt.formatDate(d, "dddd, d MMMM")
   }
 
-  function recomputeDays() {
+  function recomputeDays(source) {
+    const history = source === undefined ? root.history : source
     const labels = []
-    for (let i = 0; i < root.history.length; i++) {
-      labels.push(dayLabel(root.history[i].ts))
+    for (let i = 0; i < history.length; i++) {
+      labels.push(dayLabel(history[i].ts))
     }
     const out = []
-    for (let i = 0; i < root.history.length; i++) {
-      const e = root.history[i]
+    for (let i = 0; i < history.length; i++) {
+      const e = history[i]
       out.push({
         id: e.id,
         ts: e.ts,
@@ -216,11 +217,10 @@ Singleton {
         root.fetchPage(limit, initial, onDone)
         return
       }
-      root.history = initial ? page : root.history.concat(page)
       if (rows.length < limit) {
         exhausted = true
       }
-      recomputeDays()
+      recomputeDays(initial ? page : root.history.concat(page))
       if (initial) {
         ready = true
       }
@@ -272,7 +272,7 @@ Singleton {
           root.lastError = "notification insert failed (" + code + ") " + out.trim()
           return
         }
-        root.history = [
+        recomputeDays([
           {
             id: id,
             ts: entry.ts,
@@ -287,8 +287,7 @@ Singleton {
             imageKind: avatarReady ? "avatar" : (entry.imageTmp ? "image" : ""),
             hasImage: avatarReady || (entry.imageTmp !== "" && entry.imageTmp !== undefined)
           }
-        ].concat(root.history)
-        recomputeDays()
+        ].concat(root.history))
       })
     }
 
@@ -316,8 +315,7 @@ Singleton {
   function removeEntry(id) {
     run([sqlite, dbPath, "UPDATE notifications SET deleted_at=strftime('%s','now') WHERE id=" + id])
     const gone = root.history.find(x => x.id === id)
-    root.history = root.history.filter(x => x.id !== id)
-    recomputeDays()
+    recomputeDays(root.history.filter(x => x.id !== id))
     if (gone && gone.ts > root.lastSeen && root.unreadCount > 0) {
       root.unreadCount -= 1
     }

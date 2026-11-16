@@ -145,6 +145,10 @@ PanelBase {
     if (root.displayItems.length === 0) {
       return
     }
+    if (notifScroll.animRunning() || notifScroll.dragActive) {
+      restoreRetry.restart()
+      return
+    }
     if (root.scrollAnchorAtEnd) {
       root.lastPinMs = Date.now()
       notifScroll.positionTo(1)
@@ -355,6 +359,13 @@ PanelBase {
     onTriggered: root.captureScrollAnchor()
   }
 
+  Timer {
+    id: restoreRetry
+
+    interval: 120
+    onTriggered: root.restoreScrollAnchor()
+  }
+
   PanelHeader {
     id: headerCard
 
@@ -435,7 +446,7 @@ PanelBase {
       id: notificationList
       visible: root.displayItems.length > 0
       anchors.fill: parent
-      model: root.items
+      model: root.displayItems
       spacing: Theme.gap
       reuseItems: true
       clip: true

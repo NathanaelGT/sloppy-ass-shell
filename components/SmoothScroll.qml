@@ -33,16 +33,32 @@ Item {
     fadeTimer.restart()
   }
 
-  function overClamp(raw) {
+  function overClamp(raw, base) {
     if (root.listTarget && raw < 0) {
       return 0
     }
     const depth = Math.min(Theme.scrollOvershootCap, Math.abs(root.vel) * Theme.scrollOvershootVelMs)
-    return Math.max(-depth, Math.min(root.maxScroll + depth, raw))
+    let lo = -depth
+    let hi = root.maxScroll + depth
+    if (base <= 0) {
+      lo = 0
+    } else if (raw < 0) {
+      lo = -Math.min(depth, base)
+    }
+    if (base >= root.maxScroll) {
+      hi = root.maxScroll
+    } else if (raw > root.maxScroll) {
+      hi = root.maxScroll + Math.min(depth, root.maxScroll - base)
+    }
+    return Math.max(lo, Math.min(hi, raw))
   }
 
   function stepRunning() {
     return stepAnim.running
+  }
+
+  function animRunning() {
+    return stepAnim.running || glideAnim.running || jumpAnim.running || jumpFracAnim.running || reboundAnim.running
   }
 
   function startRebound(pos) {
@@ -99,7 +115,7 @@ Item {
       glideAnim.stop()
       jumpAnim.stop()
       const before = t.contentY
-      const applied = root.overClamp(before - event.pixelDelta.y)
+      const applied = root.overClamp(before - event.pixelDelta.y, before)
       t.contentY = applied
       root.trackVelocity(applied - before)
       if (applied < 0 || applied > root.maxScroll) {
@@ -138,7 +154,7 @@ Item {
     const base = stepAnim.running ? root.animTarget : t.contentY
     const cap = t.height * Theme.scrollGlideMaxFrac
     const extra = Math.max(-cap, Math.min(cap, root.vel * root.glideDir * Theme.scrollGlideTauMs))
-    const want = root.overClamp(base + extra)
+    const want = root.overClamp(base + extra, base)
     root.vel = 0
     if (Math.abs(want - base) < 1) {
       return
@@ -167,7 +183,7 @@ Item {
   function syncStep() {
     const t = root.target
     const base = stepAnim.running ? root.animTarget : t.contentY
-    const want = root.overClamp(base + root.pendingPx)
+    const want = root.overClamp(base + root.pendingPx, base)
     root.pendingPx = 0
     if (want === base) {
       if ((base < 0 || base > root.maxScroll) && !stepAnim.running && !glideAnim.running) {
