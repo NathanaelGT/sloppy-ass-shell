@@ -172,7 +172,7 @@ It renders in its own overlay-layer window (`bar/BannerWindow.qml`) so it
 always draws above open panel windows; the bell pill stays in the bar
 window beneath it. eDP-1 only.
 _Avoid_: toast (retired top-right stack), notification OSD — OSD is the
-volume/brightness pill
+volume/brightness surface
 
 **Notification group**:
 The active notifications currently eligible for the Banner, newest
@@ -202,8 +202,10 @@ state; newest by default, promoted by clicking its row. _Avoid_: focused
 notification
 
 **OSD**:
-The bottom-center pill announcing transient state: volume, brightness,
-microphone. Never shows notifications. _Avoid_: calling toasts OSDs
+The bottom-center surface announcing transient state: volume, brightness,
+microphone. Flush to the screen's bottom edge with concave feet, it slides
+up from the edge and back down, pinned to the screen it opened on. Never
+shows notifications. _Avoid_: calling toasts OSDs
 
 **DND**:
 Do Not Disturb: the global notification mute. While on, arriving

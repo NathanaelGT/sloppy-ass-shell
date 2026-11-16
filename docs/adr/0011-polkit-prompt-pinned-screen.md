@@ -5,7 +5,8 @@
 accepted — deviates from the grilled spec (2026-11-07) on one point: the
 bar is shown on the pinned screen while the prompt is open, not hidden;
 the spec's own placement clause contradicts its "bar hides" wording
-(below).
+(below). The OSD's live-focus gate quoted in Context is superseded by
+ADR-0013.
 
 ## Context
 

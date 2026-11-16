@@ -187,7 +187,7 @@ ShellRoot {
 
     function showVolume(): void {
       const glyph = Audio.muted || Audio.volume <= 0 ? "volume-off" : Audio.volume < 0.34 ? "volume-1" : Audio.volume < 0.67 ? "volume-2" : "volume-3"
-      Osd.show(glyph, Math.round(Audio.volume * 100) + "%", Audio.muted ? 0 : Audio.volume)
+      Osd.show(glyph, Math.round(Audio.volume * 100) + "%", Audio.muted ? 0 : Audio.volume, true)
     }
 
     function showBrightness(): void {
@@ -913,6 +913,51 @@ ShellRoot {
       })
     }
 
+    function osdState(screen: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const target = screen && screen.length > 0 ? screen : "eDP-1"
+      const item = TestDriver.osd(target)
+      if (!item) {
+        return JSON.stringify({
+          enabled: true,
+          found: false,
+          pin: Osd.pinScreen,
+          pinHeld: Osd.pinHeld
+        })
+      }
+      return JSON.stringify({
+        enabled: true,
+        found: true,
+        screen: item.screenId,
+        shown: item.shown,
+        exiting: item.exiting,
+        slide: item.slide,
+        y: item.cardY,
+        width: item.cardWidth,
+        height: item.osdHeight,
+        maskWidth: item.maskWidth,
+        maskHeight: item.maskHeight,
+        windowVisible: item.visible,
+        pin: Osd.pinScreen,
+        pinHeld: Osd.pinHeld,
+        osdVisible: Osd.visible
+      })
+    }
+
+    function osdShow(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      Osd.show("volume-3", "50%", 0.5, true)
+      return JSON.stringify({
+        enabled: true,
+        focused: Hypr.focusedScreenName,
+        pin: Osd.pinScreen
+      })
+    }
+
     function switcherState(): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
@@ -1597,11 +1642,10 @@ ShellRoot {
       return JSON.stringify(rect)
     }
 
-    function shotPanel(name: string, screen: string): string {
+    function shotRect(rect): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
       }
-      const rect = TestDriver.panelRect(name, screen)
       if (!rect) {
         return "{\"enabled\":true,\"found\":false}"
       }
@@ -1611,18 +1655,16 @@ ShellRoot {
       return JSON.stringify(shot)
     }
 
+    function shotPanel(name: string, screen: string): string {
+      return shotRect(TestDriver.panelRect(name, screen))
+    }
+
     function shotBar(screen: string): string {
-      if (!TestDriver.active) {
-        return "{\"enabled\":false}"
-      }
-      const rect = TestDriver.barRect(screen)
-      if (!rect) {
-        return "{\"enabled\":true,\"found\":false}"
-      }
-      const shot = TestDriver.runShot(rect)
-      shot.enabled = true
-      shot.found = true
-      return JSON.stringify(shot)
+      return shotRect(TestDriver.barRect(screen))
+    }
+
+    function shotOsd(screen: string): string {
+      return shotRect(TestDriver.osdRect(screen))
     }
 
     function shotPoll(): string {

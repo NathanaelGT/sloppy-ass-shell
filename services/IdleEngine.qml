@@ -14,15 +14,14 @@ Singleton {
 
   readonly property bool audioPlaying: {
     const list = Media.players
-    if (!list) {
-      return false
-    }
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].isPlaying) {
-        return true
+    if (list) {
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].isPlaying) {
+          return true
+        }
       }
     }
-    return false
+    return Mpd.state === "play" && Mpd.streamNode !== null
   }
 
   readonly property bool running: Idle.active && IdleConfig.loaded && IdleConfig.enabled

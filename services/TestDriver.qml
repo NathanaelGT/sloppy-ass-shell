@@ -11,6 +11,7 @@ Singleton {
 
   property var panels: ({})
   property var bars: ({})
+  property var osds: ({})
 
   property int shotSeq: 0
   property var shotResult: ({
@@ -24,27 +25,34 @@ Singleton {
     return name + "|" + screen
   }
 
+  function withItem(source, key, item) {
+    const next = {}
+    for (const k in source) {
+      next[k] = source[k]
+    }
+    next[key] = item
+    return next
+  }
+
+  function withoutKey(source, key) {
+    const next = {}
+    for (const k in source) {
+      if (k !== key) {
+        next[k] = source[k]
+      }
+    }
+    return next
+  }
+
   function register(name, screen, item) {
     if (!name || !screen || !item) {
       return
     }
-    const next = {}
-    for (const k in root.panels) {
-      next[k] = root.panels[k]
-    }
-    next[root.key(name, screen)] = item
-    root.panels = next
+    root.panels = root.withItem(root.panels, root.key(name, screen), item)
   }
 
   function unregister(name, screen) {
-    const target = root.key(name, screen)
-    const next = {}
-    for (const k in root.panels) {
-      if (k !== target) {
-        next[k] = root.panels[k]
-      }
-    }
-    root.panels = next
+    root.panels = root.withoutKey(root.panels, root.key(name, screen))
   }
 
   function panel(name, screen) {
@@ -69,16 +77,30 @@ Singleton {
     if (!screen || !item) {
       return
     }
-    const next = {}
-    for (const k in root.bars) {
-      next[k] = root.bars[k]
-    }
-    next[screen] = item
-    root.bars = next
+    root.bars = root.withItem(root.bars, screen, item)
   }
 
   function bar(screen) {
     const item = root.bars[screen]
+    return item === undefined ? null : item
+  }
+
+  function registerOsd(screen, item) {
+    if (!screen || !item) {
+      return
+    }
+    root.osds = root.withItem(root.osds, screen, item)
+  }
+
+  function unregisterOsd(screen) {
+    if (!screen) {
+      return
+    }
+    root.osds = root.withoutKey(root.osds, screen)
+  }
+
+  function osd(screen) {
+    const item = root.osds[screen]
     return item === undefined ? null : item
   }
 
@@ -134,6 +156,29 @@ Singleton {
     return {
       x: mon.x + Math.round(local.x),
       y: mon.y + Math.round(local.y),
+      width: Math.round(local.width),
+      height: Math.round(local.height),
+      monitor: mon.name
+    }
+  }
+
+  function osdRect(screen) {
+    const target = screen && screen.length > 0 ? screen : "eDP-1"
+    const item = root.osd(target)
+    if (!item) {
+      return null
+    }
+    const local = item.testRect()
+    if (!local) {
+      return null
+    }
+    const mon = root.monitorRect(item.screenId)
+    if (!mon) {
+      return null
+    }
+    return {
+      x: mon.x + Math.round(local.x),
+      y: mon.y + mon.height - Math.round(item.height) + Math.round(local.y),
       width: Math.round(local.width),
       height: Math.round(local.height),
       monitor: mon.name

@@ -15,14 +15,14 @@ BarButton {
 
   onRightClicked: {
     Audio.toggleMute()
-    Osd.show(Audio.muted ? "volume-off" : "volume-3", Math.round(Audio.volume * 100) + "%", Audio.muted ? 0 : Audio.volume)
+    Osd.show(Audio.muted ? "volume-off" : "volume-3", Math.round(Audio.volume * 100) + "%", Audio.muted ? 0 : Audio.volume, true)
   }
 
   onMiddleClicked: Quickshell.execDetached(["systemctl", "--user", "restart", "wireplumber"])
 
   onWheeled: delta => {
     Audio.changeVolume(delta > 0 ? 0.05 : -0.05)
-    Osd.show(Audio.muted ? "volume-off" : "volume-3", Math.round(Audio.volume * 100) + "%", Audio.muted ? 0 : Audio.volume)
+    Osd.show(Audio.muted ? "volume-off" : "volume-3", Math.round(Audio.volume * 100) + "%", Audio.muted ? 0 : Audio.volume, true)
   }
 
   VolumeIcon {
