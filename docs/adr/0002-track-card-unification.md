@@ -71,3 +71,9 @@ row holding the current song lights up the same way. Any future change to
 card metrics must be applied to both implementations (queue delegate and
 folder track delegate in `panels/MusicPanel.qml`); there is no shared
 component to change once.
+
+Row behavior on both tabs: single click is inert, double-click plays from
+that track (`playFolderTrack` honors the uri), `+` appends; hover heart/pin
+toggle per-track stickers (`setFavorite`/`setPinned` take a uri, the header
+heart/pin act on the playing song). Collection uris resolve through
+`Mpd.songsByUri` (a `listallinfo` cache invalidated on MPD `database` idle).

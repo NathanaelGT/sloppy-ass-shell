@@ -24,8 +24,10 @@ not persisted across restarts (the panel always opens at the root).
 
 Search on this tab is a subtree filter: it matches tracks (title, artist,
 album, filename) under the folder you are in, not the whole library, and its
-result set is playable from the header. This is a deliberate scope choice —
-library-wide search is not offered here.
+result set is playable from the header. Inside a collection the subtree
+filter falls back to in-place title/artist matching. This is a deliberate
+scope choice — library-wide search is not offered here. The Queue tab keeps
+its own in-place `matchesSearch` row filter.
 
 ## Considered options
 

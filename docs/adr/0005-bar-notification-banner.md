@@ -38,6 +38,11 @@ unchanged). While up: the banner pill's left-click opens the notifications
 panel and right-click dismisses the notification; the bell keeps its own
 handlers.
 
+Arrival rules: the bell widget's bar badge is the unread count (arrivals
+since the panel last opened), not the live count; the chime plays on every
+arrival not gated by DND/Locked (`pw-play`, sender sound hints first) — even
+when a center panel suppresses the banner.
+
 ## Considered options
 
 - Keep the toast stack alongside the banner: rejected — two surfaces for the
