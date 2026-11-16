@@ -11,17 +11,17 @@ Singleton {
     {
       kind: "dim",
       afterSeconds: 180,
-      audioGateSeconds: 0
+      audioGateSeconds: 180
     },
     {
       kind: "dpms",
       afterSeconds: 300,
-      audioGateSeconds: 0
+      audioGateSeconds: 300
     },
     {
       kind: "lock",
       afterSeconds: 330,
-      audioGateSeconds: 0
+      audioGateSeconds: 330
     },
     {
       kind: "suspend",
@@ -116,7 +116,7 @@ Singleton {
         kind: base.kind,
         afterSeconds: entry ? posNum(entry.afterSeconds, base.afterSeconds) : base.afterSeconds,
         enabled: entry ? flag(entry.enabled, true) : true,
-        audioGateSeconds: base.kind === "suspend" && entry ? nonNegNum(entry.audioGateSeconds, base.audioGateSeconds) : base.audioGateSeconds
+        audioGateSeconds: entry ? nonNegNum(entry.audioGateSeconds, base.audioGateSeconds) : base.audioGateSeconds
       })
     }
     stages.sort((a, b) => a.afterSeconds - b.afterSeconds)

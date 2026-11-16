@@ -32,9 +32,16 @@ dormant and untouched:
 - 5 min 30 s: Lock — the same trigger-file path as SUPER+L, so the lock
   screen and its blur behave identically to a manual lock.
 - 1.5 h: Suspend via `lockAndSuspend()` (already locked), behind the Audio
-  gate (glossary): suspend waits until no MPRIS audio has played for thirty
-  minutes, re-checked on a tick, so a playlist that outlives the deadline
-  still suspends thirty minutes after it finishes.
+  gate (glossary).
+
+Every stage sits behind the Audio gate (glossary): a stage fires on its
+timeout only after `audioGateSeconds` of audio silence, re-checked on a
+tick, so a playlist that outlives a deadline still lets the stage run the
+gate's worth of silence after the music stops. Dim, DPMS off and Lock use
+their own timeout as the gate, Suspend uses thirty minutes; because each
+gate equals its timeout, the firing order is preserved while music plays.
+Audio is MPRIS playing or MPD playing through its PipeWire stream — no
+MPRIS bridge is wanted for MPD.
 
 Any input reverts every applied stage: DPMS on and pre-dim brightness
 restored. Waking from suspend reverts immediately — monitors on, brightness

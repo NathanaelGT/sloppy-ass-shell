@@ -244,9 +244,13 @@ appear to dim together. Reverting restores the pre-Dim value of each
 monitor.
 
 **Audio gate**:
-The Suspend stage's wait for silence: with audio still playing past the
-Suspend timeout, the suspend waits until no audio has played for thirty
-minutes. Only Suspend is gated — Dim and DPMS off still fire.
+A stage's wait for silence: with audio still playing past the stage
+timeout, the stage waits until no audio has played for `audioGateSeconds`.
+Every stage is gated — Dim, DPMS off and Lock each use their own timeout
+as the gate, Suspend uses thirty minutes. Audio means any MPRIS player
+playing or MPD playing through its PipeWire stream. Since each stage's
+gate equals its timeout, the firing order Dim → DPMS → Lock is preserved
+even while music plays.
 
 **Chime**:
 The arrival sound. Plays on every arrival not muted by DND (Critical
