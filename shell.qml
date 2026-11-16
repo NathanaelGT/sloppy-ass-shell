@@ -43,6 +43,8 @@ ShellRoot {
   }
 
   IpcHandler {
+    id: shellIpc
+
     target: "shell"
 
     function setIdle(state: bool): void {
@@ -135,12 +137,18 @@ ShellRoot {
 
     function brightnessUp(): void {
       Brightness.change(0.05)
-      showBrightness()
     }
 
     function brightnessDown(): void {
       Brightness.change(-0.05)
-      showBrightness()
+    }
+
+    function extBrightnessUp(): void {
+      Brightness.changeExt(0.02)
+    }
+
+    function extBrightnessDown(): void {
+      Brightness.changeExt(-0.02)
     }
 
     function mediaPlayPause(): void {
@@ -192,6 +200,14 @@ ShellRoot {
 
     function showBrightness(): void {
       Osd.show(Brightness.level > 0.5 ? "sun-high" : "sun-low", Math.round(Brightness.level * 100) + "%", Brightness.level)
+    }
+  }
+
+  Connections {
+    target: Brightness
+
+    function onUpdated() {
+      shellIpc.showBrightness()
     }
   }
 
@@ -2452,6 +2468,13 @@ ShellRoot {
         pinScreen: Polkit.pinScreen,
         panel: panel && panel.open ? panel.testState() : null
       })
+    }
+
+    function brightnessState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      return JSON.stringify(Brightness.testState())
     }
 
     function idleState(): string {

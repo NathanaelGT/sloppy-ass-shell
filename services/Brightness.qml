@@ -7,6 +7,9 @@ Singleton {
   id: root
 
   property real level: 0
+  property real intLevel: 0
+  property real extLevel: 0
+  property bool lastTouchedInt: true
   property var ddcMap: ({})
   property bool dimmed: false
   property var preDim: ({})
@@ -15,6 +18,11 @@ Singleton {
   property bool pendingRestore: false
   property bool dimQueued: false
   property bool restoreQueued: false
+  property bool notifyUpdate: false
+  property var changeQueue: []
+  property var intQueue: []
+
+  signal updated
 
   function parseDetect(text) {
     const map = {}
@@ -39,16 +47,37 @@ Singleton {
     return map
   }
 
+  function clampLevel(v) {
+    return Math.min(1, Math.max(0, v))
+  }
+
   function applyResult(text) {
     const parts = text.trim().split(/\s+/)
-    if (parts.length < 4) {
-      return
+    let parsed = false
+    if (parts.length >= 4) {
+      const current = parseInt(parts[2], 10)
+      const max = parseInt(parts[3], 10)
+      if (!isNaN(current) && max > 0) {
+        const v = current / max
+        parsed = true
+        if (parts[0] === "EXT") {
+          if (root.changeQueue.length === 0) {
+            root.extLevel = v
+          }
+        } else if (parts[0] === "INT") {
+          root.intLevel = v
+        }
+      }
     }
-    const current = parseInt(parts[2], 10)
-    const max = parseInt(parts[3], 10)
-    if (!isNaN(current) && max > 0) {
-      level = current / max
+    if (root.notifyUpdate) {
+      root.notifyUpdate = false
+      if (parsed) {
+        root.level = root.lastTouchedInt ? root.intLevel : root.extLevel
+        root.updated()
+      }
     }
+    runNext()
+    runNextInt()
   }
 
   function script(delta) {
@@ -58,7 +87,11 @@ Singleton {
   }
 
   function refresh() {
-    run(null)
+    if (workProc.running || refreshProc.running || changeQueue.length > 0) {
+      return
+    }
+    refreshProc.command = ["bash", "-lc", script(null)]
+    refreshProc.running = true
   }
 
   function detect() {
@@ -66,12 +99,91 @@ Singleton {
   }
 
   function change(delta) {
-    run(Math.round(delta * 100))
+    if (Math.round(Math.abs(delta) * 100) <= 0) {
+      return
+    }
+    root.intLevel = clampLevel(root.intLevel + delta)
+    root.level = root.intLevel
+    root.lastTouchedInt = true
+    root.updated()
+    enqueue(Math.round(delta * 100), false)
   }
 
-  function run(delta) {
-    workProc.command = ["bash", "-lc", script(delta)]
+  function changeExt(delta) {
+    if (Object.keys(ddcMap).length === 0) {
+      return
+    }
+    root.extLevel = clampLevel(root.extLevel + delta)
+    root.level = root.extLevel
+    root.lastTouchedInt = false
+    root.updated()
+    enqueue(Math.round(delta * 100), true)
+  }
+
+  function syncInt() {
+    if (intSyncProc.running) {
+      syncTimer.restart()
+      return
+    }
+    intSyncProc.command = ["bash", "-lc", "cur=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%')\necho \"INT eDP-1 ${cur:-0} 100\""]
+    intSyncProc.running = true
+  }
+
+  function enqueue(delta, ext) {
+    const queue = ext ? root.changeQueue : root.intQueue
+    const last = queue.length > 0 ? queue[queue.length - 1] : null
+    if (last && Math.abs(last.delta) < 30) {
+      last.delta += delta
+    } else {
+      queue.push({
+        delta: delta
+      })
+    }
+    if (ext) {
+      if (!workProc.running) {
+        runNext()
+      }
+    } else {
+      if (!intProc.running) {
+        runNextInt()
+      }
+    }
+  }
+
+  function runNext() {
+    if (workProc.running || changeQueue.length === 0) {
+      return
+    }
+    if (Object.keys(ddcMap).length === 0) {
+      changeQueue = []
+      root.notifyUpdate = false
+      return
+    }
+    const entry = changeQueue.shift()
+    root.notifyUpdate = true
+    workProc.command = ["bash", "-lc", extScript(entry.delta)]
     workProc.running = true
+  }
+
+  function runNextInt() {
+    if (intProc.running || intQueue.length === 0) {
+      return
+    }
+    const entry = intQueue.shift()
+    root.notifyUpdate = true
+    intProc.command = ["bash", "-lc", intScript(entry.delta)]
+    intProc.running = true
+  }
+
+  function extScript(delta) {
+    const names = Object.keys(ddcMap)
+    const name = names[0]
+    const disp = ddcMap[name]
+    return ["clamp() { local v=$1; [ \"$v\" -lt 0 ] && v=0; [ \"$v\" -gt 100 ] && v=100; echo $v; }", "cur=$(ddcutil getvcp 10 --brief --display " + disp + " 2>/dev/null | awk '{print $4}')", "new=$(clamp $(( ${cur:-0} + " + delta + " )))", "ddcutil setvcp 10 $new --display " + disp + " >/dev/null 2>&1", "echo \"EXT " + name + " $new 100\""].join("\n")
+  }
+
+  function intScript(delta) {
+    return ["clamp() { local v=$1; [ \"$v\" -lt 0 ] && v=0; [ \"$v\" -gt 100 ] && v=100; echo $v; }", "cur=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%')", "new=$(clamp $(( ${cur:-0} + " + delta + " )))", "brightnessctl set ${new}% >/dev/null 2>&1", "echo \"INT eDP-1 $new 100\""].join("\n")
   }
 
   function dimScript() {
@@ -117,7 +229,7 @@ Singleton {
     if (root.dimmed || dimProc.running) {
       return false
     }
-    if (detectProc.running || workProc.running) {
+    if (detectProc.running || workProc.running || changeQueue.length > 0 || intProc.running || intQueue.length > 0) {
       root.dimQueued = true
       retryTimer.restart()
       return false
@@ -144,7 +256,7 @@ Singleton {
     if (restoreProc.running) {
       return false
     }
-    if (detectProc.running || workProc.running) {
+    if (detectProc.running || workProc.running || changeQueue.length > 0 || intProc.running || intQueue.length > 0) {
       root.restoreQueued = true
       retryTimer.restart()
       return false
@@ -174,6 +286,8 @@ Singleton {
     root.dimDisplays = displays
     root.preDim = stored
     root.dimmed = true
+    root.intLevel = 0
+    root.extLevel = 0
     root.level = 0
     if (root.pendingRestore) {
       root.pendingRestore = false
@@ -185,9 +299,26 @@ Singleton {
     }
   }
 
-  function applyRestore() {
+  function applyRestore(text) {
     root.roundTrip = false
     root.dimmed = false
+    const lines = text.trim().split("\n")
+    for (let i = 0; i < lines.length; i++) {
+      const parts = lines[i].trim().split(/\s+/)
+      if (parts.length < 3 || parts[0] !== "RST") {
+        continue
+      }
+      const value = parseInt(parts[2], 10)
+      if (isNaN(value)) {
+        continue
+      }
+      if (parts[1] === "eDP-1") {
+        root.intLevel = value / 100
+      } else {
+        root.extLevel = value / 100
+      }
+    }
+    root.level = root.lastTouchedInt ? root.intLevel : root.extLevel
     root.refresh()
   }
 
@@ -206,6 +337,10 @@ Singleton {
       roundTrip: root.roundTrip,
       preDim: root.preDim,
       level: root.level,
+      intLevel: root.intLevel,
+      extLevel: root.extLevel,
+      queue: root.changeQueue.length,
+      intQueue: root.intQueue.length,
       ddc: root.ddcMap
     }
   }
@@ -232,6 +367,33 @@ Singleton {
   }
 
   Process {
+    id: intProc
+    command: ["bash", "-lc", "true"]
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: root.applyResult(text)
+    }
+  }
+
+  Process {
+    id: intSyncProc
+    command: ["bash", "-lc", "true"]
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: root.applyResult(text)
+    }
+  }
+
+  Process {
+    id: refreshProc
+    command: ["bash", "-lc", "true"]
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: root.applyResult(text)
+    }
+  }
+
+  Process {
     id: dimProc
     command: ["bash", "-lc", "true"]
     running: false
@@ -245,7 +407,7 @@ Singleton {
     command: ["bash", "-lc", "true"]
     running: false
     stdout: StdioCollector {
-      onStreamFinished: root.applyRestore()
+      onStreamFinished: root.applyRestore(text)
     }
   }
 
@@ -254,6 +416,18 @@ Singleton {
     interval: 4000
     running: false
     onTriggered: root.restore()
+  }
+
+  Timer {
+    id: syncTimer
+
+    interval: 300
+    running: false
+    onTriggered: {
+      if (root.intQueue.length === 0) {
+        root.syncInt()
+      }
+    }
   }
 
   Timer {
