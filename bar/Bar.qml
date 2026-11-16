@@ -31,7 +31,7 @@ PanelWindow {
   readonly property real bellRestX: clockRestX - centerGap - notifWidget.width
   readonly property real musicRestX: clockRestX + clockWidget.fullWidth + centerGap
   readonly property bool musicMerged: musicWidget.showingTitle && !(root.laptop && Notifs.bannerVisible)
-  readonly property int clusterWidth: (musicWidget.visible ? centerGap + musicWidget.width : 0) + clockWidget.fullWidth + centerGap + notifWidget.width
+  readonly property int clusterWidth: (musicWidget.visible ? centerGap + musicWidget.iconOnlyWidth : 0) + clockWidget.fullWidth + centerGap + notifWidget.width
   readonly property int clusterRight: Math.round(bellRestX + clusterWidth)
   readonly property var bannerMetrics: ({
       bellRestX: Math.round(bellRestX),
