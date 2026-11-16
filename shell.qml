@@ -43,6 +43,14 @@ ShellRoot {
   }
 
   IpcHandler {
+    target: "notify"
+
+    function send(body: string, urgency: string): void {
+      root.workToast(urgency.length > 0 ? urgency : "normal", "Agent", body)
+    }
+  }
+
+  IpcHandler {
     id: shellIpc
 
     target: "shell"

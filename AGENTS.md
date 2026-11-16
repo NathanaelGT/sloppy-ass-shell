@@ -61,9 +61,11 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   sticky, ticking remaining ms, hoverPause) and store state (unread, lastSeen, loaded history
   count, exhausted); `test bannerState` dumps the banner (present, app/summary/body/urgency/
   actions, hasImage, ticking banner remaining ms, suppressed) — the eDP-1 clock/bell pill
-  morph is driven by the same arrival. Senders drive the live paths: `notify-send -u critical`
-  (sticky, red border), `-h string:sound-name:bell` (chime override), transient/resident via
-  `notify-send -h` hints. `quickshell ipc call shell setIdle <bool>` / `setLocked <bool>`
+  morph is driven by the same arrival. Senders drive the live paths through an external D-Bus
+  sender: `env -u LD_LIBRARY_PATH notify-send -u critical …` (sticky, red border),
+  `-h string:sound-name:bell` (chime override), transient/resident via
+  `-h boolean:transient:true` / `-h boolean:resident:true`.
+  `quickshell ipc call shell setIdle <bool>` / `setLocked <bool>`
   drive the countdown gate and the lock suppression (idle detection is shell-owned now —
   docs/adr/0010, the IdleMonitor chain feeds `Notifs.idle`, so `setIdle` is a manual
   override of it; nothing else writes `Notifs.locked`). `test bannerShot` captures the morphed pill (poll `shotPoll`);
@@ -133,16 +135,18 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   `pinApp` tests; restore aliases by re-committing the original text and pins by toggling back.
   Snapshot default sink (`test currentDevice`) and volumes before audible/routing tests
   (`routeStream`, `defaultDevice`, `wpctl`); restore after.
+- Announce toasts go through the notify IPC:
+  `quickshell ipc call notify send <body> <urgency>` (urgency
+  `low`/`normal`/`critical`, empty string = `normal`), arriving through the shell's
+  `NotificationServer` and showing as the eDP-1 banner.
 - Fall back to input injection (`ydotool`, `wtype`, `dotool`; `/dev/uinput` is writable) only for
-  interactions the driver does not cover, and only after notifying the user 2 s beforehand
-  through quickshell's own notification server (`notify-send`, from libnotify, is the sender
-  CLI — the shell's `NotificationServer` is the D-Bus server, dunst is gone):
-  `notify-send -a opencode -u normal "opencode" "about to move the cursor"` then
+  interactions the driver does not cover, and only after notifying the user 2 s beforehand:
+  `quickshell ipc call notify send "about to move the cursor" normal` then
   sleep 2, since the user is active on HDMI-A-1. The toast itself closes the focused panel
   (focus steal, 5 s lifetime), so wait it out and reopen the panel before interacting.
   `test beginWork` / `test endWork` already toast
   session start/end the same way, so a separate done notice is only needed for sessions that
-  never armed test mode: `notify-send -a opencode -u low "opencode" "testing done — all yours". Run `ydotoold` once for `ydotool`, or pipe commands
+  never armed test mode: `quickshell ipc call notify send "testing done — all yours" low`. Run `ydotoold` once for `ydotool`, or pipe commands
   straight to `dotool` — but `mousemove X Y` is RELATIVE (deltas); aim with
   `mouseto X Y` (0.0–1.0 fractions of the whole 3840x1080 layout, e.g.
   `mouseto 0.23724 0.48611` for (911,525)) and verify with `hyprctl cursorpos`.
