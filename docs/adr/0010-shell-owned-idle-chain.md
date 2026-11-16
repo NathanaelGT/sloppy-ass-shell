@@ -72,7 +72,10 @@ external before internal. While dimmed, the pre-dim values are authoritative:
 a user cannot change brightness mid-Dim (input would have reverted the Dim),
 so restore always writes the stored values.
 
-Wake detection is logind's PrepareForSleep; on resume the revert runs
+Wake detection follows `systemd-sleep` in the journal (`journalctl -f -t
+systemd-sleep`), matched on "System returned from sleep operation" — gdbus is
+not present in the session PATH and `/usr/bin` does not exist there, so the
+logind PrepareForSleep monitor could never start; on resume the revert runs
 regardless of whether the firmware re-lit the panels. The chain re-arming
 from wake means a machine woken unattended re-dims after 3 min, blanks after
 5, and suspends again after another 1.5 h — an untouched machine does not

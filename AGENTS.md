@@ -119,7 +119,7 @@ Catppuccin Mocha, `Theme.scale = 1.25`.
   Suspend never fires while armed (gated in the engine, not time-skipped): verify the gate
   by state inspection only — play real audio with `test musicCmd play`, watch
   `audioPlaying`/`silenceSeconds`/`waiting` in `idleState`; a live suspend test is
-  user-run. Wake behavior: logind PrepareForSleep reverts every applied stage immediately
+  user-run. Wake behavior: the systemd-sleep journal line "System returned from sleep operation" reverts every applied stage immediately
   and the chain re-arms from wake with the full timeouts — an untouched woken machine
   re-dims after 3 min and suspends again after another 1.5 h, so nothing stays lit
   indefinitely. Reload caveats: after editing idle services prefer `reloadNow true`; a

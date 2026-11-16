@@ -10,6 +10,7 @@ Singleton {
   property var ddcMap: ({})
   property bool dimmed: false
   property var preDim: ({})
+  property var dimDisplays: ({})
   property bool roundTrip: false
   property bool pendingRestore: false
   property bool dimQueued: false
@@ -81,13 +82,13 @@ Singleton {
       const disp = ddcMap[name]
       lines.push("cur=$(ddcutil getvcp 10 --brief --display " + disp + " 2>/dev/null | awk '{print $4}')")
       lines.push("if [ -z \"$cur\" ] || [ \"$cur\" = \"0\" ]; then echo \"SKIP " + name + "\"; else")
-      lines.push("  echo \"DIM " + name + " $cur 100\"")
+      lines.push("  echo \"DIM " + name + " $cur " + disp + "\"")
       lines.push("  ddcutil setvcp 10 0 --display " + disp + " >/dev/null 2>&1")
       lines.push("fi")
     }
     lines.push("cur=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%')")
     lines.push("if [ -z \"$cur\" ] || [ \"$cur\" = \"0\" ]; then echo \"SKIP eDP-1\"; else")
-    lines.push("  echo \"DIM eDP-1 $cur 100\"")
+    lines.push("  echo \"DIM eDP-1 $cur x\"")
     lines.push("  brightnessctl set 0% >/dev/null 2>&1")
     lines.push("fi")
     return lines.join("\n")
@@ -99,8 +100,9 @@ Singleton {
     for (let i = 0; i < names.length; i++) {
       const name = names[i]
       const value = preDim[name]
-      if (ddcMap[name] !== undefined && ddcMap[name] !== null) {
-        lines.push("ddcutil setvcp 10 " + value + " --display " + ddcMap[name] + " >/dev/null 2>&1")
+      const display = root.dimDisplays[name]
+      if (display !== undefined) {
+        lines.push("ddcutil setvcp 10 " + value + " --display " + display + " >/dev/null 2>&1")
         lines.push("echo \"RST " + name + " " + value + " 100\"")
       }
     }
@@ -155,6 +157,7 @@ Singleton {
 
   function applyDim(text) {
     const stored = {}
+    const displays = {}
     const lines = text.trim().split("\n")
     for (let i = 0; i < lines.length; i++) {
       const parts = lines[i].trim().split(/\s+/)
@@ -163,7 +166,12 @@ Singleton {
       }
       const value = parseInt(parts[2], 10)
       stored[parts[1]] = isNaN(value) ? 0 : value
+      const display = parseInt(parts[3], 10)
+      if (!isNaN(display)) {
+        displays[parts[1]] = display
+      }
     }
+    root.dimDisplays = displays
     root.preDim = stored
     root.dimmed = true
     root.level = 0

@@ -92,7 +92,7 @@ Singleton {
   }
 
   function handleWakeLine(message) {
-    if (message.indexOf("PrepareForSleep") === -1 || message.indexOf("false") === -1) {
+    if (message.indexOf("System returned from sleep operation") === -1) {
       return
     }
     if (!running) {
@@ -171,7 +171,7 @@ Singleton {
     id: wakeProc
 
     running: true
-    command: ["/usr/bin/gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1", "--object-path", "/org/freedesktop/login1"]
+    command: ["journalctl", "-f", "-n", "0", "-t", "systemd-sleep", "-o", "cat"]
     stdout: SplitParser {
       splitMarker: "\n"
       onRead: message => root.handleWakeLine(message)
