@@ -225,6 +225,21 @@ the panel only hides it until the age prune. Survives restarts.
 History entries that arrived after the panel was last opened. Drives the
 bar badge count and clears when the panel opens.
 
+**Thread stack**:
+One thread's notifications — live and History alike — drawn as a single
+entry in the notifications panel: app icon, app name and summary once, then
+one block per notification with its own body and time, hairline-separated.
+Threads are keyed by app name and summary, so each person or group within
+one app stacks separately, and one card's `×` dismisses the whole stack.
+_Avoid_: app stack, notification group, conversation card
+
+**Thread stack gap**:
+The sixty-minute silence that ends a Thread stack: a notification joins its
+thread's stack while its gap to the previous member is under an hour, so a
+steady thread forms one long card and a quiet one forms several. It is a
+silence threshold, not a span limit — a chatty stack may cover hours or
+cross midnight. _Avoid_: window, thread window
+
 **Idle**:
 Five seconds without keyboard or pointer input, detected by the shell.
 While idle, a banner's countdown is paused; the first input resumes it. The
@@ -233,7 +248,8 @@ longer timeouts.
 
 **Idle chain**:
 The staged response to absent input: Dim, then DPMS off, then Lock, then
-Suspend, each at its own timeout since the last input. Any input reverts
+Suspend, each at its own timeout since the last input, with the Media hold
+(glossary) stopping the whole chain while media plays. Any input reverts
 every applied stage in place — monitors wake and brightness returns to its
 pre-Dim value — and waking from Suspend does the same immediately.
 
@@ -243,14 +259,12 @@ external monitors first (DDC is the slow setter), internal last, so both
 appear to dim together. Reverting restores the pre-Dim value of each
 monitor.
 
-**Audio gate**:
-A stage's wait for silence: with audio still playing past the stage
-timeout, the stage waits until no audio has played for `audioGateSeconds`.
-Every stage is gated — Dim, DPMS off and Lock each use their own timeout
-as the gate, Suspend uses thirty minutes. Audio means any MPRIS player
-playing or MPD playing through its PipeWire stream. Since each stage's
-gate equals its timeout, the firing order Dim → DPMS → Lock is preserved
-even while music plays.
+**Media hold**:
+The Idle chain's pause while media plays: any MPRIS player reporting
+playing, or MPD playing through its PipeWire stream, arms the hold after
+three seconds of continuous playback, which stops the chain and resets it.
+Every timeout therefore counts from the last input with no media playing,
+or from the moment playback stops; a sub-second alert never arms it.
 
 **Chime**:
 The arrival sound. Plays on every arrival not muted by DND (Critical

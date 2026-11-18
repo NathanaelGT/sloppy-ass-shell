@@ -2413,6 +2413,89 @@ ShellRoot {
       })
     }
 
+    function notifStacks(payload: string): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      let parsed = null
+      if (payload && payload.length > 0) {
+        try {
+          parsed = JSON.parse(payload)
+        } catch (e) {
+          return JSON.stringify({
+            enabled: true,
+            error: String(e)
+          })
+        }
+      }
+      if (!parsed || !parsed.entries) {
+        const panel = TestDriver.panel("notifications", parsed && parsed.screen ? parsed.screen : "eDP-1")
+        if (!panel || !panel.open) {
+          return JSON.stringify({
+            enabled: true,
+            open: false
+          })
+        }
+        const stacks = []
+        for (let i = 0; i < panel.displayItems.length; i++) {
+          const item = panel.displayItems[i]
+          const members = []
+          for (let j = 0; j < item.members.length; j++) {
+            members.push({
+              body: item.members[j].body,
+              ts: item.members[j].ts,
+              day: item.members[j].day,
+              active: item.members[j].active
+            })
+          }
+          stacks.push({
+            key: item.key,
+            appName: item.appName,
+            summary: item.summary,
+            count: item.count,
+            day: item.day,
+            active: item.active,
+            members: members
+          })
+        }
+        return JSON.stringify({
+          enabled: true,
+          open: true,
+          closingCount: panel.closingCount,
+          frozen: panel.modelFrozen,
+          stacks: stacks
+        })
+      }
+      const entries = []
+      const list = parsed.entries
+      for (let i = 0; i < list.length; i++) {
+        const e = list[i]
+        const ts = Math.round(e.ts)
+        if (!Number.isFinite(ts)) {
+          return JSON.stringify({
+            enabled: true,
+            error: "entry " + i + " needs a numeric ts"
+          })
+        }
+        entries.push({
+          appName: e.app || "",
+          summary: e.summary || "",
+          body: e.body || "",
+          ts: ts,
+          urgency: e.urgency === undefined ? 1 : e.urgency,
+          transient: e.transient === true,
+          active: e.active !== false,
+          sortId: e.sortId === undefined ? 0 : e.sortId,
+          day: NotifStore.dayLabel(ts)
+        })
+      }
+      return JSON.stringify({
+        enabled: true,
+        inputCount: entries.length,
+        stacks: NotifStacks.stacksFor(entries)
+      })
+    }
+
     function lockPreview(open: string): bool {
       if (!TestDriver.active) {
         return false
@@ -2505,13 +2588,8 @@ ShellRoot {
         chainApplied: IdleEngine.applied,
         chainElapsed: Math.round(IdleEngine.elapsedSeconds()),
         chainArmed: IdleConfig.testArm !== null,
-        chainGate: {
-          waiting: IdleEngine.gateWaiting,
-          audioPlaying: IdleEngine.audioPlaying,
-          lastAudioAt: IdleEngine.lastAudioAt,
-          silenceSeconds: IdleEngine.lastAudioAt > 0 ? Math.round(IdleEngine.silenceMs() / 1000) : -1,
-          gateSeconds: IdleConfig.stage("suspend") !== null ? IdleConfig.stage("suspend").audioGateSeconds : 0
-        }
+        audioPlaying: IdleEngine.audioPlaying,
+        mediaHold: IdleEngine.mediaHold
       })
     }
 

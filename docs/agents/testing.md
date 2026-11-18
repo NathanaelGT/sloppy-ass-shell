@@ -105,6 +105,15 @@ the scroll-position seam for thumb/wheel assertions. History row delete and
 panel action buttons have no driver seam (clicks are real); the countdown
 only advances while not idle, so idle pause is asserted via `remaining`
 freezing in `notifState`/`bannerState`, not wall-clock.
+`test notifStacks '{"entries":[{"app":"WhatsApp","summary":"Alice","body":"a1","ts":1700000000}]}'`
+feeds synthetic entries (absolute numeric `ts` required; optional
+`urgency`/`transient`/`active`/`sortId`) to `NotifStacks.stacksFor` and returns the
+resulting stacks — thread key, count, day, newest `ts`, `sortId` and members with
+their own day — so gap splits, chaining and midnight-crossing cards are asserted
+without waiting an hour or writing the archive. Called with no fixture (or
+`'{"screen":"eDP-1"}'`) it dumps the open panel's live stack model plus
+`closingCount`/`frozen`. Quickshell IPC reads a bare `[...]` argument as an
+argument list, so the array must sit inside the object.
 
 ## Lock
 
@@ -124,9 +133,9 @@ protocol in docs/adr/0008 guards against stale content). The real lock
 `test idleState` dumps the loaded config
 (loaded/configEnabled/idleSeconds/stages), detection (detected/manual/idle),
 dim state (dimmed/preDim/brightness), chain state
-(chainRunning/chainApplied/chainElapsed/chainArmed) and the suspend gate
-(waiting/audioPlaying/lastAudioAt/silenceSeconds/gateSeconds) — read-only, no
-cursor or focus effects. `test idleArm <idleSec> <dimSec> <dpmsSec> <lockSec>`
+(chainRunning/chainApplied/chainElapsed/chainArmed) and the media hold
+(audioPlaying/mediaHold) — read-only, no cursor or focus effects.
+`test idleArm <idleSec> <dimSec> <dpmsSec> <lockSec>`
 (all four args required by the ipc; 0 keeps that loaded timeout) arms a
 short-timeout IN-MEMORY config (idle.json is never written; pass 0 to keep a
 loaded timeout, suspend has no override); `test idleDisarm` restores the
@@ -139,10 +148,13 @@ brightness (`dimmed`/`preDim`/`brightness` in `idleState`); any input reverts
 applied stages (DPMS on, pre-dim brightness back). `test idleDimRoundTrip`
 does a real dim to 0 with its own announce toast and auto-restores after 4 s
 — read `dimmed`/`preDim` back through `idleState` while it runs. Suspend
-never fires while armed (gated in the engine, not time-skipped): verify the
-gate by state inspection only — play real audio with `test musicCmd play`,
-watch `audioPlaying`/`silenceSeconds`/`waiting` in `idleState`; a live
-suspend test is user-run. Reload caveats: after editing idle services prefer
+never fires while armed (gated in the engine, not time-skipped), so a live
+suspend test is user-run. Arming also bypasses the Media hold, so `idleArm`
+still fires with media playing; verify the hold on the unarmed config
+instead: play real audio with `test musicCmd play` and watch
+`audioPlaying`/`mediaHold`/`chainRunning` — the hold arms after three
+seconds of playback, and `chainRunning` drops to false with `chainElapsed`
+reset. Reload caveats: after editing idle services prefer
 `reloadNow true`; a reload or restart while dimmed resets the Brightness
 singleton (`dimmed:false` with hardware still at 0, preDim lost) — restore
 manually (`brightnessctl set <n>%`, `ddcutil setvcp 10 <n>`) or re-run the

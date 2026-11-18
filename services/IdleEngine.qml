@@ -7,9 +7,8 @@ Singleton {
   id: root
 
   property var applied: ({})
+  property bool mediaHold: false
   property real elapsedMs: 0
-  property real silenceAccMs: Number.MAX_VALUE
-  property real lastAudioAt: 0
   property real lastTickAt: 0
 
   readonly property bool audioPlaying: {
@@ -24,32 +23,21 @@ Singleton {
     return Mpd.state === "play" && Mpd.streamNode !== null
   }
 
-  readonly property bool running: Idle.active && IdleConfig.loaded && IdleConfig.enabled
-
-  readonly property bool gateWaiting: {
-    if (!root.running || IdleConfig.testArm !== null) {
-      return false
-    }
-    const stage = IdleConfig.stage("suspend")
-    if (!stage || !stage.enabled || root.applied["suspend"]) {
-      return false
-    }
-    return root.elapsedSeconds() >= stage.afterSeconds && !root.gateSatisfied(stage)
-  }
+  readonly property bool running: Idle.active && IdleConfig.loaded && IdleConfig.enabled && (IdleConfig.testArm !== null || !mediaHold)
 
   function elapsedSeconds() {
     return elapsedMs / 1000
   }
 
-  function silenceMs() {
-    return silenceAccMs
-  }
-
-  function gateSatisfied(stage) {
-    if (!stage.audioGateSeconds) {
-      return true
+  function syncHold() {
+    if (!audioPlaying) {
+      holdArm.stop()
+      mediaHold = false
+      return
     }
-    return silenceMs() >= stage.audioGateSeconds * 1000
+    if (!mediaHold && !holdArm.running) {
+      holdArm.restart()
+    }
   }
 
   function applyStage(kind) {
@@ -108,12 +96,6 @@ Singleton {
     const now = Date.now()
     const delta = Math.min(Math.max(now - lastTickAt, 0), 5000)
     lastTickAt = now
-    if (audioPlaying) {
-      lastAudioAt = now
-      silenceAccMs = 0
-    } else if (silenceAccMs < Number.MAX_VALUE) {
-      silenceAccMs += delta
-    }
     elapsedMs += delta
     const elapsed = elapsedSeconds()
     const stages = IdleConfig.stages
@@ -122,20 +104,25 @@ Singleton {
       if (!stage.enabled || applied[stage.kind] || stage.afterSeconds > elapsed) {
         continue
       }
-      if (stage.kind === "suspend") {
-        if (IdleConfig.testArm !== null || !gateSatisfied(stage)) {
-          continue
-        }
-      }
       applyStage(stage.kind)
     }
   }
 
   function restartBaseline() {
     elapsedMs = IdleConfig.idleSeconds * 1000
-    silenceAccMs = Number.MAX_VALUE
-    lastAudioAt = 0
     lastTickAt = Date.now()
+  }
+
+  onAudioPlayingChanged: root.syncHold()
+
+  Component.onCompleted: root.syncHold()
+
+  Timer {
+    id: holdArm
+
+    interval: 3000
+    repeat: false
+    onTriggered: root.mediaHold = true
   }
 
   Timer {

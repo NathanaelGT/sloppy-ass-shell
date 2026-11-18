@@ -10,23 +10,19 @@ Singleton {
   readonly property var defaultStages: [
     {
       kind: "dim",
-      afterSeconds: 180,
-      audioGateSeconds: 180
+      afterSeconds: 180
     },
     {
       kind: "dpms",
-      afterSeconds: 300,
-      audioGateSeconds: 300
+      afterSeconds: 300
     },
     {
       kind: "lock",
-      afterSeconds: 330,
-      audioGateSeconds: 330
+      afterSeconds: 330
     },
     {
       kind: "suspend",
-      afterSeconds: 5400,
-      audioGateSeconds: 1800
+      afterSeconds: 5400
     }
   ]
 
@@ -35,15 +31,6 @@ Singleton {
   property var stages: []
   property bool loaded: false
   property var testArm: null
-
-  function stage(kind) {
-    for (let i = 0; i < stages.length; i++) {
-      if (stages[i].kind === kind) {
-        return stages[i]
-      }
-    }
-    return null
-  }
 
   function arm(idleSeconds, overrides) {
     if (testArm !== null) {
@@ -56,8 +43,7 @@ Singleton {
       next.push({
         kind: entry.kind,
         afterSeconds: seconds,
-        enabled: entry.enabled,
-        audioGateSeconds: entry.audioGateSeconds
+        enabled: entry.enabled
       })
     }
     next.sort((a, b) => a.afterSeconds - b.afterSeconds)
@@ -89,10 +75,6 @@ Singleton {
     return typeof value === "number" && isFinite(value) && value > 0 ? value : fallback
   }
 
-  function nonNegNum(value, fallback) {
-    return typeof value === "number" && isFinite(value) && value >= 0 ? value : fallback
-  }
-
   function flag(value, fallback) {
     return typeof value === "boolean" ? value : fallback
   }
@@ -115,8 +97,7 @@ Singleton {
       stages.push({
         kind: base.kind,
         afterSeconds: entry ? posNum(entry.afterSeconds, base.afterSeconds) : base.afterSeconds,
-        enabled: entry ? flag(entry.enabled, true) : true,
-        audioGateSeconds: entry ? nonNegNum(entry.audioGateSeconds, base.audioGateSeconds) : base.audioGateSeconds
+        enabled: entry ? flag(entry.enabled, true) : true
       })
     }
     stages.sort((a, b) => a.afterSeconds - b.afterSeconds)

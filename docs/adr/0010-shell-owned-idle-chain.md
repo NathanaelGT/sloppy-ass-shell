@@ -31,17 +31,16 @@ dormant and untouched:
 - 5 min: DPMS off, globally via the Hyprland dispatcher.
 - 5 min 30 s: Lock — the same trigger-file path as SUPER+L, so the lock
   screen and its blur behave identically to a manual lock.
-- 1.5 h: Suspend via `lockAndSuspend()` (already locked), behind the Audio
-  gate (glossary).
+- 1.5 h: Suspend via `lockAndSuspend()` (already locked).
 
-Every stage sits behind the Audio gate (glossary): a stage fires on its
-timeout only after `audioGateSeconds` of audio silence, re-checked on a
-tick, so a playlist that outlives a deadline still lets the stage run the
-gate's worth of silence after the music stops. Dim, DPMS off and Lock use
-their own timeout as the gate, Suspend uses thirty minutes; because each
-gate equals its timeout, the firing order is preserved while music plays.
-Audio is MPRIS playing or MPD playing through its PipeWire stream — no
-MPRIS bridge is wanted for MPD.
+The Media hold (glossary) stops the chain while media plays. Any MPRIS
+player reporting playing, or MPD playing through its PipeWire stream, arms
+the hold after three seconds of continuous playback; the chain then reverts
+every applied stage and resets, so each timeout counts from the last input
+with no media playing, or from the moment playback stops. The dwell keeps a
+sub-second alert played by a web app's media session from arming the hold.
+Detection is MPRIS plus MPD's PipeWire stream — no MPRIS bridge is wanted
+for MPD.
 
 Any input reverts every applied stage: DPMS on and pre-dim brightness
 restored. Waking from suspend reverts immediately — monitors on, brightness
@@ -61,8 +60,11 @@ now feeds `Notifs.idle`.
   would duplicate state the shell already owns.
 - Suspend unconditionally at the deadline: rejected — an overnight playlist
   would be killed mid-listen.
-- Never suspend once the deadline passes with audio playing: rejected — a
-  finished playlist would keep the machine awake until the user returns.
+- Never run the chain while media plays: accepted later as the Media hold —
+  a video must not dim, lock or suspend mid-playback, so an endless stream
+  now keeps the machine awake until it stops. The per-stage Audio gate it
+  replaced shared the same MPRIS/MPD detector, never gated Dim, DPMS off or
+  Lock in practice, and became unreachable behind the hold.
 - Stay dark after wake until the first input: rejected by the user — wake
   should present the lock screen lit, not a black surface.
 - Internal monitor only for Dim: rejected — the user works on the external

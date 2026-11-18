@@ -41,61 +41,54 @@ PanelBase {
     const epoch = root.layoutEpoch
     const active = Notifs.active && Notifs.active.values ? Notifs.active.values : []
     const history = NotifStore.history
-    const out = []
+    const entries = []
     for (let i = 0; i < active.length; i++) {
       const n = active[i]
-      out.push({
-        key: "a" + n.id,
+      const ts = Notifs.timeOf(n)
+      entries.push({
         active: true,
         notification: n,
+        id: n.id,
         sortId: Number(n.id) || 0,
-        ts: Notifs.timeOf(n),
+        ts: ts,
+        day: NotifStore.dayLabel(ts),
         appName: n.appName || "",
         appIcon: n.appIcon || "",
         desktopEntry: n.desktopEntry || "",
         summary: n.summary || "",
         body: n.body || "",
+        urgency: n.urgency,
+        transient: n.transient === true,
         actionTexts: n.actions ? n.actions.map(a => a.text) : [],
         imageSource: n.image || ""
       })
     }
     for (let i = 0; i < history.length; i++) {
       const e = history[i]
-      out.push({
-        key: "h" + e.id,
+      entries.push({
         active: false,
         id: e.id,
         sortId: Number(e.id) || 0,
         ts: e.ts,
+        day: NotifStore.dayLabel(e.ts),
         appName: e.appName || "",
         appIcon: e.appIcon || "",
         desktopEntry: e.desktopEntry || "",
         summary: e.summary || "",
         body: e.body || "",
+        urgency: e.urgency,
+        transient: e.transient === true,
         actionTexts: [],
         imageSource: "",
         hasImage: e.hasImage
       })
     }
-    out.sort((a, b) => {
-      if (a.ts !== b.ts) {
-        return b.ts - a.ts
-      }
-      if (a.active !== b.active) {
-        return a.active ? -1 : 1
-      }
-      return b.sortId - a.sortId
-    })
-    const labels = []
-    for (let i = 0; i < out.length; i++) {
-      labels.push(NotifStore.dayLabel(out[i].ts))
+    const stacks = NotifStacks.stacksFor(entries)
+    for (let i = 0; i < stacks.length; i++) {
+      stacks[i].firstInDay = i === 0 || stacks[i - 1].day !== stacks[i].day
+      stacks[i].lastInDay = i === stacks.length - 1 || stacks[i + 1].day !== stacks[i].day
     }
-    for (let i = 0; i < out.length; i++) {
-      out[i].day = labels[i]
-      out[i].firstInDay = i === 0 || labels[i] !== labels[i - 1]
-      out[i].lastInDay = i === out.length - 1 || labels[i] !== labels[i + 1]
-    }
-    return out
+    return stacks
   }
 
   property bool modelFrozen: false
@@ -467,8 +460,9 @@ PanelBase {
         property bool closeDone: false
         property string itemKey: ""
 
-        readonly property bool active: notificationRow.modelData.active
-        readonly property bool thumbVisible: active ? String(modelData.imageSource || "").length > 0 : modelData.hasImage
+        readonly property var lead: modelData.members[0]
+        readonly property bool active: modelData.active
+        readonly property bool thumbVisible: lead.active ? String(lead.imageSource || "").length > 0 : lead.hasImage
         readonly property real headerSpace: dayHeader.visible ? dayHeader.height + spacing : 0
 
         function runCloseTarget() {
@@ -476,10 +470,13 @@ PanelBase {
             return
           }
           closeDone = true
-          if (closeTarget.active) {
-            closeTarget.notification.dismiss()
-          } else {
-            NotifStore.removeEntry(closeTarget.id)
+          const members = closeTarget.members
+          for (let i = 0; i < members.length; i++) {
+            if (members[i].active) {
+              members[i].notification.dismiss()
+            } else {
+              NotifStore.removeEntry(members[i].id)
+            }
           }
         }
 
@@ -504,6 +501,12 @@ PanelBase {
         }
 
         function beginClose(actionIndex) {
+          if (actionIndex >= 0 && !closing && !root.clearing && notificationRow.lead.active) {
+            notificationRow.lead.notification.actions[actionIndex].invoke()
+            if (modelData.count > 1) {
+              return
+            }
+          }
           if (closing || root.closingCount > 0 || root.clearing) {
             return
           }
@@ -514,9 +517,6 @@ PanelBase {
           keepHeader = modelData.firstInDay && !modelData.lastInDay
           root.closingCount += 1
           closeAnim.start()
-          if (actionIndex >= 0 && active) {
-            modelData.notification.actions[actionIndex].invoke()
-          }
         }
 
         function beginClear(delay) {
@@ -528,8 +528,8 @@ PanelBase {
         }
 
         function syncImage() {
-          if (!modelData.active && modelData.hasImage) {
-            NotifStore.requestImage(modelData.id)
+          if (!notificationRow.lead.active && notificationRow.lead.hasImage) {
+            NotifStore.requestImage(notificationRow.lead.id)
           }
         }
 
@@ -659,12 +659,16 @@ PanelBase {
             id: notificationSlide
           }
 
+          HoverHandler {
+            id: cardHover
+          }
+
           width: parent.width
           spacing: Math.round(8 * Theme.scale)
 
           Item {
             width: parent.width
-            height: Math.round(16 * Theme.scale)
+            height: Math.round(22 * Theme.scale)
 
             Image {
               id: appIcon
@@ -674,7 +678,43 @@ PanelBase {
               width: Math.round(16 * Theme.scale)
               height: width
               sourceSize: Qt.size(width, height)
-              source: Quickshell.iconPath(AppIcons.forNotification(notificationRow.modelData.appIcon, notificationRow.modelData.desktopEntry, notificationRow.modelData.appName), "dialog-information")
+              source: Quickshell.iconPath(AppIcons.forNotification(notificationRow.lead.appIcon, notificationRow.lead.desktopEntry, notificationRow.lead.appName), "dialog-information")
+            }
+
+            IconButton {
+              id: closeButton
+
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              size: Math.round(16 * Theme.scale)
+              glyphSize: Theme.fontSizeSmall
+              name: "x"
+              iconColor: Theme.overlay
+              opacity: notificationRow.active || cardHover.hovered ? 1 : 0
+              onClicked: notificationRow.beginClose(-1)
+            }
+
+            Rectangle {
+              id: countChip
+
+              visible: notificationRow.modelData.count > 1
+              anchors.right: closeButton.left
+              anchors.rightMargin: Math.round(8 * Theme.scale)
+              anchors.verticalCenter: parent.verticalCenter
+              width: countLabel.implicitWidth + Math.round(10 * Theme.scale)
+              height: countLabel.implicitHeight + Math.round(2 * Theme.scale)
+              radius: height / 2
+              color: Theme.surfaceHigher
+
+              Text {
+                id: countLabel
+
+                anchors.centerIn: parent
+                text: notificationRow.modelData.count
+                color: Theme.subtext
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall
+              }
             }
 
             Text {
@@ -683,8 +723,8 @@ PanelBase {
               anchors.left: appIcon.right
               anchors.leftMargin: Math.round(6 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
-              width: Math.min(implicitWidth, parent.width - appIcon.width - Math.round(6 * Theme.scale) - appTime.width - Math.round(10 * Theme.scale))
-              text: notificationRow.modelData.appName
+              width: Math.min(implicitWidth, parent.width * 0.4)
+              text: notificationRow.lead.appName
               color: Theme.subtext
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSizeSmall
@@ -692,15 +732,19 @@ PanelBase {
             }
 
             Text {
-              id: appTime
+              id: threadName
 
               anchors.left: appName.right
-              anchors.leftMargin: Math.round(10 * Theme.scale)
+              anchors.leftMargin: Math.round(6 * Theme.scale)
+              anchors.right: countChip.visible ? countChip.left : closeButton.left
+              anchors.rightMargin: Math.round(6 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
-              text: root.timeLabel(notificationRow.modelData.ts)
-              color: Theme.subtext
+              text: notificationRow.lead.summary
+              color: Theme.text
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSizeSmall
+              font.bold: true
+              elide: Text.ElideRight
             }
           }
 
@@ -711,10 +755,6 @@ PanelBase {
             color: Theme.base
             antialiasing: true
 
-            HoverHandler {
-              id: rowHover
-            }
-
             Column {
               id: innerCol
 
@@ -724,112 +764,121 @@ PanelBase {
               anchors.margins: Math.round(10 * Theme.scale)
               spacing: Math.round(6 * Theme.scale)
 
-              Item {
-                width: parent.width
-                height: Math.max(thumb.visible ? thumb.height : 0, bodyText.implicitHeight, closeButton.height)
+              Repeater {
+                model: notificationRow.modelData.members
 
-                Rectangle {
-                  id: thumb
+                delegate: Column {
+                  required property var modelData
+                  required property int index
 
-                  visible: notificationRow.thumbVisible
-                  anchors.left: parent.left
-                  anchors.top: parent.top
-                  width: Math.round(44 * Theme.scale)
-                  height: width
-                  radius: Math.round(10 * Theme.scale)
-                  color: Theme.surfaceHigh
-                  clip: true
+                  readonly property bool dayBreak: index > 0 && modelData.day !== notificationRow.modelData.members[index - 1].day
+
+                  width: innerCol.width
+                  spacing: Math.round(6 * Theme.scale)
 
                   Item {
-                    anchors.fill: parent
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                      maskEnabled: true
-                      maskSource: thumbMask
-                      maskSpreadAtMin: 1.0
-                      maskThresholdMin: 0.5
+                    width: parent.width
+                    height: Math.max(leadThumb.visible ? leadThumb.height : 0, blockBody.implicitHeight, blockTime.implicitHeight)
+
+                    Rectangle {
+                      id: leadThumb
+
+                      visible: index === 0 && notificationRow.thumbVisible
+                      anchors.left: parent.left
+                      anchors.top: parent.top
+                      width: Math.round(44 * Theme.scale)
+                      height: width
+                      radius: Math.round(10 * Theme.scale)
+                      color: Theme.surfaceHigh
+                      clip: true
+
+                      Item {
+                        anchors.fill: parent
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                          maskEnabled: true
+                          maskSource: leadThumbMask
+                          maskSpreadAtMin: 1.0
+                          maskThresholdMin: 0.5
+                        }
+
+                        Image {
+                          anchors.fill: parent
+                          fillMode: Image.PreserveAspectCrop
+                          sourceSize: Qt.size(leadThumb.width, leadThumb.height)
+                          source: notificationRow.lead.active ? notificationRow.lead.imageSource : NotifStore.imageUrlFor(notificationRow.lead.id) || ""
+                          visible: notificationRow.lead.active || source !== ""
+                        }
+                      }
+
+                      Rectangle {
+                        id: leadThumbMask
+
+                        anchors.fill: parent
+                        visible: false
+                        radius: leadThumb.radius
+                        color: "white"
+                        antialiasing: true
+                        layer.enabled: true
+                      }
+
+                      Spinner {
+                        anchors.centerIn: parent
+                        visible: !notificationRow.lead.active && NotifStore.imageUrlFor(notificationRow.lead.id) === ""
+                        running: visible
+                      }
                     }
 
-                    Image {
-                      anchors.fill: parent
-                      fillMode: Image.PreserveAspectCrop
-                      sourceSize: Qt.size(thumb.width, thumb.height)
-                      source: notificationRow.active ? notificationRow.modelData.imageSource : NotifStore.imageUrlFor(notificationRow.modelData.id) || ""
-                      visible: notificationRow.active || source !== ""
+                    Text {
+                      id: blockTime
+
+                      anchors.right: parent.right
+                      anchors.top: parent.top
+                      text: dayBreak ? modelData.day + " · " + root.timeLabel(modelData.ts) : root.timeLabel(modelData.ts)
+                      color: Theme.subtext
+                      font.family: Theme.fontFamily
+                      font.pixelSize: Theme.fontSizeSmall
+                    }
+
+                    Column {
+                      id: blockBody
+
+                      anchors.left: leadThumb.visible ? leadThumb.right : parent.left
+                      anchors.leftMargin: leadThumb.visible ? Math.round(10 * Theme.scale) : 0
+                      anchors.right: blockTime.left
+                      anchors.rightMargin: Math.round(6 * Theme.scale)
+                      anchors.top: parent.top
+                      spacing: Math.round(2 * Theme.scale)
+
+                      Text {
+                        width: parent.width
+                        visible: text.length > 0
+                        text: modelData.body
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeSmall
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: modelData.active ? 3 : 2
+                        elide: Text.ElideRight
+                      }
                     }
                   }
 
                   Rectangle {
-                    id: thumbMask
-
-                    anchors.fill: parent
-                    visible: false
-                    radius: thumb.radius
-                    color: "white"
-                    antialiasing: true
-                    layer.enabled: true
-                  }
-
-                  Spinner {
-                    anchors.centerIn: parent
-                    visible: !notificationRow.active && NotifStore.imageUrlFor(notificationRow.modelData.id) === ""
-                    running: visible
-                  }
-                }
-
-                Column {
-                  id: bodyText
-
-                  anchors.left: thumb.visible ? thumb.right : parent.left
-                  anchors.leftMargin: thumb.visible ? Math.round(10 * Theme.scale) : 0
-                  anchors.right: closeButton.left
-                  anchors.rightMargin: Math.round(4 * Theme.scale)
-                  anchors.top: parent.top
-                  spacing: Math.round(2 * Theme.scale)
-
-                  Text {
+                    visible: index < notificationRow.modelData.members.length - 1
                     width: parent.width
-                    text: notificationRow.modelData.summary
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                    font.bold: true
-                    elide: Text.ElideRight
+                    height: 1
+                    color: Theme.surfaceHigher
                   }
-
-                  Text {
-                    width: parent.width
-                    visible: text.length > 0
-                    text: notificationRow.modelData.body
-                    color: Theme.subtext
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSmall
-                    wrapMode: Text.WordWrap
-                    maximumLineCount: notificationRow.active ? 3 : 2
-                    elide: Text.ElideRight
-                  }
-                }
-
-                IconButton {
-                  id: closeButton
-
-                  anchors.right: parent.right
-                  anchors.top: parent.top
-                  size: Math.round(16 * Theme.scale)
-                  glyphSize: Theme.fontSizeSmall
-                  name: "x"
-                  iconColor: Theme.overlay
-                  opacity: notificationRow.active ? 1 : (rowHover.hovered ? 1 : 0)
-                  onClicked: notificationRow.beginClose(-1)
                 }
               }
 
               Row {
-                visible: notificationRow.active && notificationRow.modelData.actionTexts.length > 0
+                visible: notificationRow.active && notificationRow.lead.actionTexts.length > 0
                 spacing: Math.round(6 * Theme.scale)
 
                 Repeater {
-                  model: Math.min(3, notificationRow.modelData.actionTexts.length)
+                  model: Math.min(3, notificationRow.lead.actionTexts.length)
 
                   delegate: BarButton {
                     required property int modelData
@@ -840,7 +889,7 @@ PanelBase {
                       id: actionLabel
 
                       anchors.centerIn: parent
-                      text: notificationRow.modelData.actionTexts[modelData]
+                      text: notificationRow.lead.actionTexts[modelData]
                       color: Theme.text
                       font.family: Theme.fontFamily
                       font.pixelSize: Theme.fontSizeSmall
