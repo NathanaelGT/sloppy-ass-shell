@@ -385,6 +385,33 @@ PanelWindow {
     clip: root.attached
 
     Item {
+      id: concaveLead
+
+      readonly property real slideFrac: visual.height > root.shadowPad ? Math.max(0, Math.min(1, (visual.y + visual.height) / (visual.height - root.shadowPad))) : 1
+      readonly property real reveal: Math.max(0, Math.min(1, (slideFrac - 0.1) / 0.25))
+
+      x: root.cardX - root.cornerRadius
+      y: 0
+      width: root.cardWidth + root.cornerRadius * 2
+      height: root.cornerRadius
+      clip: true
+      visible: root.attached && root.cornerRadius > 0 && reveal > 0
+      opacity: reveal
+      layer.enabled: true
+      layer.samples: 4
+
+      BarSurface {
+        surfaceColor: Theme.base
+        edgeMargin: root.cornerRadius
+        cornerRadius: root.cornerRadius
+        barWidth: root.cardWidth
+        barHeight: root.cardHeight
+        width: parent.width
+        height: root.cardHeight
+      }
+    }
+
+    Item {
       id: visual
 
       x: root.cardX - root.shadowPad

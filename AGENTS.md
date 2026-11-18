@@ -64,6 +64,9 @@ Hand-written Quickshell 0.3.2 config. NixOS, Hyprland, Catppuccin Mocha, `Theme.
 - Concave top corners come from `components/BarSurface.qml`; the bar and the attached menu cards
   share it (see also docs/adr/0016).
   `layer.enabled` clips a subtree to its own rect, so widen the item rather than relying on overflow.
+- A `Shape` (CurveRenderer) renders nothing under an ancestor `clip: true` unless its own subtree is
+  layered: put `layer.enabled: true` (+ `layer.samples: 4`) on the clipped item itself, as `visual`
+  and `concaveLead` in `panels/PanelBase.qml` do.
 - Shadow = one `components/PanelShadow.qml` (`QtQuick.Effects.MultiEffect`, hidden source, shadow
   behind) around the card on all sides, tuned by `Theme.shadowPad/shadowBlur/shadowOpacity/
   shadowVerticalOffset`. Same recipe for bar and menus; `layer.effect` clips, so use the hidden-source
