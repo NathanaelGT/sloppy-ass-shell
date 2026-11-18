@@ -139,6 +139,10 @@ Rectangle {
     })
   }
 
+  function typeText(text) {
+    editor.text = String(text)
+  }
+
   onActiveChanged: {
     root.syncShown()
     if (root.active) {

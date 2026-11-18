@@ -96,6 +96,8 @@ PanelBase {
   property bool dropdownOpen: false
   property bool focusLock: false
   property string focusTarget: "term"
+  property var paramEditBase: ({})
+  property string paramDirty: ""
 
   property var providerSessions: ({})
   property var providerProcs: ({})
@@ -1028,6 +1030,8 @@ PanelBase {
       }
     }
     root.paramValues = values
+    root.paramEditBase = {}
+    root.paramDirty = ""
     root.paramCandidates = []
     root.paramCandidateIndex = -1
     root.dropdownOpen = false
@@ -1158,6 +1162,7 @@ PanelBase {
   }
 
   function focusTerm() {
+    root.commitParam()
     root.focusLock = true
     root.focusTarget = "term"
     root.dropdownOpen = false
@@ -1217,6 +1222,7 @@ PanelBase {
   }
 
   function focusParam(key) {
+    root.commitParam()
     const param = root.findParam(key)
     if (!param) {
       return false
@@ -1224,7 +1230,11 @@ PanelBase {
     const state = root.paramState(key)
     if (state && Providers.hasDropdown(param) && state.text.length > 0) {
       root.writeParam(key, state.value, "", "", state.set)
+      root.setParamBase(key, "")
+    } else {
+      root.setParamBase(key, state ? state.text : "")
     }
+    root.paramDirty = ""
     root.focusLock = true
     root.focusTarget = key
     root.paramCandidateIndex = -1
@@ -1278,10 +1288,42 @@ PanelBase {
     return true
   }
 
-  function onParamEdited(key, text) {
+  function setParamBase(key, text) {
+    const next = {}
+    const keys = Object.keys(root.paramEditBase)
+    for (let i = 0; i < keys.length; i++) {
+      next[keys[i]] = root.paramEditBase[keys[i]]
+    }
+    next[key] = text
+    root.paramEditBase = next
+  }
+
+  function commitParam() {
+    const key = root.focusTarget
+    if (key === "term") {
+      return
+    }
+    const state = root.paramState(key)
+    if (!state || !root.findParam(key)) {
+      return
+    }
+    const base = root.paramEditBase[key]
+    if (root.paramDirty !== key && base !== undefined && base === state.text) {
+      return
+    }
+    root.onParamEdited(key, state.text, true)
+    root.setParamBase(key, state.text)
+    root.paramDirty = ""
+  }
+
+  function onParamEdited(key, text, final) {
     const param = root.findParam(key)
     if (!param) {
       return false
+    }
+    const committed = final === true
+    if (!committed && key === root.focusTarget) {
+      root.paramDirty = key
     }
     const state = root.paramState(key)
     const current = state ? state.value : ""
@@ -1290,7 +1332,7 @@ PanelBase {
       const matched = Providers.matchOf(param, text)
       if (matched) {
         root.writeParam(key, Providers.valueOf(matched), text, "", true)
-      } else if (text.length === 0) {
+      } else if (text.length === 0 || !committed) {
         root.writeParam(key, current, text, "", wasSet)
       } else {
         const result = Providers.validate(param, text)
@@ -1307,14 +1349,14 @@ PanelBase {
     if (text.length === 0) {
       const def = Providers.defaultOf(param)
       if (param.required === true && def === undefined) {
-        root.writeParam(key, "", "", "required", false)
+        root.writeParam(key, "", "", committed ? "required" : "", false)
         return false
       }
       root.writeParam(key, def === undefined ? "" : def, "", "", false)
       return true
     }
     const result = Providers.validate(param, text)
-    root.writeParam(key, result.value, text, result.ok ? "" : result.error, true)
+    root.writeParam(key, result.value, text, result.ok || !committed ? "" : result.error, true)
     return result.ok
   }
 
@@ -1526,6 +1568,7 @@ PanelBase {
   }
 
   function runProviderSearch() {
+    root.commitParam()
     const provider = root.currentProvider
     if (!provider || root.providerTerm.length === 0 || root.providerSession.loading) {
       return false
@@ -2349,6 +2392,7 @@ PanelBase {
         onTextChanged: root.handleSearchText(text)
         onAccepted: root.acceptCurrent()
         onActiveFocusChanged: if (activeFocus && !root.focusLock) {
+          root.commitParam()
           root.focusTarget = "term"
           root.dropdownOpen = false
         }
