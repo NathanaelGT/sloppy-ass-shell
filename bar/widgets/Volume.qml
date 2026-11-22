@@ -8,6 +8,7 @@ BarButton {
   id: root
 
   property var screen
+  panelKey: "volume"
 
   active: Panels.openOn("volume", root.screen.name)
 

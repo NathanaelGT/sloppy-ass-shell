@@ -9,6 +9,7 @@ BarButton {
   id: root
 
   property var screen
+  panelKey: "network"
 
   active: Panels.openOn("network", root.screen.name)
 

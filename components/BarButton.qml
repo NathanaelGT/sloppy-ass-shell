@@ -1,5 +1,6 @@
 import QtQuick
 import "../theme"
+import "../services"
 
 Rectangle {
   id: root
@@ -11,6 +12,7 @@ Rectangle {
 
   property bool capsule: true
   property bool active: false
+  property string panelKey: ""
   property color fill: capsule ? Theme.capsuleFill : "transparent"
   property color hoverFill: capsule ? Theme.capsuleHover : Theme.surface
   property color borderColor: "transparent"
@@ -36,6 +38,21 @@ Rectangle {
 
   HoverHandler {
     id: hoverHandler
+
+    onHoveredChanged: if (hovered) {
+      prewarmDwell.restart()
+    } else {
+      prewarmDwell.stop()
+    }
+  }
+
+  Timer {
+    id: prewarmDwell
+
+    interval: 120
+    onTriggered: if (root.panelKey.length > 0) {
+      Panels.prewarm(root.panelKey)
+    }
   }
 
   MouseArea {

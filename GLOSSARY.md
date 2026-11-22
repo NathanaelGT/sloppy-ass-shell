@@ -271,6 +271,20 @@ The arrival sound. Plays on every arrival not muted by DND (Critical
 excepted) or Locked — even when the Banner is suppressed by an open
 panel. Honors a sender-requested sound, else falls back by urgency.
 
+## Wi-Fi
+
+**Scan**:
+The Wi-Fi panel's read-a-code flow: hold a Wi-Fi QR code in front of the
+camera, or paste a screenshot of one, and the panel joins that network.
+Contrast Share, which shows a code instead of reading one. _Avoid_: QR mode,
+camera mode
+
+**Share**:
+The Wi-Fi panel's show-a-code flow: the qrcode action on a connected or saved
+row renders that network's own code for someone else to scan. Contrast Scan,
+which reads a code instead of showing one. _Avoid_: broadcast, QR panel
+(unqualified — both flows are QR)
+
 ## Launcher
 
 **Icon index**:

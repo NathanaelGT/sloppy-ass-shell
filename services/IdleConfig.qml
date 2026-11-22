@@ -28,6 +28,7 @@ Singleton {
 
   property bool enabled: true
   property int idleSeconds: 5
+  property int lockedStartSeconds: 290
   property var stages: []
   property bool loaded: false
   property var testArm: null

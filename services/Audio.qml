@@ -213,6 +213,17 @@ Singleton {
     return out
   }
 
+  function deviceNodes() {
+    const out = []
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]
+      if (node.audio && !node.isStream) {
+        out.push(node)
+      }
+    }
+    return out
+  }
+
   function nodeByName(kind, name) {
     const cls = kind === "output" ? "Audio/Sink" : "Audio/Source"
     for (let i = 0; i < nodes.length; i++) {
@@ -358,16 +369,7 @@ Singleton {
   }
 
   PwObjectTracker {
-    objects: {
-      const list = []
-      if (root.sink) {
-        list.push(root.sink)
-      }
-      if (root.source) {
-        list.push(root.source)
-      }
-      return list
-    }
+    objects: root.deviceNodes()
   }
 
   Process {

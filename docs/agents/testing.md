@@ -35,7 +35,16 @@ effects); `wifiBeginPass <name>`/`wifiSetPass`/`wifiPassEcho`/`wifiShowToggle`/
 `wifiSectionToggle`/`wifiSectionSet` mirror the chevrons;
 `wifiForgetAsk`/`wifiForgetCancel` stage and drop the confirm strip. Live
 ammo: `wifiPassSubmit` attempts a real join, `wifiForgetConfirm` really
-forgets (reconnect by hand afterwards) — announce first.
+forgets (reconnect by hand afterwards) — announce first. Scan card:
+`wifiScanOpen`/`wifiScanClose` are idempotent open/close,
+`wifiScanState` reads {open, phase, status, frame, lastPayload, decoded,
+target} — phase is scanning/connecting/unavailable/missing/error;
+`wifiScanDecode <file>` decodes a fixture image through the tool's one-shot
+mode (decode only — the readout lands in `wifiScanState.decoded`),
+`wifiScanJoin` joins the last decoded payload (real join — failure paths
+only for agents), `wifiScanPaste` mirrors the paste button (real join).
+`tools/qrscan` needs `bun install` once; with the camera held elsewhere the
+card reports "Camera unavailable" after ~4 s, without Bun "Decoder missing".
 
 ## Battery process list
 

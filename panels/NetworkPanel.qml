@@ -8,9 +8,7 @@ import "../services"
 
 PanelBase {
   id: root
-
   panelName: "network"
-
   property string pending: ""
   property bool showPassword: false
   property string confirmForget: ""
@@ -33,11 +31,20 @@ PanelBase {
   property bool scanInFlight: false
   property bool modifyInFlight: false
   property bool pskInFlight: false
-
+  property bool scanOpen: false
+  property string scanPhase: "idle"
+  property string scanStatus: ""
+  property string scanFrame: ""
+  property string scanLastPayload: ""
+  property var scanDecoded: null
+  property string scanTarget: ""
+  property var scanParsed: null
+  property string scanResumePhase: "scanning"
+  property string decodeMode: ""
+  property bool joinInFlight: false
+  readonly property string scanToolPath: Quickshell.configDir + "/tools/qrscan/qrscan.mjs"
   readonly property bool interacting: pending !== "" || expanded !== "" || confirmForget !== "" || sharing !== "" || activating !== ""
-
   readonly property bool enabled: Networking.wifiEnabled
-
   readonly property var device: {
     const list = Networking.devices ? Networking.devices.values : []
     for (let i = 0; i < list.length; i++) {
@@ -47,13 +54,11 @@ PanelBase {
     }
     return null
   }
-
   onDeviceChanged: {
     if (root.device && root.open) {
       root.device.scannerEnabled = true
     }
   }
-
   readonly property var allNetworks: {
     if (!device || !device.networks) {
       return []
@@ -65,7 +70,6 @@ PanelBase {
     }
     return out
   }
-
   readonly property var connectedNetwork: {
     for (let i = 0; i < allNetworks.length; i++) {
       if (allNetworks[i].connected) {
@@ -74,7 +78,6 @@ PanelBase {
     }
     return null
   }
-
   readonly property var savedNetworks: {
     const out = []
     for (let i = 0; i < allNetworks.length; i++) {
@@ -86,7 +89,6 @@ PanelBase {
     out.sort((a, b) => root.sortValue(b) - root.sortValue(a))
     return out
   }
-
   readonly property var availableNetworks: {
     const out = []
     for (let i = 0; i < allNetworks.length; i++) {
@@ -98,7 +100,6 @@ PanelBase {
     out.sort((a, b) => root.sortValue(b) - root.sortValue(a))
     return out
   }
-
   readonly property var rows: {
     const out = []
     if (connectedNetwork) {
@@ -152,34 +153,32 @@ PanelBase {
     }
     return out
   }
-
   onAllNetworksChanged: {
     root.pruneFlowState()
     root.rebuildSortStrength()
   }
-
   onInteractingChanged: if (!root.interacting) {
     root.rebuildSortStrength()
   }
-
   onEnabledChanged: {
-    if (!root.enabled || !root.open) {
+    if (!root.enabled) {
+      root.closeScanCard()
+      return
+    }
+    if (!root.open) {
       return
     }
     root.maybeRescan()
   }
-
   onCardHoveredChanged: {
     if (cardHovered) {
       root.maybeRescan()
     }
   }
-
   function sortValue(network) {
     const s = root.sortStrength[network.name]
     return s === undefined ? (network.signalStrength || 0) : s
   }
-
   function rebuildSortStrength() {
     if (root.interacting) {
       return
@@ -195,7 +194,6 @@ PanelBase {
     }
     root.sortStrength = next
   }
-
   function pruneFlowState() {
     if (root.pending !== "" && !root.findNetwork(root.pending)) {
       root.pending = ""
@@ -207,7 +205,23 @@ PanelBase {
       root.expanded = ""
     }
   }
-
+  function closeRowFlows() {
+    root.pending = ""
+    root.confirmForget = ""
+    root.expanded = ""
+    root.sharing = ""
+  }
+  function closeSectionFlows(section) {
+    if (root.pending !== "" && root.rowSection(root.pending) === section) {
+      root.pending = ""
+    }
+    if (root.confirmForget !== "" && root.rowSection(root.confirmForget) === section) {
+      root.confirmForget = ""
+    }
+    if (root.expanded !== "" && root.rowSection(root.expanded) === section) {
+      root.expanded = ""
+    }
+  }
   function rowSection(name) {
     const net = root.findNetwork(name)
     if (!net) {
@@ -218,7 +232,6 @@ PanelBase {
     }
     return net.known ? "saved" : "available"
   }
-
   function applySection(section, value) {
     if (section === "connected") {
       root.connectedExpanded = value
@@ -230,15 +243,7 @@ PanelBase {
       return false
     }
     if (!value) {
-      if (root.pending !== "" && root.rowSection(root.pending) === section) {
-        root.pending = ""
-      }
-      if (root.confirmForget !== "" && root.rowSection(root.confirmForget) === section) {
-        root.confirmForget = ""
-      }
-      if (root.expanded !== "" && root.rowSection(root.expanded) === section) {
-        root.expanded = ""
-      }
+      root.closeSectionFlows(section)
     }
     root.sharing = ""
     if (root.pending !== "" || root.confirmForget !== "") {
@@ -246,11 +251,9 @@ PanelBase {
     }
     return true
   }
-
   function toggleSection(section) {
     return root.applySection(section, !root.sectionExpanded(section))
   }
-
   function sectionExpanded(section) {
     if (section === "connected") {
       return root.connectedExpanded
@@ -263,12 +266,10 @@ PanelBase {
     }
     return false
   }
-
   function signalPct(network) {
     const s = network && network.signalStrength ? network.signalStrength : 0
     return Math.round(s > 1 ? s : s * 100)
   }
-
   function glyphFor(network) {
     const pct = signalPct(network)
     if (pct > 66) {
@@ -279,13 +280,11 @@ PanelBase {
     }
     return "wifi-0"
   }
-
   function secured(network) {
     return network.security !== WifiSecurityType.Open
   }
-
   function rescan() {
-    if (!device || !root.open || scanProc.running) {
+    if (!device || !root.open || root.scanOpen || scanProc.running) {
       return
     }
     root.device.scannerEnabled = true
@@ -295,67 +294,61 @@ PanelBase {
     scanProc.running = true
     scanWatchdog.restart()
   }
-
   function lastRefreshAge() {
     return Date.now() - root.lastRefresh
   }
-
   function maybeRescan() {
-    if (root.scanning || root.lastRefreshAge() <= 5000) {
+    if (root.scanOpen || root.scanning || root.lastRefreshAge() <= 5000) {
       return
     }
     root.rescan()
   }
-
   function activate(network) {
     if (!network) {
       return
     }
     if (secured(network) && !network.known) {
-      if (root.pending === network.name) {
-        root.pending = ""
-      } else {
+      const wasPending = root.pending === network.name
+      root.closeRowFlows()
+      if (!wasPending) {
         root.pending = network.name
         root.showPassword = false
       }
-      root.confirmForget = ""
-      root.expanded = ""
-      root.sharing = ""
       return
     }
-    root.pending = ""
-    root.confirmForget = ""
-    root.sharing = ""
-    root.expanded = root.expanded === network.name ? "" : network.name
+    const wasExpanded = root.expanded === network.name
+    root.closeRowFlows()
+    if (!wasExpanded) {
+      root.expanded = network.name
+    }
   }
-
   function requestForget(network) {
     if (!network) {
       return
     }
-    root.pending = ""
-    root.sharing = ""
-    if (root.confirmForget !== network.name) {
+    const keepExpanded = root.expanded
+    const wasConfirm = root.confirmForget === network.name
+    root.closeRowFlows()
+    root.expanded = keepExpanded
+    if (!wasConfirm) {
       root.confirmArmedAt = Date.now()
     }
-    root.confirmForget = root.confirmForget === network.name ? "" : network.name
+    root.confirmForget = wasConfirm ? "" : network.name
   }
-
   function toggleExpanded(network) {
     if (!network) {
       return false
     }
-    root.pending = ""
-    root.confirmForget = ""
-    root.sharing = ""
-    root.expanded = root.expanded === network.name ? "" : network.name
+    const wasExpanded = root.expanded === network.name
+    root.closeRowFlows()
+    if (!wasExpanded) {
+      root.expanded = network.name
+    }
     return true
   }
-
   function autoEnabled(name) {
     return root.autoConnect[name] !== false
   }
-
   function queryAutoConnect() {
     if (queryProc.running) {
       root.queryPending = true
@@ -365,7 +358,6 @@ PanelBase {
     queryProc.command = ["nmcli", "-t", "-f", "NAME,AUTOCONNECT", "connection", "show"]
     queryProc.running = true
   }
-
   function setAutoConnect(name, value) {
     const next = {}
     for (const k in root.autoConnect) {
@@ -376,7 +368,6 @@ PanelBase {
     root.modifyQueue.push([name, value ? "yes" : "no"])
     root.pumpModify()
   }
-
   function pumpModify() {
     if (modifyProc.running || root.modifyQueue.length === 0) {
       return
@@ -387,14 +378,12 @@ PanelBase {
     root.modifyInFlight = true
     modifyWatchdog.restart()
   }
-
   function qrHasPassword(network) {
     if (!network) {
       return false
     }
     return network.security !== WifiSecurityType.Open && network.security !== WifiSecurityType.Owe
   }
-
   function qrKind(network) {
     const s = network.security
     if (s === WifiSecurityType.StaticWep || s === WifiSecurityType.DynamicWep || s === WifiSecurityType.Leap) {
@@ -402,18 +391,15 @@ PanelBase {
     }
     return "WPA"
   }
-
   function qrEscape(value) {
     return String(value).replace(/([\\;,":])/g, "\\$1")
   }
-
   function pskValid(network, text) {
     if (!network || text.length === 0) {
       return false
     }
     return root.qrKind(network) === "WEP" || text.length >= 8
   }
-
   function submitPsk() {
     const network = root.findNetwork(root.pending)
     if (!network) {
@@ -430,11 +416,9 @@ PanelBase {
     root.pending = ""
     return true
   }
-
   function pskLoaded(name) {
     return root.pskCache[name] !== undefined
   }
-
   function qrPayload(name) {
     const network = root.findNetwork(name)
     if (!network || !network.known) {
@@ -450,7 +434,6 @@ PanelBase {
     }
     return "WIFI:T:" + root.qrKind(network) + ";S:" + ssid + ";P:" + root.qrEscape(psk) + ";;"
   }
-
   function requestPsk(name) {
     if (!name || root.pskLoaded(name)) {
       return
@@ -460,7 +443,6 @@ PanelBase {
     }
     root.pumpPsk()
   }
-
   function pskProperty(name) {
     const network = root.findNetwork(name)
     if (!network) {
@@ -474,7 +456,6 @@ PanelBase {
     }
     return "802-11-wireless-security.psk"
   }
-
   function pumpPsk() {
     if (pskProc.running || root.pskQueue.length === 0) {
       return
@@ -487,7 +468,6 @@ PanelBase {
     root.pskInFlight = true
     pskWatchdog.restart()
   }
-
   function storePsk(name, output) {
     const psk = output.replace(/\n+$/, "")
     const next = {}
@@ -501,7 +481,6 @@ PanelBase {
     }
     root.pskCache = next
   }
-
   function dropPsk(name) {
     if (!name || root.pskCache[name] === undefined) {
       return
@@ -514,7 +493,6 @@ PanelBase {
     }
     root.pskCache = next
   }
-
   function toggleSharing(network) {
     if (!network) {
       return false
@@ -526,10 +504,318 @@ PanelBase {
     }
     return true
   }
-
+  function startScan() {
+    if (qrProc.running) {
+      return
+    }
+    root.scanFrame = ""
+    qrProc.command = ["bun", root.scanToolPath]
+    qrProc.running = true
+    scanFailTimer.restart()
+  }
+  function stopScan() {
+    if (qrProc.running) {
+      qrProc.running = false
+    }
+    root.scanFrame = ""
+  }
+  function scanHandleError(msg) {
+    if (msg.error === "camera-unavailable") {
+      root.scanPhase = "unavailable"
+      root.scanStatus = "Camera unavailable"
+      return true
+    }
+    if (msg.error === "missing-deps") {
+      root.scanPhase = "missing"
+      root.scanStatus = "Decoder missing"
+      return true
+    }
+    if (msg.error === "no-image") {
+      root.scanStatus = "No image in clipboard"
+      return true
+    }
+    return false
+  }
+  function scanLine(data) {
+    const line = data.trim()
+    if (line === "") {
+      return
+    }
+    let msg
+    try {
+      msg = JSON.parse(line)
+    } catch (e) {
+      return
+    }
+    if (root.scanHandleError(msg)) {
+      return
+    }
+    if (msg.payload !== undefined) {
+      root.handleScanPayload(msg.payload)
+      return
+    }
+    if (msg.frame !== undefined) {
+      root.scanFrame = msg.frame
+    }
+  }
+  function decodeLine(data) {
+    const line = data.trim()
+    if (line === "") {
+      return
+    }
+    let msg
+    try {
+      msg = JSON.parse(line)
+    } catch (e) {
+      return
+    }
+    if (root.scanHandleError(msg)) {
+      return
+    }
+    if (msg.payload === undefined) {
+      return
+    }
+    root.scanLastPayload = msg.payload
+    if (root.decodeMode === "file") {
+      root.scanDecoded = root.parseWifiPayload(msg.payload)
+      return
+    }
+    root.handleScanPayload(msg.payload)
+  }
+  function scanProcExited(code) {
+    if (!root.scanOpen || root.scanPhase === "connecting") {
+      return
+    }
+    if (code === 2) {
+      root.scanPhase = "unavailable"
+      root.scanStatus = "Camera unavailable"
+      return
+    }
+    if (code === 3) {
+      root.scanPhase = "missing"
+      root.scanStatus = "Decoder missing"
+      return
+    }
+    root.scanPhase = "error"
+    root.scanStatus = "Scan stopped"
+  }
+  function parseWifiPayload(text) {
+    if (text.indexOf("WIFI:") !== 0) {
+      return null
+    }
+    const body = text.slice(5)
+    const fields = []
+    let cur = ""
+    let esc = false
+    for (let i = 0; i < body.length; i++) {
+      const c = body[i]
+      if (esc) {
+        cur += c
+        esc = false
+        continue
+      }
+      if (c === "\\") {
+        esc = true
+        continue
+      }
+      if (c === ";") {
+        fields.push(cur)
+        cur = ""
+        continue
+      }
+      cur += c
+    }
+    fields.push(cur)
+    const out = {
+      hidden: false,
+      psk: ""
+    }
+    for (let i = 0; i < fields.length; i++) {
+      const idx = fields[i].indexOf(":")
+      if (idx < 0) {
+        if (fields[i] === "H") {
+          out.hidden = true
+        }
+        continue
+      }
+      if (idx === 0) {
+        continue
+      }
+      const key = fields[i].slice(0, idx)
+      const value = fields[i].slice(idx + 1)
+      if (key === "T") {
+        out.security = value
+      } else if (key === "S") {
+        out.ssid = value
+      } else if (key === "P") {
+        out.psk = value
+      } else if (key === "H") {
+        out.hidden = value === "true" || value === "h"
+      }
+    }
+    if (!out.ssid) {
+      return null
+    }
+    if (out.security === "WPA2" || out.security === "WPA3") {
+      out.security = "WPA"
+    }
+    if (!out.security || out.security === "nopass") {
+      out.security = "nopass"
+      out.psk = ""
+    } else if (out.security !== "WPA" && out.security !== "WEP") {
+      return null
+    }
+    if (out.security !== "nopass" && out.psk === "") {
+      return null
+    }
+    return out
+  }
+  function handleScanPayload(payload) {
+    root.scanLastPayload = payload
+    if (root.scanPhase === "connecting") {
+      return
+    }
+    const parsed = root.parseWifiPayload(payload)
+    if (!parsed) {
+      root.scanStatus = "Not a Wi-Fi code"
+      return
+    }
+    root.joinScanned(parsed)
+  }
+  function joinScanned(parsed) {
+    if (!parsed) {
+      return false
+    }
+    if (root.connectedNetwork && parsed.ssid === root.connectedNetwork.name) {
+      root.scanStatus = "Already connected"
+      return true
+    }
+    root.scanParsed = parsed
+    root.scanTarget = parsed.ssid
+    root.scanResumePhase = qrProc.running ? "scanning" : root.scanPhase
+    root.scanPhase = "connecting"
+    root.scanStatus = "Connecting to " + parsed.ssid + "..."
+    const cmd = ["nmcli", "device", "wifi", "connect", parsed.ssid, "ifname", root.wifiIface()]
+    if (parsed.hidden) {
+      cmd.push("hidden", "yes")
+    }
+    if (parsed.security === "WPA" || parsed.security === "WEP") {
+      cmd.push("password", parsed.psk)
+    }
+    joinProc.command = cmd
+    joinProc.running = true
+    root.joinInFlight = true
+    joinWatchdog.restart()
+    return true
+  }
+  function joinFailed(reason) {
+    root.joinInFlight = false
+    joinWatchdog.stop()
+    Quickshell.execDetached(["notify-send", "-a", "opencode", "-u", "normal", "opencode", "Wi-Fi: connection to " + root.scanTarget + " failed (" + reason + ")"])
+    if (!root.scanOpen || root.scanPhase !== "connecting") {
+      return
+    }
+    root.scanPhase = root.scanResumePhase
+    root.scanStatus = "Failed: " + reason
+  }
+  function openScanCard() {
+    if (!root.enabled) {
+      return false
+    }
+    if (root.scanOpen) {
+      return true
+    }
+    root.closeRowFlows()
+    root.scanOpen = true
+    root.scanPhase = "scanning"
+    root.scanStatus = "Scanning..."
+    root.startScan()
+    return true
+  }
+  function closeScanCard() {
+    if (!root.scanOpen) {
+      return false
+    }
+    root.scanOpen = false
+    root.scanPhase = "idle"
+    root.scanStatus = ""
+    root.stopScan()
+    root.focusKeyCatcher()
+    return true
+  }
+  function pasteScan() {
+    if (!root.scanOpen || decodeProc.running) {
+      return false
+    }
+    root.decodeMode = "paste"
+    decodeProc.command = ["bun", root.scanToolPath, "--paste"]
+    decodeProc.running = true
+    return true
+  }
+  function toggleScanCard() {
+    return root.scanOpen ? root.closeScanCard() : root.openScanCard()
+  }
+  Process {
+    id: qrProc
+    running: false
+    stdout: SplitParser {
+      onRead: data => root.scanLine(data)
+    }
+    onExited: code => root.scanProcExited(code)
+  }
+  Timer {
+    id: scanFailTimer
+    interval: 600
+    running: false
+    onTriggered: if (root.scanOpen && root.scanPhase === "scanning" && !qrProc.running) {
+      root.scanPhase = "missing"
+      root.scanStatus = "Decoder missing"
+    }
+  }
+  Process {
+    id: decodeProc
+    running: false
+    stdout: SplitParser {
+      onRead: data => root.decodeLine(data)
+    }
+  }
+  Process {
+    id: joinProc
+    running: false
+    stderr: StdioCollector {
+      id: joinErr
+    }
+    onExited: code => {
+      if (!root.joinInFlight) {
+        return
+      }
+      const reason = joinErr.text.trim()
+      if (code === 0) {
+        root.joinInFlight = false
+        joinWatchdog.stop()
+        if (root.scanParsed && root.scanParsed.psk !== "") {
+          root.storePsk(root.scanTarget, root.scanParsed.psk)
+        }
+        root.queryAutoConnect()
+        root.closeScanCard()
+        return
+      }
+      root.joinFailed(reason !== "" ? reason : "unknown error")
+    }
+  }
+  Timer {
+    id: joinWatchdog
+    interval: 45000
+    running: false
+    onTriggered: if (root.joinInFlight) {
+      if (joinProc.running) {
+        joinProc.running = false
+      }
+      root.joinFailed("timed out")
+    }
+  }
   Process {
     id: scanProc
-
     running: false
     onExited: {
       root.scanning = false
@@ -538,10 +824,8 @@ PanelBase {
       root.rebuildSortStrength()
     }
   }
-
   Timer {
     id: scanWatchdog
-
     interval: 10000
     running: false
     onTriggered: if (root.scanInFlight && !scanProc.running) {
@@ -550,20 +834,19 @@ PanelBase {
       root.rebuildSortStrength()
     }
   }
-
   Connections {
     target: root
-
     function onOpenChanged() {
+      if (!root.open) {
+        root.closeScanCard()
+      }
       if (!root.open && root.device) {
         root.device.scannerEnabled = false
       }
     }
   }
-
   Process {
     id: queryProc
-
     running: false
     stdout: StdioCollector {
       onStreamFinished: {
@@ -585,10 +868,8 @@ PanelBase {
       }
     }
   }
-
   Process {
     id: modifyProc
-
     running: false
     onExited: {
       root.modifyInFlight = false
@@ -596,10 +877,8 @@ PanelBase {
       root.queryAutoConnect()
     }
   }
-
   Timer {
     id: modifyWatchdog
-
     interval: 10000
     running: false
     onTriggered: if (root.modifyInFlight && !modifyProc.running) {
@@ -607,10 +886,8 @@ PanelBase {
       root.queryAutoConnect()
     }
   }
-
   Process {
     id: pskProc
-
     running: false
     property string target: ""
     property string output: ""
@@ -623,10 +900,8 @@ PanelBase {
       root.pumpPsk()
     }
   }
-
   Timer {
     id: pskWatchdog
-
     interval: 10000
     running: false
     onTriggered: if (root.pskInFlight && !pskProc.running) {
@@ -634,14 +909,11 @@ PanelBase {
       root.pumpPsk()
     }
   }
-
   Timer {
     id: activatingTimer
-
     interval: 30000
     onTriggered: root.activating = ""
   }
-
   function rowDelegates() {
     const out = []
     const kids = list.contentItem.children
@@ -652,7 +924,6 @@ PanelBase {
     }
     return out
   }
-
   function editorForName(name) {
     if (!name) {
       return null
@@ -665,7 +936,6 @@ PanelBase {
     }
     return null
   }
-
   function findNetwork(name) {
     for (let i = 0; i < allNetworks.length; i++) {
       if (allNetworks[i].name === name) {
@@ -674,20 +944,16 @@ PanelBase {
     }
     return null
   }
-
   function testBeginPassword(name) {
     const network = root.findNetwork(name)
     if (!network || !root.secured(network) || network.known) {
       return false
     }
+    root.closeRowFlows()
     root.pending = name
     root.showPassword = false
-    root.confirmForget = ""
-    root.expanded = ""
-    root.sharing = ""
     return true
   }
-
   function testSetPassword(text) {
     const editor = root.editorForName(root.pending)
     if (!editor) {
@@ -696,7 +962,6 @@ PanelBase {
     editor.text = text
     return true
   }
-
   function testPasswordEcho() {
     const editor = root.editorForName(root.pending)
     if (!editor) {
@@ -704,12 +969,10 @@ PanelBase {
     }
     return editor.echoMode === TextInput.Password ? "hidden" : "shown"
   }
-
   function testToggleShowPassword() {
     root.showPassword = !root.showPassword
     return root.showPassword
   }
-
   function testPasswordRect() {
     const editor = root.editorForName(root.pending)
     if (!editor) {
@@ -727,14 +990,12 @@ PanelBase {
       echo: root.testPasswordEcho()
     }
   }
-
   function testSubmitPassword() {
     if (!root.pending) {
       return false
     }
     return root.submitPsk()
   }
-
   function testAskForget(name) {
     const network = root.findNetwork(name)
     if (!network) {
@@ -743,7 +1004,6 @@ PanelBase {
     root.requestForget(network)
     return true
   }
-
   function testConfirmForget() {
     if (!root.confirmForget) {
       return false
@@ -758,7 +1018,6 @@ PanelBase {
     root.confirmForget = ""
     return true
   }
-
   function testCancelForget() {
     if (!root.confirmForget) {
       return false
@@ -766,7 +1025,6 @@ PanelBase {
     root.confirmForget = ""
     return true
   }
-
   function testToggleExpanded(name) {
     const network = root.findNetwork(name)
     if (!network) {
@@ -774,7 +1032,6 @@ PanelBase {
     }
     return root.toggleExpanded(network)
   }
-
   function testToggleAutoConnect(name) {
     const network = root.findNetwork(name)
     if (!network || !network.known) {
@@ -783,11 +1040,9 @@ PanelBase {
     root.setAutoConnect(name, !root.autoEnabled(name))
     return true
   }
-
   function testSetSection(section, state) {
     return root.applySection(section, state === true)
   }
-
   function testToggleSharing(name) {
     const network = root.findNetwork(name)
     if (!network || !network.known) {
@@ -795,29 +1050,58 @@ PanelBase {
     }
     return root.toggleSharing(network)
   }
-
   function wifiIface() {
     return root.device ? root.device.name : ""
   }
-
   function testToggleSpeedtest() {
     if (!root.connectedNetwork) {
       return false
     }
     return Speedtest.toggle(root.connectedNetwork.name, root.wifiIface())
   }
-
   function testPreloadSpeedtest() {
     return Speedtest.preload()
   }
-
   function testMockSpeedtest(phase, down, up) {
     if (!root.connectedNetwork) {
       return false
     }
     return Speedtest.mock(root.connectedNetwork.name, phase, down, up)
   }
-
+  function testScanOpen() {
+    return root.openScanCard()
+  }
+  function testScanClose() {
+    return root.closeScanCard()
+  }
+  function testScanState() {
+    return {
+      open: root.scanOpen,
+      phase: root.scanPhase,
+      status: root.scanStatus,
+      frame: root.scanFrame !== "",
+      lastPayload: root.scanLastPayload,
+      decoded: root.scanDecoded,
+      target: root.scanTarget,
+      wifi: root.enabled
+    }
+  }
+  function testScanDecodeFile(path) {
+    if (decodeProc.running) {
+      return false
+    }
+    root.decodeMode = "file"
+    root.scanDecoded = null
+    decodeProc.command = ["bun", root.scanToolPath, "--file", path]
+    decodeProc.running = true
+    return true
+  }
+  function testScanJoin() {
+    if (!root.scanDecoded) {
+      return false
+    }
+    return root.joinScanned(root.scanDecoded)
+  }
   function testWifiState() {
     return {
       pending: root.pending,
@@ -839,54 +1123,60 @@ PanelBase {
       speedtest: Speedtest.state()
     }
   }
-
   onOpened: {
     if (root.device) {
       root.device.scannerEnabled = true
     }
     root.maybeRescan()
     root.rebuildSortStrength()
-    pending = ""
-    confirmForget = ""
+    closeRowFlows()
     pskAttempt = ""
-    expanded = ""
-    sharing = ""
     activating = ""
     showPassword = false
+    scanOpen = false
+    scanPhase = "idle"
+    scanStatus = ""
+    scanFrame = ""
+    scanLastPayload = ""
+    scanDecoded = null
+    scanTarget = ""
     queryAutoConnect()
   }
-
   PanelHeader {
     title: "Wi-Fi"
-
     IconButton {
       name: "refresh"
       visible: root.enabled && root.rows.length > 0
-      enabled: !root.scanning
+      enabled: !root.scanning && !root.scanOpen
       iconColor: root.scanning ? Theme.overlay : Theme.text
       spinning: root.scanning
       onClicked: root.rescan()
     }
-
+    IconButton {
+      name: "camera"
+      visible: root.enabled
+      onClicked: root.toggleScanCard()
+    }
     Switch {
       anchors.verticalCenter: parent.verticalCenter
       checked: root.enabled
       onToggled: Networking.wifiEnabled = !Networking.wifiEnabled
     }
   }
-
+  WifiScanCard {
+    visible: root.scanOpen
+    panel: root
+  }
   PlaceholderCard {
-    shown: !root.enabled || (root.enabled && root.rows.length === 0)
+    shown: !root.scanOpen && (!root.enabled || (root.enabled && root.rows.length === 0))
     instant: !root.enabled
     icon: !root.enabled ? "wifi-off" : "wifi"
     text: !root.enabled ? "Wi-Fi is off" : "Scanning"
     rolling: root.enabled && root.rows.length === 0
   }
-
   SectionList {
     id: list
-
-    visible: root.enabled && count > 0
+    visible: root.enabled && count > 0 && !root.scanOpen
     height: visible ? contentHeight : 0
     entries: root.rows
     sections: ({
@@ -895,19 +1185,15 @@ PanelBase {
         available: root.availableExpanded
       })
     onSectionToggled: root.toggleSection(section)
-
     delegate: Item {
       id: entry
-
       objectName: "wifiRow"
-
       required property string key
       required property string kind
       required property string section
       required property string label
       required property string itemKey
       required property bool active
-
       readonly property var net: entry.isLabel ? null : root.findNetwork(entry.itemKey)
       readonly property bool isLabel: entry.kind === "label"
       readonly property bool isConnected: entry.net ? entry.net.connected : entry.active
@@ -924,10 +1210,8 @@ PanelBase {
           root.rebuildSortStrength()
         }
       }
-
       Connections {
         target: entry.net
-
         function onConnectionFailed(reason) {
           if (root.pskAttempt !== entry.itemKey && root.activating !== entry.itemKey) {
             return
@@ -963,45 +1247,36 @@ PanelBase {
       }
       readonly property int actionsHeight: entry.qrExpanded ? entry.qrSize + Math.round(24 * Theme.scale) : Math.round(34 * Theme.scale)
       readonly property int extraHeight: (entry.pwOpen || entry.confirmOpen) ? Math.round(34 * Theme.scale) : (entry.actionsOpen ? entry.actionsHeight : 0)
-
       function revealRow() {
         root.ensureVisible(list.y + entry.y, Math.round(44 * Theme.scale) + entry.extraHeight)
       }
-
       onPwOpenChanged: if (entry.pwOpen) {
         Qt.callLater(entry.revealRow)
         revealTimer.restart()
       }
-
       onConfirmOpenChanged: if (entry.confirmOpen) {
         Qt.callLater(entry.revealRow)
         revealTimer.restart()
       }
-
       onActionsOpenChanged: if (entry.actionsOpen) {
         Qt.callLater(entry.revealRow)
         revealTimer.restart()
       }
-
       Timer {
         id: revealTimer
-
         interval: 240
         onTriggered: entry.revealRow()
       }
-
       readonly property color cardColor: entry.qrOpen ? Theme.qrSurface : (entry.highlighted ? Theme.surfaceHigh : Theme.surface)
       readonly property color hoverSurface: entry.qrOpen ? Theme.qrHover : Theme.surfaceHigher
       readonly property color strongText: entry.qrOpen ? Theme.crust : (entry.isConnected ? Theme.primary : Theme.text)
       readonly property color mutedText: entry.qrOpen ? Theme.overlay : Theme.subtext
       readonly property color accentText: entry.qrOpen ? Theme.crust : Theme.primary
       readonly property color hoverText: entry.qrOpen ? Theme.crust : Theme.text
-
       width: list.width
       height: entry.shown ? (entry.isLabel ? Math.round(20 * Theme.scale) : Math.round(44 * Theme.scale) + entry.extraHeight) : 0
       opacity: entry.shown ? 1 : 0
       clip: true
-
       Behavior on height {
         NumberAnimation {
           duration: 220
@@ -1014,14 +1289,11 @@ PanelBase {
           easing.type: Easing.OutCubic
         }
       }
-
       Timer {
         id: qrCollapseTimer
-
         interval: entry.qrFadeMs
         onTriggered: entry.qrExpanded = false
       }
-
       SectionHeaderRow {
         visible: entry.isLabel
         anchors.left: parent.left
@@ -1032,7 +1304,6 @@ PanelBase {
         expanded: list.isExpanded(entry.section)
         onToggleRequested: list.toggleSection(entry.section)
       }
-
       Rectangle {
         visible: !entry.isLabel
         width: parent.width
@@ -1041,25 +1312,20 @@ PanelBase {
         color: entry.cardColor
         antialiasing: true
         clip: true
-
         Behavior on color {
           ColorAnimation {
             duration: 220
             easing.type: Easing.OutCubic
           }
         }
-
         MouseArea {
           id: cardHover
-
           anchors.fill: parent
           hoverEnabled: true
           acceptedButtons: Qt.NoButton
         }
-
         MouseArea {
           id: headerMouse
-
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.top: parent.top
@@ -1070,28 +1336,23 @@ PanelBase {
             root.activate(entry.net)
           }
         }
-
         Item {
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.top: parent.top
           height: Math.round(44 * Theme.scale)
-
           Item {
             id: leadingHost
-
             anchors.left: parent.left
             anchors.leftMargin: Math.round(12 * Theme.scale)
             anchors.verticalCenter: parent.verticalCenter
             width: children.length > 0 ? children[0].width : 0
             height: children.length > 0 ? children[0].height : 0
-
             Icon {
               anchors.verticalCenter: parent.verticalCenter
               name: entry.net ? root.glyphFor(entry.net) : "wifi"
               color: entry.strongText
               font.pixelSize: Theme.iconSizeLarge
-
               Behavior on color {
                 ColorAnimation {
                   duration: 220
@@ -1100,7 +1361,6 @@ PanelBase {
               }
             }
           }
-
           Text {
             anchors.left: leadingHost.right
             anchors.leftMargin: Math.round(10 * Theme.scale)
@@ -1113,7 +1373,6 @@ PanelBase {
             font.pixelSize: Theme.fontSize
             font.bold: entry.isConnected
             elide: Text.ElideRight
-
             Behavior on color {
               ColorAnimation {
                 duration: 220
@@ -1121,16 +1380,13 @@ PanelBase {
               }
             }
           }
-
           Row {
             id: actionsRow
-
             anchors.right: parent.right
             anchors.rightMargin: Math.round(8 * Theme.scale)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Math.round(6 * Theme.scale)
             z: 1
-
             Icon {
               anchors.verticalCenter: parent.verticalCenter
               visible: entry.net ? root.secured(entry.net) : false
@@ -1138,14 +1394,12 @@ PanelBase {
               color: Theme.overlay
               font.pixelSize: Theme.fontSize
             }
-
             Text {
               anchors.verticalCenter: parent.verticalCenter
               text: entry.net ? root.signalPct(entry.net) + "%" : ""
               color: entry.mutedText
               font.family: Theme.fontFamily
               font.pixelSize: Theme.fontSizeSmall
-
               Behavior on color {
                 ColorAnimation {
                   duration: 220
@@ -1153,7 +1407,6 @@ PanelBase {
                 }
               }
             }
-
             Spinner {
               anchors.verticalCenter: parent.verticalCenter
               visible: entry.busy && !entry.actionsOpen
@@ -1162,7 +1415,6 @@ PanelBase {
             }
           }
         }
-
         Item {
           visible: entry.pwOpen
           width: parent.width
@@ -1170,21 +1422,18 @@ PanelBase {
           anchors.topMargin: Math.round(44 * Theme.scale)
           height: visible ? Math.round(34 * Theme.scale) : 0
           clip: true
-
           Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
               root.pending = ""
               event.accepted = true
             }
           }
-
           onVisibleChanged: if (visible) {
             pwField.text = ""
             pwField.forceActiveFocus()
           } else if (root.pending === "") {
             root.focusKeyCatcher()
           }
-
           Row {
             anchors.left: parent.left
             anchors.right: parent.right
@@ -1194,10 +1443,8 @@ PanelBase {
             anchors.rightMargin: Math.round(6 * Theme.scale)
             height: Math.round(20 * Theme.scale)
             spacing: Math.round(4 * Theme.scale)
-
             TextInput {
               id: pwField
-
               width: parent.width - Math.round(48 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
               color: Theme.text
@@ -1206,16 +1453,13 @@ PanelBase {
               font.pixelSize: Theme.fontSize
               clip: true
               onAccepted: root.submitPsk()
-
               MouseArea {
                 id: pwHover
-
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.NoButton
                 cursorShape: Qt.IBeamCursor
               }
-
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 visible: pwField.text.length === 0
@@ -1225,10 +1469,8 @@ PanelBase {
                 font.pixelSize: Theme.fontSize
               }
             }
-
             IconButton {
               id: eyeBtn
-
               size: Math.round(20 * Theme.scale)
               glyphSize: Math.round(13 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
@@ -1237,10 +1479,8 @@ PanelBase {
               hoverColor: Theme.surfaceHigher
               onClicked: root.showPassword = !root.showPassword
             }
-
             IconButton {
               id: passCheckBtn
-
               size: Math.round(20 * Theme.scale)
               glyphSize: Math.round(13 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
@@ -1251,7 +1491,6 @@ PanelBase {
             }
           }
         }
-
         Item {
           visible: entry.confirmOpen
           width: parent.width
@@ -1259,7 +1498,6 @@ PanelBase {
           anchors.topMargin: Math.round(44 * Theme.scale)
           height: visible ? Math.round(34 * Theme.scale) : 0
           clip: true
-
           Row {
             anchors.left: parent.left
             anchors.right: parent.right
@@ -1269,7 +1507,6 @@ PanelBase {
             anchors.rightMargin: Math.round(6 * Theme.scale)
             height: Math.round(20 * Theme.scale)
             spacing: Math.round(4 * Theme.scale)
-
             Text {
               width: parent.width - Math.round(48 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
@@ -1279,10 +1516,8 @@ PanelBase {
               font.pixelSize: Theme.fontSize
               elide: Text.ElideRight
             }
-
             IconButton {
               id: forgetCancelBtn
-
               size: Math.round(20 * Theme.scale)
               glyphSize: Math.round(13 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
@@ -1293,10 +1528,8 @@ PanelBase {
                 root.confirmForget = ""
               }
             }
-
             IconButton {
               id: forgetCheckBtn
-
               size: Math.round(20 * Theme.scale)
               glyphSize: Math.round(13 * Theme.scale)
               anchors.verticalCenter: parent.verticalCenter
@@ -1314,7 +1547,6 @@ PanelBase {
             }
           }
         }
-
         Item {
           visible: entry.actionsOpen
           width: parent.width
@@ -1322,17 +1554,14 @@ PanelBase {
           anchors.topMargin: Math.round(44 * Theme.scale)
           height: visible ? entry.actionsHeight : 0
           clip: true
-
           QrCode {
             id: qrView
-
             x: Math.round(12 * Theme.scale)
             y: Math.round(12 * Theme.scale)
             width: entry.qrSize
             height: entry.qrSize
             text: entry.qrPayload
             opacity: entry.qrOpen && entry.qrPayload !== "" ? 1 : 0
-
             Behavior on opacity {
               NumberAnimation {
                 duration: entry.qrFadeMs
@@ -1340,7 +1569,6 @@ PanelBase {
               }
             }
           }
-
           Text {
             visible: entry.qrMissing
             anchors.left: parent.left
@@ -1355,19 +1583,16 @@ PanelBase {
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
           }
-
           Item {
             x: Math.round(12 * Theme.scale)
             width: parent.width - Math.round(12 * Theme.scale) - Math.round(6 * Theme.scale)
             height: Math.round(20 * Theme.scale)
             y: Math.round(4 * Theme.scale)
-
             Row {
               visible: entry.isConnected && Speedtest.visibleFor(entry.itemKey)
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               spacing: Math.round(4 * Theme.scale)
-
               Icon {
                 visible: Speedtest.down >= 0 || entry.speedFailed
                 anchors.verticalCenter: parent.verticalCenter
@@ -1375,7 +1600,6 @@ PanelBase {
                 color: entry.mutedText
                 font.pixelSize: Theme.fontSizeSmall
               }
-
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: entry.speedFailed ? Speedtest.error : (Speedtest.down >= 0 ? Speedtest.text(Speedtest.down) : (Speedtest.running ? Speedtest.statusText() : "--"))
@@ -1383,14 +1607,12 @@ PanelBase {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
               }
-
               Item {
                 visible: Speedtest.up >= 0 && Speedtest.target === entry.itemKey
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.round(8 * Theme.scale)
                 height: Math.round(8 * Theme.scale)
               }
-
               Icon {
                 visible: Speedtest.up >= 0 && Speedtest.target === entry.itemKey
                 anchors.verticalCenter: parent.verticalCenter
@@ -1398,7 +1620,6 @@ PanelBase {
                 color: entry.mutedText
                 font.pixelSize: Theme.fontSizeSmall
               }
-
               Text {
                 visible: Speedtest.up >= 0 && Speedtest.target === entry.itemKey
                 anchors.verticalCenter: parent.verticalCenter
@@ -1408,10 +1629,8 @@ PanelBase {
                 font.pixelSize: Theme.fontSizeSmall
               }
             }
-
             IconButton {
               id: toggleActionBtn
-
               visible: !entry.busy
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
@@ -1433,7 +1652,6 @@ PanelBase {
                 }
               }
             }
-
             Spinner {
               anchors.right: parent.right
               anchors.rightMargin: Math.round(2 * Theme.scale)
@@ -1442,10 +1660,8 @@ PanelBase {
               running: visible
               color: entry.accentText
             }
-
             IconButton {
               id: trashActionBtn
-
               visible: entry.net ? entry.net.known : false
               anchors.right: toggleActionBtn.left
               anchors.rightMargin: Math.round(4 * Theme.scale)
@@ -1459,10 +1675,8 @@ PanelBase {
                 root.requestForget(entry.net)
               }
             }
-
             IconButton {
               id: qrActionBtn
-
               visible: entry.net ? entry.net.known : false
               anchors.right: trashActionBtn.left
               anchors.rightMargin: Math.round(4 * Theme.scale)
@@ -1475,7 +1689,6 @@ PanelBase {
               onClicked: if (entry.net) {
                 root.toggleSharing(entry.net)
               }
-
               Behavior on iconColor {
                 ColorAnimation {
                   duration: 220
@@ -1483,10 +1696,8 @@ PanelBase {
                 }
               }
             }
-
             Rectangle {
               id: autoToggleBtn
-
               visible: entry.net ? entry.net.known : false
               anchors.right: qrActionBtn.left
               anchors.rightMargin: Math.round(4 * Theme.scale)
@@ -1496,7 +1707,6 @@ PanelBase {
               radius: height / 2
               color: badgeHover.containsMouse ? entry.hoverSurface : "transparent"
               antialiasing: true
-
               Text {
                 anchors.centerIn: parent
                 text: "AUTO"
@@ -1504,7 +1714,6 @@ PanelBase {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSmall
                 font.bold: root.autoEnabled(entry.itemKey)
-
                 Behavior on color {
                   ColorAnimation {
                     duration: 220
@@ -1512,10 +1721,8 @@ PanelBase {
                   }
                 }
               }
-
               MouseArea {
                 id: badgeHover
-
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
@@ -1524,10 +1731,8 @@ PanelBase {
                 }
               }
             }
-
             IconButton {
               id: speedActionBtn
-
               visible: entry.isConnected
               anchors.right: autoToggleBtn.left
               anchors.rightMargin: Math.round(4 * Theme.scale)

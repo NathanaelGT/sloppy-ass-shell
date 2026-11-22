@@ -8,6 +8,7 @@ BarButton {
   id: root
 
   property var screen
+  panelKey: "dashboard"
   property bool merged: false
 
   readonly property bool altTime: ClockState.showAltTime

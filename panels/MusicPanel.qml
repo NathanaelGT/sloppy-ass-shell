@@ -2430,7 +2430,7 @@ PanelBase {
         clip: true
         model: queueModel
         spacing: 0
-        cacheBuffer: s(600)
+        cacheBuffer: s(200)
         boundsBehavior: Flickable.StopAtBounds
         move: Transition {
           enabled: !queueDragger.suppressMove && !root.bulkQueueSync
@@ -2865,7 +2865,7 @@ PanelBase {
       spacing: Math.round(1 * Theme.scale)
 
       Repeater {
-        model: root.routeRows()
+        model: routePopup.opened ? root.routeRows() : []
 
         delegate: Item {
           id: routeOption

@@ -7,6 +7,7 @@ BarButton {
   id: root
 
   property var screen
+  panelKey: "music"
   property bool merged: false
   property real mergedSpan: 0
 

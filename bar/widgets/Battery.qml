@@ -8,6 +8,7 @@ BarButton {
   id: root
 
   property var screen
+  panelKey: "battery"
 
   readonly property int edgePad: Math.round(10 * Theme.scale)
 

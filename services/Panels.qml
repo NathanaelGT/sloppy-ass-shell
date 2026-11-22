@@ -1,4 +1,5 @@
 pragma Singleton
+import QtQuick
 import Quickshell
 
 Singleton {
@@ -8,6 +9,12 @@ Singleton {
     })
   readonly property string panel: openState.name
   readonly property string screenName: openState.screen
+  property string lastPanelScreen: ""
+  readonly property string targetScreen: openState.screen.length > 0 ? openState.screen : lastPanelScreen
+  property var prewarmState: ({
+      name: ""
+    })
+  readonly property string prewarmPanel: prewarmState.name
   property string barHoverScreen: ""
   signal closeCleared(string name, string screen)
   property var clusterWidths: ({})
@@ -99,9 +106,47 @@ Singleton {
     if (LockState.sessionLocked) {
       return
     }
+    if (screen && screen.length > 0) {
+      lastPanelScreen = screen
+    }
     openState = {
       name: name,
       screen: screen
+    }
+  }
+
+  function prewarm(name) {
+    if (LockState.sessionLocked) {
+      return
+    }
+    if (name.length === 0 || name === "tray") {
+      return
+    }
+    if (prewarmPanel !== name) {
+      prewarmState = {
+        name: name
+      }
+    }
+    prewarmTimer.restart()
+  }
+
+  function prewarmOn(name) {
+    return prewarmPanel === name
+  }
+
+  function clearPrewarm() {
+    prewarmTimer.stop()
+    prewarmState = {
+      name: ""
+    }
+  }
+
+  Timer {
+    id: prewarmTimer
+
+    interval: 2500
+    onTriggered: if (Panels.panel !== Panels.prewarmPanel) {
+      Panels.clearPrewarm()
     }
   }
 

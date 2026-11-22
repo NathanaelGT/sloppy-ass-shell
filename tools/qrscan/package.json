@@ -1,0 +1,15 @@
+{
+  "name": "qrscan",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixtures": "bun make-fixtures.mjs"
+  },
+  "dependencies": {
+    "jpeg-js": "^0.4.4",
+    "jsqr": "^1.4.0"
+  },
+  "devDependencies": {
+    "qrcode": "^1.5.4"
+  }
+}

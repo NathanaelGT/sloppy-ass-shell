@@ -9,7 +9,7 @@ import "../services"
 PanelWindow {
   id: root
 
-  required property var modelData
+  property var modelData
 
   property string panelName: ""
   property string align: "right"
@@ -18,7 +18,7 @@ PanelWindow {
   property bool attached: true
   property int topMargin: Theme.barThickness
   property int cardWidth: Theme.panelWidth
-  property int maxCardHeight: (modelData ? modelData.height : 0) - Theme.barThickness - Math.round(40 * Theme.scale)
+  property int maxCardHeight: (modelData ? modelData.height : 10000) - Theme.barThickness - Math.round(40 * Theme.scale)
   property bool externalRequested: false
   property bool exclusiveFocus: false
   property bool exclusiveKeyboard: false
@@ -36,6 +36,7 @@ PanelWindow {
   readonly property real stemGap: (Theme.barThickness - Theme.capsuleThickness) / 2
   readonly property int stemTop: Math.floor(Theme.barThickness - root.stemGap)
   property bool slideUnlocked: true
+  property bool geometrySettled: true
   property color contentColor: "transparent"
   property int contentInset: 0
   property int contentOuterPad: contentPad
@@ -58,6 +59,38 @@ PanelWindow {
       keyCatcher.forceActiveFocus()
     }
     root.opened()
+  }
+  function beginOpen() {
+    closeDelay.stop()
+    root.ownerFocused = Hypr.focusedScreenName === root.screenId
+    open = true
+    if (Panels.isClosing(root.screenId)) {
+      Panels.setClosing(root.screenId, false)
+    }
+    stemOutAnim.stop()
+    stemInAnim.restart()
+    root.geometrySettled = false
+    geometrySettleTimer.restart()
+    geometryHoldTimer.restart()
+    root.slideUnlocked = false
+    if (root.stemEnabled) {
+      stemSlideDelay.restart()
+    }
+    if (visible) {
+      root.maybeOpened()
+    }
+  }
+  function tryUnlockSlide() {
+    if (!root.geometrySettled) {
+      return
+    }
+    if (root.stemEnabled && stemSlideDelay.running) {
+      return
+    }
+    root.slideUnlocked = true
+  }
+  Component.onCompleted: if (requested) {
+    beginOpen()
   }
   signal scrolled
   signal keyPressed(var event)
@@ -125,7 +158,7 @@ PanelWindow {
   property int cardHeight: Math.min(bodyColumn.implicitHeight + (root.headerHeight > 0 ? root.headerHeight + Theme.gap : 0) + contentPad + contentOuterPad + contentInset, maxCardHeight)
 
   Behavior on cardHeight {
-    enabled: root.animateCardHeight
+    enabled: root.animateCardHeight && root.geometrySettled
     NumberAnimation {
       duration: 220
       easing.type: Easing.OutCubic
@@ -133,7 +166,7 @@ PanelWindow {
   }
 
   Behavior on cardWidth {
-    enabled: root.animateCardWidth
+    enabled: root.animateCardWidth && root.geometrySettled
     NumberAnimation {
       duration: 220
       easing.type: Easing.OutCubic
@@ -244,23 +277,7 @@ PanelWindow {
 
   onRequestedChanged: {
     if (requested) {
-      closeDelay.stop()
-      root.ownerFocused = Hypr.focusedScreenName === root.screenId
-      open = true
-      if (Panels.isClosing(root.screenId)) {
-        Panels.setClosing(root.screenId, false)
-      }
-      stemOutAnim.stop()
-      stemInAnim.restart()
-      if (root.stemEnabled) {
-        root.slideUnlocked = false
-        stemSlideDelay.restart()
-      } else {
-        root.slideUnlocked = true
-      }
-      if (visible) {
-        root.maybeOpened()
-      }
+      beginOpen()
     } else {
       root.openedFired = false
       open = false
@@ -269,12 +286,14 @@ PanelWindow {
         Panels.setClosing(root.screenId, true)
       }
       closeDelay.restart()
-      if (root.stemEnabled && !root.slideUnlocked) {
+      if (!root.slideUnlocked) {
         root.slideUnlocked = true
         stemSlideDelay.stop()
-        stemOutAnim.restart()
-        root.closePending = false
-        Panels.closeCleared(root.panelName, root.screenId)
+        if (root.stemEnabled) {
+          stemOutAnim.restart()
+          root.closePending = false
+          Panels.closeCleared(root.panelName, root.screenId)
+        }
       }
     }
   }
@@ -355,10 +374,42 @@ PanelWindow {
   Timer {
     id: stemSlideDelay
 
-    interval: 150
+    interval: 70
     running: false
-    onTriggered: root.slideUnlocked = true
+    onTriggered: root.tryUnlockSlide()
   }
+
+  Timer {
+    id: geometrySettleTimer
+
+    interval: 40
+    running: false
+    onTriggered: {
+      root.geometrySettled = true
+      root.tryUnlockSlide()
+    }
+  }
+
+  Timer {
+    id: geometryHoldTimer
+
+    interval: 500
+    running: false
+    onTriggered: {
+      root.geometrySettled = true
+      root.tryUnlockSlide()
+    }
+  }
+
+  onCardHeightChanged: if (root.open && !root.geometrySettled) {
+    geometrySettleTimer.restart()
+  }
+
+  onCardWidthChanged: if (root.open && !root.geometrySettled) {
+    geometrySettleTimer.restart()
+  }
+
+  onGeometrySettledChanged: root.tryUnlockSlide()
 
   MouseArea {
     id: backdrop
@@ -436,6 +487,7 @@ PanelWindow {
       }
 
       Behavior on y {
+        enabled: !root.open || root.slideUnlocked
         NumberAnimation {
           duration: 220
           easing.type: Easing.OutCubic

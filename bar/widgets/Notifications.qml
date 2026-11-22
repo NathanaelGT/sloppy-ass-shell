@@ -7,6 +7,7 @@ BarButton {
   id: root
 
   property var screen
+  panelKey: "notifications"
   property real merge: 1
   property bool merged: false
 

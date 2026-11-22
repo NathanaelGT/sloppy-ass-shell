@@ -33,7 +33,9 @@ dormant and untouched:
   screen and its blur behave identically to a manual lock.
 - 1.5 h: Suspend via `lockAndSuspend()` (already locked).
 
-The Media hold (glossary) stops the chain while media plays. Any MPRIS
+The Media hold (glossary) stops the chain while media plays, except while
+the session is locked — locking counts as leaving, so playback does not keep
+the screens on. Any MPRIS
 player reporting playing, or MPD playing through its PipeWire stream, arms
 the hold after three seconds of continuous playback; the chain then reverts
 every applied stage and resets, so each timeout counts from the last input
@@ -45,8 +47,15 @@ for MPD.
 Any input reverts every applied stage: DPMS on and pre-dim brightness
 restored. Waking from suspend reverts immediately — monitors on, brightness
 back — and if no input follows, the chain re-runs from wake with the full
-timeouts. `IdleMonitor.respectInhibitors` is on, so wayland idle-inhibit
-clients (e.g. fullscreen video) pause the chain.
+timeouts, from the locked baseline while the session is still locked.
+Locking starts the chain from `IdleConfig.lockedStartSeconds` (290 s) instead
+of the detection timeout — DPMS then follows ~10 s after a manual lock and
+suspend ~85 min from it, so a manual lock counts as leaving right away.
+`IdleMonitor.respectInhibitors` is on, so wayland idle-inhibit clients
+(e.g. fullscreen video) pause the chain, including while locked. It must
+stay static: Quickshell 0.3.2 recreates the protocol notification when the
+property changes, and the recreated notifier stops delivering `resumed`, so
+input would never revert applied stages until the next reload.
 
 The 5 s Idle (glossary) that pauses the notification countdown is the
 shortest stage of the same mechanism: the chain, not an external process,

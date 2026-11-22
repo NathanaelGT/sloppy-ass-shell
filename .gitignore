@@ -1,1 +1,4 @@
 .scratch/
+
+# qrscan tool node modules
+tools/qrscan/node_modules/

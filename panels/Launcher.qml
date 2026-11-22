@@ -16,6 +16,7 @@ PanelBase {
   exclusiveFocus: true
   autoFocusKeyCatcher: false
   animateCardHeight: true
+  scrollDriver: listScroll
 
   property string query: ""
   property int selectedIndex: 0
@@ -803,7 +804,7 @@ PanelBase {
     if (stride <= 0 || rowCount <= 0) {
       return 0
     }
-    const top = Math.max(0, root.scrollY - list.y)
+    const top = Math.max(0, list.contentY)
     return Math.max(0, Math.min(rowCount - 1, Math.floor(top / stride)))
   }
 
@@ -821,6 +822,27 @@ PanelBase {
       return false
     }
     return root.activateIndex(index)
+  }
+
+  function ensureRowVisible(index) {
+    if (index < 0 || index >= rowCount) {
+      return
+    }
+    listScroll.snap()
+    const top = rowTop(index)
+    const maxY = Math.max(0, list.contentHeight - list.height)
+    let target = list.contentY
+    if (top < target) {
+      target = top
+    } else if (top + root.rowHeight > target + list.height) {
+      target = top + root.rowHeight - list.height
+    }
+    list.contentY = Math.max(0, Math.min(maxY, target))
+  }
+
+  function scrollToTop() {
+    listScroll.snap()
+    list.contentY = 0
   }
 
   function searchPlaceholder() {
@@ -2039,7 +2061,7 @@ PanelBase {
       headerHeight: root.headerHeight,
       cardHeight: root.cardHeight,
       viewportHeight: root.viewportHeight,
-      scrollY: root.scrollY,
+      scrollY: list.contentY,
       listY: list.y,
       searchIconX: iconOrigin ? iconOrigin.x + searchIconSlot.width / 2 : -1,
       rowIconX: listOrigin ? listOrigin.x + root.iconInset + root.iconSlotSize / 2 : -1,
@@ -2260,7 +2282,7 @@ PanelBase {
   }
 
   onSelectedChanged: if (selected >= 0) {
-    ensureVisible(list.y + rowTop(selected), root.rowHeight, 0)
+    ensureRowVisible(selected)
   }
 
   onOpened: {
@@ -2770,6 +2792,7 @@ PanelBase {
       entries: root.shownEntries
       reorderAnimation: false
       fadeAnimation: false
+      height: Math.min(contentHeight, root.listCap)
 
       delegate: Item {
         id: entry
@@ -3041,6 +3064,13 @@ PanelBase {
           onClicked: root.toggleFavoriteItem(entry.itemKey)
         }
       }
+    }
+
+    SmoothScroll {
+      id: listScroll
+
+      target: list
+      anchors.fill: list
     }
   }
 }

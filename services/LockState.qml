@@ -16,6 +16,8 @@ Singleton {
   property string error: ""
   property string pendingPassword: ""
   property string fieldText: ""
+  property bool retryPending: false
+  property int retryCount: 0
   property var previewScreen: null
   property var lockScreens: []
 
@@ -136,6 +138,8 @@ Singleton {
     root.attempts = 0
     root.error = ""
     root.fieldText = ""
+    root.retryPending = false
+    root.retryCount = 0
     root.setLockedHint(false)
     blurRestoreAnim.startRestore()
   }
@@ -150,6 +154,8 @@ Singleton {
     root.pendingPassword = password
     root.authenticating = true
     root.error = ""
+    root.retryPending = false
+    root.retryCount = 0
     if (pam.start()) {
       return true
     }
@@ -159,6 +165,17 @@ Singleton {
       root.error = "Authentication unavailable"
     }
     return true
+  }
+
+  function startAuthRetry() {
+    root.authenticating = true
+    root.error = ""
+    if (pam.start()) {
+      return
+    }
+    root.authenticating = false
+    root.pendingPassword = ""
+    root.error = "Authentication unavailable"
   }
 
   function finishSuccess() {
@@ -177,6 +194,8 @@ Singleton {
   function finishFailure(message) {
     root.authenticating = false
     root.pendingPassword = ""
+    root.retryPending = false
+    root.retryCount = 0
     root.attempts += 1
     root.fieldText = ""
     if (message !== "") {
@@ -286,7 +305,29 @@ Singleton {
     }
 
     onError: err => {
+      if (root.pendingPassword === "") {
+        root.finishFailure("Authentication unavailable")
+        return
+      }
+      if (root.retryCount < 2) {
+        root.retryCount += 1
+        root.retryPending = true
+        root.authenticating = false
+        root.error = "Authentication unavailable"
+        authRetryTimer.interval = root.retryCount === 1 ? 3000 : 8000
+        authRetryTimer.restart()
+        return
+      }
+      root.pendingPassword = ""
       root.finishFailure("Authentication unavailable")
+    }
+  }
+
+  Timer {
+    id: authRetryTimer
+
+    onTriggered: if ((root.sessionLocked || root.previewActive) && root.pendingPassword !== "" && !root.authenticating) {
+      root.startAuthRetry()
     }
   }
 

@@ -23,7 +23,7 @@ Singleton {
     return Mpd.state === "play" && Mpd.streamNode !== null
   }
 
-  readonly property bool running: Idle.active && IdleConfig.loaded && IdleConfig.enabled && (IdleConfig.testArm !== null || !mediaHold)
+  readonly property bool running: Idle.active && IdleConfig.loaded && IdleConfig.enabled && (IdleConfig.testArm !== null || !mediaHold || LockState.sessionLocked)
 
   function elapsedSeconds() {
     return elapsedMs / 1000
@@ -109,7 +109,7 @@ Singleton {
   }
 
   function restartBaseline() {
-    elapsedMs = IdleConfig.idleSeconds * 1000
+    elapsedMs = (LockState.sessionLocked ? IdleConfig.lockedStartSeconds : IdleConfig.idleSeconds) * 1000
     lastTickAt = Date.now()
   }
 
@@ -149,6 +149,20 @@ Singleton {
     function onStagesChanged() {
       if (root.running) {
         root.restartBaseline()
+      }
+    }
+  }
+
+  Connections {
+    target: LockState
+
+    function onSessionLockedChanged() {
+      if (LockState.sessionLocked) {
+        root.restartBaseline()
+      } else {
+        root.revertAll()
+        root.elapsedMs = 0
+        root.lastTickAt = 0
       }
     }
   }

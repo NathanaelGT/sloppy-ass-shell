@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import "theme"
 import "services"
+import "components"
 import "bar"
 import "panels"
 import "osd"
@@ -913,6 +914,22 @@ ShellRoot {
       return true
     }
 
+    function prewarm(name: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Panels.prewarm(name)
+      return true
+    }
+
+    function prewarmClear(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      Panels.clearPrewarm()
+      return true
+    }
+
     function panelState(name: string): string {
       if (!TestDriver.active) {
         return "{\"enabled\":false}"
@@ -1512,6 +1529,75 @@ ShellRoot {
         return false
       }
       return panel.testSetSection(section, state)
+    }
+
+    function wifiScanOpen(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("network")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testScanOpen()
+    }
+
+    function wifiScanClose(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("network")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testScanClose()
+    }
+
+    function wifiScanState(): string {
+      if (!TestDriver.active) {
+        return "{\"enabled\":false}"
+      }
+      const panel = TestDriver.panel("network")
+      if (!panel || !panel.open) {
+        return "{\"enabled\":true,\"open\":false}"
+      }
+      const state = panel.testScanState()
+      state.enabled = true
+      state.openPanel = panel.open
+      return JSON.stringify(state)
+    }
+
+    function wifiScanDecode(file: string): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("network")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testScanDecodeFile(file)
+    }
+
+    function wifiScanJoin(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("network")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testScanJoin()
+    }
+
+    function wifiScanPaste(): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("network")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.pasteScan()
     }
 
     function bluetoothState(): string {
@@ -2588,6 +2674,8 @@ ShellRoot {
         chainApplied: IdleEngine.applied,
         chainElapsed: Math.round(IdleEngine.elapsedSeconds()),
         chainArmed: IdleConfig.testArm !== null,
+        locked: LockState.sessionLocked,
+        lockedStartSeconds: IdleConfig.lockedStartSeconds,
         audioPlaying: IdleEngine.audioPlaying,
         mediaHold: IdleEngine.mediaHold
       })
@@ -2660,80 +2748,124 @@ ShellRoot {
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      Dashboard {}
+  PanelGate {
+    id: dashboardGate
+
+    panelKey: "dashboard"
+    panelComponent: Component {
+      Dashboard {
+        modelData: dashboardGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      NetworkPanel {}
+  PanelGate {
+    id: networkGate
+
+    panelKey: "network"
+    panelComponent: Component {
+      NetworkPanel {
+        modelData: networkGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      BluetoothPanel {}
+  PanelGate {
+    id: bluetoothGate
+
+    panelKey: "bluetooth"
+    panelComponent: Component {
+      BluetoothPanel {
+        modelData: bluetoothGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      VolumePanel {}
+  PanelGate {
+    id: volumeGate
+
+    panelKey: "volume"
+    panelComponent: Component {
+      VolumePanel {
+        modelData: volumeGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      BatteryPanel {}
+  PanelGate {
+    id: batteryGate
+
+    panelKey: "battery"
+    panelComponent: Component {
+      BatteryPanel {
+        modelData: batteryGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      MusicPanel {}
+  PanelGate {
+    id: musicGate
+
+    panelKey: "music"
+    panelComponent: Component {
+      MusicPanel {
+        modelData: musicGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      NotificationsPanel {}
+  PanelGate {
+    id: notificationsGate
+
+    panelKey: "notifications"
+    panelComponent: Component {
+      NotificationsPanel {
+        modelData: notificationsGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      Launcher {}
+  PanelGate {
+    id: launcherGate
+
+    panelKey: "launcher"
+    panelComponent: Component {
+      Launcher {
+        modelData: launcherGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      PowerMenu {}
+  PanelGate {
+    id: powerGate
+
+    panelKey: "power"
+    panelComponent: Component {
+      PowerMenu {
+        modelData: powerGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      WindowSwitcher {}
+  PanelGate {
+    id: windowSwitcherGate
+
+    panelKey: "window-switcher"
+    panelComponent: Component {
+      WindowSwitcher {
+        modelData: windowSwitcherGate.modelData
+      }
     }
   }
 
-  Variants {
-    model: Quickshell.screens
-    delegate: Component {
-      TrayMenu {}
+  PanelGate {
+    id: trayGate
+
+    panelKey: "tray"
+    panelComponent: Component {
+      TrayMenu {
+        modelData: trayGate.modelData
+      }
     }
   }
 

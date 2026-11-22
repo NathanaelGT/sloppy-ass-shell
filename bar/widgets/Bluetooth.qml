@@ -9,6 +9,7 @@ BarButton {
   id: root
 
   property var screen
+  panelKey: "bluetooth"
 
   active: Panels.openOn("bluetooth", root.screen.name)
 
