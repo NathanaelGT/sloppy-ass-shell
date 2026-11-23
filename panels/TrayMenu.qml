@@ -38,17 +38,24 @@ PanelBase {
     if (!entry || !entry.hasChildren) {
       return false
     }
-    const index = root.expandedEntries.indexOf(entry)
-    if (index >= 0) {
-      const next = root.expandedEntries.slice()
-      next.splice(index, 1)
-      root.expandedEntries = next
-      root.closeKidOpener(entry)
+    if (root.isExpanded(entry)) {
+      root.collapse(entry)
       return false
     }
     root.openKidOpener(entry)
     root.expandedEntries = root.expandedEntries.concat([entry])
     return true
+  }
+
+  function collapse(entry) {
+    const kids = root.kidValues(entry)
+    for (let i = 0; i < kids.length; i++) {
+      if (root.isExpanded(kids[i])) {
+        root.collapse(kids[i])
+      }
+    }
+    root.expandedEntries = root.expandedEntries.filter(e => e !== entry)
+    root.closeKidOpener(entry)
   }
 
   function openKidOpener(entry) {
