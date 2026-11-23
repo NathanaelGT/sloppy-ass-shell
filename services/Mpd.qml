@@ -125,6 +125,10 @@ Singleton {
   readonly property var coverNames: ["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png", "album.jpg", "album.png"]
   readonly property string artUrl: root.coverPath.length > 0 ? ("file://" + root.coverPath) : ""
 
+  function shellQuote(s) {
+    return "'" + String(s).replace(/'/g, "'\\''") + "'"
+  }
+
   function esc(s) {
     if (s === null || s === undefined) {
       return ""
@@ -1105,14 +1109,17 @@ Singleton {
     const out = root.cacheDir + "/cover-" + tag + ".img"
     const folder = root.parentDir(root.song.file)
     const base = root.musicDir.endsWith("/") ? root.musicDir.slice(0, -1) : root.musicDir
-    let cmd = "mkdir -p '" + root.cacheDir + "' && find '" + root.cacheDir + "' -maxdepth 1 -name 'cover-*.img' ! -name 'cover-" + prev + ".img' -delete && "
+    const cacheArg = root.shellQuote(root.cacheDir)
+    const outArg = root.shellQuote(out)
+    const fileArg = root.shellQuote(root.song.file)
+    let cmd = "mkdir -p " + cacheArg + " && find " + cacheArg + " -maxdepth 1 -name 'cover-*.img' ! -name 'cover-" + prev + ".img' -delete && "
     if (base.length > 0) {
       const dir = base + (folder.length > 0 ? "/" + folder : "")
-      cmd += "cd '" + dir + "' 2>/dev/null && for n in " + root.coverNames.join(" ") + "; do [ -f \"$n\" ] && cat \"$n\" > '" + out + "' && break; done; "
+      cmd += "cd " + root.shellQuote(dir) + " 2>/dev/null && for n in " + root.coverNames.join(" ") + "; do [ -f \"$n\" ] && cat \"$n\" > " + outArg + " && break; done; "
     }
-    cmd += "[ -s '" + out + "' ] || mpc -q readpicture '" + root.esc(root.song.file) + "' > '" + out + "' 2>/dev/null; "
-    cmd += "[ -s '" + out + "' ] || mpc -q albumart '" + root.esc(root.song.file) + "' > '" + out + "' 2>/dev/null; "
-    cmd += "test -s '" + out + "'"
+    cmd += "[ -s " + outArg + " ] || mpc -q readpicture " + fileArg + " > " + outArg + " 2>/dev/null; "
+    cmd += "[ -s " + outArg + " ] || mpc -q albumart " + fileArg + " > " + outArg + " 2>/dev/null; "
+    cmd += "test -s " + outArg
     coverProc.command = ["sh", "-c", cmd]
     coverProc.running = true
   }
@@ -1142,10 +1149,12 @@ Singleton {
     trackCoverProc.tag = file
     const out = root.cacheDir + "/track-" + Qt.md5(file) + ".img"
     trackCoverProc.out = out
-    let cmd = "mkdir -p '" + root.cacheDir + "'; "
-    cmd += "[ -s '" + out + "' ] || mpc -q readpicture '" + root.esc(file) + "' > '" + out + "' 2>/dev/null; "
-    cmd += "[ -s '" + out + "' ] || mpc -q albumart '" + root.esc(file) + "' > '" + out + "' 2>/dev/null; "
-    cmd += "test -s '" + out + "'"
+    const outArg = root.shellQuote(out)
+    const fileArg = root.shellQuote(file)
+    let cmd = "mkdir -p " + root.shellQuote(root.cacheDir) + "; "
+    cmd += "[ -s " + outArg + " ] || mpc -q readpicture " + fileArg + " > " + outArg + " 2>/dev/null; "
+    cmd += "[ -s " + outArg + " ] || mpc -q albumart " + fileArg + " > " + outArg + " 2>/dev/null; "
+    cmd += "test -s " + outArg
     trackCoverProc.command = ["sh", "-c", cmd]
     trackCoverProc.running = true
   }
