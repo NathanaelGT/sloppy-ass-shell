@@ -615,23 +615,16 @@ Singleton {
   function tick() {
     const pausedByBanner = root.bannerVisible
     const group = root.bannerGroup
-    let expired = false
-    const next = []
-    for (let i = 0; i < root.records.length; i++) {
-      const r = root.records[i]
+    const snapshot = root.records
+    for (let i = 0; i < snapshot.length; i++) {
+      const r = snapshot[i]
       const inBanner = pausedByBanner && group.indexOf(r) !== -1
       if (!r.sticky && !r.hoverPause && !inBanner && !(root.idle && !root.locked)) {
         r.remaining -= tickTimer.interval
         if (r.remaining <= 0) {
           r.n.expire()
-          expired = true
-          continue
         }
       }
-      next.push(r)
-    }
-    if (expired) {
-      root.records = next
     }
   }
 
