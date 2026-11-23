@@ -286,6 +286,7 @@ Singleton {
     run([sqlite, dbPath, "UPDATE notifications SET deleted_at=strftime('%s','now') WHERE id=" + id])
     const gone = root.history.find(x => x.id === id)
     root.history = root.history.filter(x => x.id !== id)
+    root.forgetImage(id)
     if (gone && gone.ts > root.lastSeen && root.unreadCount > 0) {
       root.unreadCount -= 1
     }
@@ -296,6 +297,8 @@ Singleton {
     root.clearStamp = Date.now()
     run([sqlite, dbPath, "UPDATE notifications SET deleted_at=" + root.clearStamp + " WHERE deleted_at IS NULL"])
     root.history = []
+    root.imageUrls = ({})
+    Quickshell.execDetached(["bash", "-c", "rm -f " + root.imageTmpDir + "/hist-*.png"])
     exhausted = true
     root.unreadCount = 0
     markSeen()
@@ -391,6 +394,16 @@ Singleton {
     })
   }
 
+  function forgetImage(id) {
+    if (imageUrls[id] === undefined) {
+      return
+    }
+    const upd = Object.assign({}, imageUrls)
+    delete upd[id]
+    imageUrls = upd
+    Quickshell.execDetached(["rm", "-f", root.imageTmpDir + "/hist-" + id + ".png"])
+  }
+
   function imageUrlFor(id) {
     return imageUrls[id] === undefined ? "" : imageUrls[id]
   }
@@ -423,7 +436,9 @@ Singleton {
     interval: 10000
     running: false
     onTriggered: {
-      if (root.busy && !dbProc.running) {
+      if (dbProc.running) {
+        dbProc.running = false
+      } else if (root.busy) {
         root.settle(125)
       }
     }
