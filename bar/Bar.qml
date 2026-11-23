@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import "../theme"
 import "../components"
 import "../services"
@@ -95,27 +94,24 @@ PanelWindow {
     height: root.maskFull ? Theme.barThickness : Math.round(4 * Theme.scale)
   }
 
-  Process {
-    id: cursorProc
-    command: ["hyprctl", "cursorpos", "-j"]
-    running: false
-    stdout: StdioCollector {
-      onStreamFinished: {
-        try {
-          if (LockState.sessionLocked) {
-            root.revealed = false
-            Panels.barHoverScreen = ""
-            return
-          }
-          const pos = JSON.parse(text)
-          const nearTop = pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y - Math.round(2 * Theme.scale) && pos.y < screen.y + Math.round(3 * Theme.scale)
-          const overBar = root.shown && pos.x >= screen.x + root.edgeMargin && pos.x < screen.x + root.edgeMargin + root.barWidth && pos.y >= screen.y && pos.y < screen.y + Theme.barThickness
-          root.revealed = nearTop || overBar
-          Panels.barHoverScreen = overBar ? screen.name : (Panels.barHoverScreen === screen.name ? "" : Panels.barHoverScreen)
-        } catch (e) {}
-      }
+  function syncHover() {
+    if (LockState.sessionLocked) {
+      root.revealed = false
+      Panels.barHoverScreen = ""
+      return
     }
+    root.revealed = barHover.hovered
+    Panels.barHoverScreen = barHover.hovered && root.shown ? screen.name : (Panels.barHoverScreen === screen.name ? "" : Panels.barHoverScreen)
   }
+
+  onShownChanged: root.syncHover()
+
+  HoverHandler {
+    id: barHover
+
+    onHoveredChanged: root.syncHover()
+  }
+
   Item {
     id: visual
     x: 0
@@ -239,13 +235,6 @@ PanelWindow {
         }
       }
     }
-  }
-
-  Timer {
-    interval: root.menuOpen ? 120 : 250
-    running: root.autoHide || root.menuOpen
-    repeat: true
-    onTriggered: cursorProc.running = true
   }
 
   Connections {
