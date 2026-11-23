@@ -575,7 +575,8 @@ Singleton {
 
   function captureAvatar(n, item) {
     const key = root.avatarKeyOf(n)
-    if (key === "") {
+    const existing = root.findRecord(n)
+    if (key === "" || (existing && existing.avatarTmp !== "")) {
       return
     }
     root.imageSeq += 1
