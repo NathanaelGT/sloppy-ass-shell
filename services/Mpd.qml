@@ -1175,7 +1175,6 @@ Singleton {
   }
 
   function reorderRemaining() {
-    // collect current queue after current song, reorder by weight
     if (!root.connected || root.queue.length <= 1) {
       return
     }
@@ -1298,7 +1297,6 @@ Singleton {
   }
 
   Component.onCompleted: {
-    // ensure cache dir
     mkdirProc.running = true
   }
 
@@ -1502,12 +1500,8 @@ Singleton {
         root.playSource = obj.playSource || ""
         root.weightedRandom = !!obj.weightedRandom
         root.lastTab = obj.lastTab || 0
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }
-    onLoadFailed: error => {
-    // ignore missing file
-    }
+    onLoadFailed: error => {}
   }
 }
