@@ -2884,7 +2884,7 @@ ShellRoot {
   }
 
   Variants {
-    model: Quickshell.screens
+    model: Quickshell.screens.filter(s => s.name === "eDP-1")
     delegate: Component {
       LockPreview {}
     }
