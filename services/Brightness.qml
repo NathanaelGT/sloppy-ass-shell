@@ -111,6 +111,7 @@ Singleton {
 
   function changeExt(delta) {
     if (Object.keys(ddcMap).length === 0) {
+      detectTimer.restart()
       return
     }
     root.extLevel = clampLevel(root.extLevel + delta)
@@ -464,13 +465,24 @@ Singleton {
   }
 
   Timer {
+    id: detectTimer
+
     interval: 1500
-    repeat: true
     running: true
     onTriggered: {
-      if (!dimProc.running && !restoreProc.running && !workProc.running) {
-        root.detect()
+      if (dimProc.running || restoreProc.running || workProc.running) {
+        detectTimer.restart()
+        return
       }
+      root.detect()
+    }
+  }
+
+  Connections {
+    target: Quickshell
+
+    function onScreensChanged() {
+      detectTimer.restart()
     }
   }
 }
