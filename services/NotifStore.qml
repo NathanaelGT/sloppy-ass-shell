@@ -102,36 +102,6 @@ Singleton {
     return Qt.formatDate(d, "dddd, d MMMM")
   }
 
-  function recomputeDays(source) {
-    const history = source === undefined ? root.history : source
-    const labels = []
-    for (let i = 0; i < history.length; i++) {
-      labels.push(dayLabel(history[i].ts))
-    }
-    const out = []
-    for (let i = 0; i < history.length; i++) {
-      const e = history[i]
-      out.push({
-        id: e.id,
-        ts: e.ts,
-        appName: e.appName,
-        appIcon: e.appIcon,
-        desktopEntry: e.desktopEntry,
-        summary: e.summary,
-        body: e.body,
-        urgency: e.urgency,
-        actions: e.actions,
-        transient: e.transient,
-        imageKind: e.imageKind,
-        hasImage: e.hasImage,
-        day: labels[i],
-        firstInDay: i === 0 || labels[i] !== labels[i - 1],
-        lastInDay: i === labels.length - 1 || labels[i] !== labels[i + 1]
-      })
-    }
-    root.history = out
-  }
-
   function open() {
     run(["bash", "-lc", "mkdir -p " + root.imageTmpDir + "; rm -f " + root.imageTmpDir + "/hist-*.png " + root.imageTmpDir + "/avatar-*.png " + root.imageTmpDir + "/*.img"])
     const cutoff = "strftime('%s','now') - " + retentionDays * 86400
@@ -220,7 +190,7 @@ Singleton {
       if (rows.length < limit) {
         exhausted = true
       }
-      recomputeDays(initial ? page : root.history.concat(page))
+      root.history = initial ? page : root.history.concat(page)
       if (initial) {
         ready = true
       }
@@ -272,7 +242,7 @@ Singleton {
           root.lastError = "notification insert failed (" + code + ") " + out.trim()
           return
         }
-        recomputeDays([
+        root.history = [
           {
             id: id,
             ts: entry.ts,
@@ -287,7 +257,7 @@ Singleton {
             imageKind: avatarReady ? "avatar" : (entry.imageTmp ? "image" : ""),
             hasImage: avatarReady || (entry.imageTmp !== "" && entry.imageTmp !== undefined)
           }
-        ].concat(root.history))
+        ].concat(root.history)
       })
     }
 
@@ -315,7 +285,7 @@ Singleton {
   function removeEntry(id) {
     run([sqlite, dbPath, "UPDATE notifications SET deleted_at=strftime('%s','now') WHERE id=" + id])
     const gone = root.history.find(x => x.id === id)
-    recomputeDays(root.history.filter(x => x.id !== id))
+    root.history = root.history.filter(x => x.id !== id)
     if (gone && gone.ts > root.lastSeen && root.unreadCount > 0) {
       root.unreadCount -= 1
     }
