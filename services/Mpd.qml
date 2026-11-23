@@ -70,8 +70,7 @@ Singleton {
   readonly property var streamNode: {
     const nodes = Pipewire.nodes ? Pipewire.nodes.values : []
     for (let i = 0; i < nodes.length; i++) {
-      const props = nodes[i].properties
-      if (props && props["node.name"] === root.streamName) {
+      if (nodes[i].name === root.streamName) {
         return nodes[i]
       }
     }
