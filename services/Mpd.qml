@@ -1152,9 +1152,9 @@ Singleton {
     const outArg = root.shellQuote(out)
     const fileArg = root.shellQuote(file)
     let cmd = "mkdir -p " + root.shellQuote(root.cacheDir) + "; "
-    cmd += "[ -s " + outArg + " ] || mpc -q readpicture " + fileArg + " > " + outArg + " 2>/dev/null; "
+    cmd += "if [ -s " + outArg + " ]; then touch " + outArg + "; else mpc -q readpicture " + fileArg + " > " + outArg + " 2>/dev/null; fi; "
     cmd += "[ -s " + outArg + " ] || mpc -q albumart " + fileArg + " > " + outArg + " 2>/dev/null; "
-    cmd += "test -s " + outArg
+    cmd += "[ -s " + outArg + " ] || { rm -f " + outArg + "; exit 1; }"
     trackCoverProc.command = ["sh", "-c", cmd]
     trackCoverProc.running = true
   }
@@ -1481,7 +1481,7 @@ Singleton {
   Process {
     id: mkdirProc
 
-    command: ["sh", "-c", "mkdir -p '" + root.cacheDir + "' '" + root.stateFile.substring(0, root.stateFile.lastIndexOf("/")) + "' && find '" + root.cacheDir + "' -name 'track-*.img' -mtime +60 -delete"]
+    command: ["sh", "-c", "mkdir -p '" + root.cacheDir + "' '" + root.stateFile.substring(0, root.stateFile.lastIndexOf("/")) + "' && find '" + root.cacheDir + "' -name 'track-*.img' \\( -mtime +60 -o -empty \\) -delete"]
     running: false
   }
 
