@@ -213,12 +213,11 @@ Singleton {
     return out
   }
 
-  function deviceNodes() {
+  function audioNodes() {
     const out = []
     for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i]
-      if (node.audio && !node.isStream) {
-        out.push(node)
+      if (nodes[i].audio) {
+        out.push(nodes[i])
       }
     }
     return out
@@ -369,7 +368,7 @@ Singleton {
   }
 
   PwObjectTracker {
-    objects: root.deviceNodes()
+    objects: root.audioNodes()
   }
 
   Process {
