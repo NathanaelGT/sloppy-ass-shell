@@ -2050,6 +2050,17 @@ ShellRoot {
       return panel.testProcFilter(text)
     }
 
+    function memPage(page: int): bool {
+      if (!TestDriver.active) {
+        return false
+      }
+      const panel = TestDriver.panel("battery")
+      if (!panel || !panel.open) {
+        return false
+      }
+      return panel.testMemPage(page)
+    }
+
     function procSlash(): bool {
       if (!TestDriver.active) {
         return false

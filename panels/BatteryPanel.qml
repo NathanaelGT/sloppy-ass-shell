@@ -25,6 +25,9 @@ PanelBase {
   property real zramUsed: 0
   property real zswapPool: 0
   property real swapfileUsed: 0
+  property real tmpfsUsed: 0
+  property real shmemUsed: 0
+  property int memPage: 0
   property int spdType: 0
   property int spdTck: 0
   property real gpuUsage: 0
@@ -201,7 +204,7 @@ PanelBase {
   }
 
   function collectScript() {
-    return ["hwmon_find() { for n in \"$@\"; do for h in /sys/class/hwmon/hwmon*; do [ \"$(cat $h/name 2>/dev/null)\" = \"$n\" ] && echo $h && return; done; done; }", "c1=$(grep '^cpu ' /proc/stat)", "p1=$(grep '^cpu[0-9]' /proc/stat)", "sleep 0.2", "c2=$(grep '^cpu ' /proc/stat)", "p2=$(grep '^cpu[0-9]' /proc/stat)", "set -- $c1; u1=$2; n1=$3; s1=$4; i1=$5; io1=$6; irq1=$7; si1=$8; st1=$9", "set -- $c2; u2=$2; n2=$3; s2=$4; i2=$5; io2=$6; irq2=$7; si2=$8; st2=$9", "total1=$((u1+n1+s1+i1+io1+irq1+si1+st1))", "total2=$((u2+n2+s2+i2+io2+irq2+si2+st2))", "idle1=$((i1+io1))", "idle2=$((i2+io2))", "core_pcts=$(paste <(echo \"$p1\") <(echo \"$p2\") | awk '{a=$2+$3+$4+$7+$8+$9; b=$5+$6; ta=a+b; c=$13+$14+$15+$18+$19+$20; d=$16+$17; tc=c+d; dt=tc-ta; di=d-b; v=(dt>0)?(dt-di)/dt*100:0; printf \"%s%.1f\", (NR>1?\" \":\"\"), v}')", "cpu_threads=$(nproc)", "cpu_usage=$(awk -v t1=$total1 -v t2=$total2 -v i1=$idle1 -v i2=$idle2 'BEGIN{dt=t2-t1; di=i2-i1; if(dt>0) printf \"%.1f\", (dt-di)/dt*100; else print 0}')", "cpu_watt=$(cat /run/cpu-watt 2>/dev/null || echo 0)", "cpu_temp=$(awk '{printf \"%.1f\", $1/1000}' \"$(hwmon_find k10temp coretemp)/temp1_input\" 2>/dev/null)", "cpu_name=$(grep -m1 'model name' /proc/cpuinfo | cut -d':' -f2 | sed 's/^ *//')", "cpu_clock=$(awk '/^cpu MHz/ {s+=$4; n++} END {if(n>0) printf \"%.2f\", s/n/1000; else print 0}' /proc/cpuinfo)", "mem_line=$(free -b | awk '/^Mem:/ {print $3, $2}')", "set -- $mem_line; mem_used=$1; mem_total=$2", "zram_used=$(cat /sys/block/zram*/mm_stat 2>/dev/null | awk '{sum+=$3} END{print sum+0}')", "zswap_pool=$(awk '/^Zswap:/ {print $2*1024}' /proc/meminfo)", "swapfile_used=$(awk '/swapfile/ {sum+=$4} END{print sum*1024+0}' /proc/swaps)", "spd_file=$(ls /sys/bus/i2c/devices/*/eeprom 2>/dev/null | head -n1)", "spd_type=$(dd if=\"$spd_file\" bs=1 skip=2 count=1 2>/dev/null | od -A n -t u1 | awk '{print int($1/16)}')", "spd_tck=$(dd if=\"$spd_file\" bs=1 skip=20 count=2 2>/dev/null | od -A n -t u1 | awk '{print $1+$2*256}')", "igpu_card=$(for c in /sys/class/drm/card[0-9]*; do [ \"$(basename $(readlink $c/device/driver 2>/dev/null))\" = \"amdgpu\" ] && echo $c && break; done)", "igpu_usage=$(cat \"$igpu_card/device/gpu_busy_percent\" 2>/dev/null || echo 0)", "igpu_hwmon=$(hwmon_find amdgpu)", "igpu_temp=$(awk '{printf \"%.1f\", $1/1000}' \"$igpu_hwmon/temp1_input\" 2>/dev/null || echo 0)", "igpu_watt=$(awk '{printf \"%.2f\", $1/1000000}' \"$igpu_hwmon/power1_average\" 2>/dev/null || echo 0)", "igpu_freq=$(cat \"$igpu_hwmon/freq1_input\" 2>/dev/null | awk '{printf \"%.0f\", $1/1000000}')", "igpu_vram_used=$(cat \"$igpu_card/device/mem_info_vram_used\" 2>/dev/null || echo 0)", "igpu_vram_total=$(cat \"$igpu_card/device/mem_info_vram_total\" 2>/dev/null || echo 0)", "igpu_name=$(cat \"$igpu_card/device/product_name\" 2>/dev/null || echo \"$cpu_name\" | sed -n 's/.*Radeon \\(.*\\) Graphics.*/AMD Radeon \\1/p')", "cpu_name=$(echo \"$cpu_name\" | sed 's/ w\\/ .*//')", "echo \"cpu_usage=$cpu_usage\"", "echo \"cpu_temp=$cpu_temp\"", "echo \"cpu_watt=$cpu_watt\"", "echo \"cpu_name=$cpu_name\"", "echo \"cpu_clock=$cpu_clock\"", "echo \"cpu_cores=$core_pcts\"", "echo \"cpu_threads=$cpu_threads\"", "echo \"mem_used=$mem_used\"", "echo \"mem_total=$mem_total\"", "echo \"zram_used=$zram_used\"", "echo \"zswap_pool=$zswap_pool\"", "echo \"swapfile_used=$swapfile_used\"", "echo \"spd_type=$spd_type\"", "echo \"spd_tck=$spd_tck\"", "echo \"igpu_usage=$igpu_usage\"", "echo \"igpu_temp=$igpu_temp\"", "echo \"igpu_watt=$igpu_watt\"", "echo \"igpu_freq=$igpu_freq\"", "echo \"igpu_name=$igpu_name\"", "echo \"igpu_vram_used=$igpu_vram_used\"", "echo \"igpu_vram_total=$igpu_vram_total\""].join("\n")
+    return ["hwmon_find() { for n in \"$@\"; do for h in /sys/class/hwmon/hwmon*; do [ \"$(cat $h/name 2>/dev/null)\" = \"$n\" ] && echo $h && return; done; done; }", "c1=$(grep '^cpu ' /proc/stat)", "p1=$(grep '^cpu[0-9]' /proc/stat)", "sleep 0.2", "c2=$(grep '^cpu ' /proc/stat)", "p2=$(grep '^cpu[0-9]' /proc/stat)", "set -- $c1; u1=$2; n1=$3; s1=$4; i1=$5; io1=$6; irq1=$7; si1=$8; st1=$9", "set -- $c2; u2=$2; n2=$3; s2=$4; i2=$5; io2=$6; irq2=$7; si2=$8; st2=$9", "total1=$((u1+n1+s1+i1+io1+irq1+si1+st1))", "total2=$((u2+n2+s2+i2+io2+irq2+si2+st2))", "idle1=$((i1+io1))", "idle2=$((i2+io2))", "core_pcts=$(paste <(echo \"$p1\") <(echo \"$p2\") | awk '{a=$2+$3+$4+$7+$8+$9; b=$5+$6; ta=a+b; c=$13+$14+$15+$18+$19+$20; d=$16+$17; tc=c+d; dt=tc-ta; di=d-b; v=(dt>0)?(dt-di)/dt*100:0; printf \"%s%.1f\", (NR>1?\" \":\"\"), v}')", "cpu_threads=$(nproc)", "cpu_usage=$(awk -v t1=$total1 -v t2=$total2 -v i1=$idle1 -v i2=$idle2 'BEGIN{dt=t2-t1; di=i2-i1; if(dt>0) printf \"%.1f\", (dt-di)/dt*100; else print 0}')", "cpu_watt=$(cat /run/cpu-watt 2>/dev/null || echo 0)", "cpu_temp=$(awk '{printf \"%.1f\", $1/1000}' \"$(hwmon_find k10temp coretemp)/temp1_input\" 2>/dev/null)", "cpu_name=$(grep -m1 'model name' /proc/cpuinfo | cut -d':' -f2 | sed 's/^ *//')", "cpu_clock=$(awk '/^cpu MHz/ {s+=$4; n++} END {if(n>0) printf \"%.2f\", s/n/1000; else print 0}' /proc/cpuinfo)", "mem_line=$(free -b | awk '/^Mem:/ {print $3, $2}')", "set -- $mem_line; mem_used=$1; mem_total=$2", "zram_used=$(cat /sys/block/zram*/mm_stat 2>/dev/null | awk '{sum+=$3} END{print sum+0}')", "zswap_pool=$(awk '/^Zswap:/ {print $2*1024}' /proc/meminfo)", "swapfile_used=$(awk '/swapfile/ {sum+=$4} END{print sum*1024+0}' /proc/swaps)", "tmpfs_used=$(df -B1 -t tmpfs --output=used 2>/dev/null | awk 'NR>1 {sum+=$1} END{print sum+0}')", "shmem=$(awk '/^Shmem:/ {print $2*1024}' /proc/meminfo)", "spd_file=$(ls /sys/bus/i2c/devices/*/eeprom 2>/dev/null | head -n1)", "spd_type=$(dd if=\"$spd_file\" bs=1 skip=2 count=1 2>/dev/null | od -A n -t u1 | awk '{print int($1/16)}')", "spd_tck=$(dd if=\"$spd_file\" bs=1 skip=20 count=2 2>/dev/null | od -A n -t u1 | awk '{print $1+$2*256}')", "igpu_card=$(for c in /sys/class/drm/card[0-9]*; do [ \"$(basename $(readlink $c/device/driver 2>/dev/null))\" = \"amdgpu\" ] && echo $c && break; done)", "igpu_usage=$(cat \"$igpu_card/device/gpu_busy_percent\" 2>/dev/null || echo 0)", "igpu_hwmon=$(hwmon_find amdgpu)", "igpu_temp=$(awk '{printf \"%.1f\", $1/1000}' \"$igpu_hwmon/temp1_input\" 2>/dev/null || echo 0)", "igpu_watt=$(awk '{printf \"%.2f\", $1/1000000}' \"$igpu_hwmon/power1_average\" 2>/dev/null || echo 0)", "igpu_freq=$(cat \"$igpu_hwmon/freq1_input\" 2>/dev/null | awk '{printf \"%.0f\", $1/1000000}')", "igpu_vram_used=$(cat \"$igpu_card/device/mem_info_vram_used\" 2>/dev/null || echo 0)", "igpu_vram_total=$(cat \"$igpu_card/device/mem_info_vram_total\" 2>/dev/null || echo 0)", "igpu_name=$(cat \"$igpu_card/device/product_name\" 2>/dev/null || echo \"$cpu_name\" | sed -n 's/.*Radeon \\(.*\\) Graphics.*/AMD Radeon \\1/p')", "cpu_name=$(echo \"$cpu_name\" | sed 's/ w\\/ .*//')", "echo \"cpu_usage=$cpu_usage\"", "echo \"cpu_temp=$cpu_temp\"", "echo \"cpu_watt=$cpu_watt\"", "echo \"cpu_name=$cpu_name\"", "echo \"cpu_clock=$cpu_clock\"", "echo \"cpu_cores=$core_pcts\"", "echo \"cpu_threads=$cpu_threads\"", "echo \"mem_used=$mem_used\"", "echo \"mem_total=$mem_total\"", "echo \"zram_used=$zram_used\"", "echo \"zswap_pool=$zswap_pool\"", "echo \"swapfile_used=$swapfile_used\"", "echo \"tmpfs_used=$tmpfs_used\"", "echo \"shmem=$shmem\"", "echo \"spd_type=$spd_type\"", "echo \"spd_tck=$spd_tck\"", "echo \"igpu_usage=$igpu_usage\"", "echo \"igpu_temp=$igpu_temp\"", "echo \"igpu_watt=$igpu_watt\"", "echo \"igpu_freq=$igpu_freq\"", "echo \"igpu_name=$igpu_name\"", "echo \"igpu_vram_used=$igpu_vram_used\"", "echo \"igpu_vram_total=$igpu_vram_total\""].join("\n")
   }
 
   function refresh() {
@@ -298,6 +301,28 @@ PanelBase {
           value: "N/A"
         }]
     }
+    if (key === "mem" && root.memPage === 1) {
+      const stored = fmtBytesParts(root.tmpfsUsed)
+      const inRam = fmtBytesParts(root.shmemUsed)
+      const swapped = fmtBytesParts(Math.max(0, root.tmpfsUsed - root.shmemUsed))
+      return [
+        {
+          label: "Stored",
+          value: stored.num,
+          unit: stored.unit
+        },
+        {
+          label: "In RAM",
+          value: inRam.num,
+          unit: inRam.unit
+        },
+        {
+          label: "Swapped",
+          value: swapped.num,
+          unit: swapped.unit
+        }
+      ]
+    }
     if (key === "mem") {
       const zswap = fmtBytesParts(root.zswapPool)
       const zram = fmtBytesParts(root.zramUsed)
@@ -369,19 +394,22 @@ PanelBase {
         ratio: 0,
         segments: root.cpuCores,
         mark: 0,
-        mark2: 0
+        mark2: 0,
+        mark3: 0
       }
     }
     if (key === "mem") {
       const zram = Math.max(0, Math.min(root.zramUsed, root.memUsed))
       const zswap = Math.max(0, Math.min(root.zswapPool, root.memUsed - zram))
+      const tmpfs = Math.max(0, Math.min(root.shmemUsed, root.memUsed - zram - zswap))
       return {
         label: "RAM",
         value: fmtBytes(root.memUsed) + " / " + fmtBytes(root.memTotal),
-        ratio: root.memTotal > 0 ? Math.max(0, Math.min(1, (root.memUsed - zram - zswap) / root.memTotal)) : 0,
+        ratio: root.memTotal > 0 ? Math.max(0, Math.min(1, (root.memUsed - zram - zswap - tmpfs) / root.memTotal)) : 0,
         segments: [],
         mark: root.memTotal > 0 ? Math.max(0, Math.min(1, zswap / root.memTotal)) : 0,
-        mark2: root.memTotal > 0 ? Math.max(0, Math.min(1, zram / root.memTotal)) : 0
+        mark2: root.memTotal > 0 ? Math.max(0, Math.min(1, zram / root.memTotal)) : 0,
+        mark3: root.memTotal > 0 ? Math.max(0, Math.min(1, tmpfs / root.memTotal)) : 0
       }
     }
     if (key === "gpu") {
@@ -391,7 +419,8 @@ PanelBase {
         ratio: root.gpuVramTotal > 0 ? root.gpuVramUsed / root.gpuVramTotal : 0,
         segments: [],
         mark: 0,
-        mark2: 0
+        mark2: 0,
+        mark3: 0
       }
     }
     if (key === "igpu") {
@@ -401,7 +430,8 @@ PanelBase {
         ratio: root.igpuVramTotal > 0 ? root.igpuVramUsed / root.igpuVramTotal : 0,
         segments: [],
         mark: 0,
-        mark2: 0
+        mark2: 0,
+        mark3: 0
       }
     }
     return {
@@ -410,7 +440,8 @@ PanelBase {
       ratio: 0,
       segments: [],
       mark: 0,
-      mark2: 0
+      mark2: 0,
+      mark3: 0
     }
   }
 
@@ -477,6 +508,7 @@ PanelBase {
   function resetState() {
     root.procGen++
     root.primed = false
+    root.memPage = 0
     root.refresh()
     root.procPrev = ({})
     root.procTs = 0
@@ -1117,6 +1149,14 @@ PanelBase {
     return true
   }
 
+  function testMemPage(page) {
+    if (page !== 0 && page !== 1) {
+      return false
+    }
+    root.memPage = page
+    return true
+  }
+
   function testProcSlash() {
     root.keyPressed({
       key: Qt.Key_Slash,
@@ -1526,6 +1566,10 @@ PanelBase {
             root.zswapPool = isNaN(num) ? 0 : num
           } else if (key === "swapfile_used") {
             root.swapfileUsed = isNaN(num) ? 0 : num
+          } else if (key === "tmpfs_used") {
+            root.tmpfsUsed = isNaN(num) ? 0 : num
+          } else if (key === "shmem") {
+            root.shmemUsed = isNaN(num) ? 0 : num
           } else if (key === "spd_type") {
             root.spdType = isNaN(num) ? 0 : num
           } else if (key === "spd_tck") {
@@ -1772,6 +1816,68 @@ PanelBase {
         antialiasing: true
         implicitHeight: cardCol.implicitHeight + Theme.gap * 2 + (hasBar ? Math.round(4 * Theme.scale) : 0)
 
+        MouseArea {
+          anchors.fill: parent
+          enabled: card.modelData.key === "mem"
+          acceptedButtons: Qt.RightButton
+          onClicked: root.memPage = 1 - root.memPage
+        }
+
+        Item {
+          id: pageDots
+
+          readonly property real dotSize: Math.round(5 * Theme.scale)
+          readonly property real dotStep: dotSize + Math.round(4 * Theme.scale)
+
+          anchors.top: parent.top
+          anchors.topMargin: Theme.gap
+          anchors.horizontalCenter: parent.horizontalCenter
+          width: dotStep + dotSize
+          height: dotSize
+          visible: card.modelData.key === "mem"
+
+          Repeater {
+            model: 2
+
+            delegate: Rectangle {
+              required property int index
+
+              x: index * pageDots.dotStep
+              width: pageDots.dotSize
+              height: width
+              radius: width / 2
+              color: Theme.surfaceHigher
+
+              MouseArea {
+                anchors.centerIn: parent
+                width: Math.round(16 * Theme.scale)
+                height: width
+                enabled: parent.index !== root.memPage
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: root.memPage = parent.index
+              }
+            }
+          }
+
+          Rectangle {
+            x: root.memPage * pageDots.dotStep
+            width: pageDots.dotSize
+            height: width
+            radius: width / 2
+            color: card.modelData.accent
+
+            Behavior on x {
+              enabled: root.primed
+
+              NumberAnimation {
+                duration: 250
+                easing.type: Easing.OutBack
+                easing.overshoot: 3
+              }
+            }
+          }
+        }
+
         Column {
           id: cardCol
 
@@ -1957,9 +2063,11 @@ PanelBase {
 
               readonly property real seg1: Math.max(0, Math.min(1, card.bar.ratio)) * width
               readonly property real seg2: seg1 + Math.max(0, Math.min(1, card.bar.mark)) * width
-              readonly property real segEnd: seg2 + Math.max(0, Math.min(1, card.bar.mark2)) * width
+              readonly property real seg3: seg2 + Math.max(0, Math.min(1, card.bar.mark2)) * width
+              readonly property real segEnd: seg3 + Math.max(0, Math.min(1, card.bar.mark3)) * width
               readonly property color zswapColor: Qt.rgba(card.modelData.accent.r * 0.75 + color.r * 0.15, card.modelData.accent.g * 0.75 + color.g * 0.15, card.modelData.accent.b * 0.75 + color.b * 0.15, 1)
               readonly property color zramColor: Qt.rgba(card.modelData.accent.r * 0.5 + color.r * 0.3, card.modelData.accent.g * 0.5 + color.g * 0.3, card.modelData.accent.b * 0.5 + color.b * 0.3, 1)
+              readonly property color tmpfsColor: Qt.rgba(card.modelData.accent.r * 0.3 + color.r * 0.5, card.modelData.accent.g * 0.3 + color.g * 0.5, card.modelData.accent.b * 0.3 + color.b * 0.5, 1)
 
               width: parent.width
               height: Math.round(6 * Theme.scale)
@@ -2011,9 +2119,33 @@ PanelBase {
               Rectangle {
                 visible: card.bar.mark2 > 0
                 x: barTrack.seg2
-                width: Math.max(0, barTrack.segEnd - parent.height / 2 - barTrack.seg2)
+                width: Math.max(0, Math.min(barTrack.seg3 + parent.height / 2, barTrack.segEnd) - barTrack.seg2)
                 height: parent.height
                 color: barTrack.zramColor
+
+                Behavior on x {
+                  enabled: root.primed
+
+                  NumberAnimation {
+                    duration: root.animMs
+                  }
+                }
+
+                Behavior on width {
+                  enabled: root.primed
+
+                  NumberAnimation {
+                    duration: root.animMs
+                  }
+                }
+              }
+
+              Rectangle {
+                visible: card.bar.mark3 > 0
+                x: barTrack.seg3
+                width: Math.max(0, barTrack.segEnd - parent.height / 2 - barTrack.seg3)
+                height: parent.height
+                color: barTrack.tmpfsColor
 
                 Behavior on x {
                   enabled: root.primed
@@ -2038,7 +2170,7 @@ PanelBase {
                 width: parent.height
                 height: parent.height
                 radius: height / 2
-                color: card.bar.mark2 > 0 ? barTrack.zramColor : card.bar.mark > 0 ? barTrack.zswapColor : card.modelData.accent
+                color: card.bar.mark3 > 0 ? barTrack.tmpfsColor : card.bar.mark2 > 0 ? barTrack.zramColor : card.bar.mark > 0 ? barTrack.zswapColor : card.modelData.accent
 
                 Behavior on x {
                   enabled: root.primed

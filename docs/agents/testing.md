@@ -55,6 +55,8 @@ right-click context menu for a row, `test procMenuState` reads it back,
 `test procMenuInvoke <index>` clicks an entry (dangerous ones arm first and
 return `armed`, the second invoke executes — kills are real),
 `test procMenuClose` drops it.
+`test memPage <0|1>` sets the Memory card substat page (0 swap, 1 tmpfs;
+idempotent, mirrors the card's right-click; reopening resets to 0).
 
 ## Music
 
