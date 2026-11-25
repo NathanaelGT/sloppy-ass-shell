@@ -130,10 +130,12 @@ PanelWindow {
   Region {
     id: cardMask
 
+    readonly property real cardTop: clipFrame.y + visual.y + root.shadowPad
+
     x: root.cardX - root.cornerRadius
-    y: clipFrame.y + visual.y + root.shadowPad
+    y: Math.max(clipFrame.y, cardTop)
     width: root.cardWidth + root.cornerRadius * 2
-    height: root.cardHeight
+    height: Math.max(0, cardTop + root.cardHeight - y)
     radius: root.cornerRadius
   }
 
