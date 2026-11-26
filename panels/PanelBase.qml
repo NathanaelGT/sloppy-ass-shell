@@ -24,6 +24,7 @@ PanelWindow {
   property bool exclusiveKeyboard: false
   property bool forceKeyboard: false
   property bool ownerFocused: false
+  property bool typingActive: false
   property bool dismissOnBackdrop: true
   property bool autoFocusKeyCatcher: true
   property var cancelItem: null
@@ -109,7 +110,7 @@ PanelWindow {
   property bool cardHovered: false
   property bool popupOpen: false
   readonly property bool exitCloseActive: open && dismissOnBackdrop && !exclusiveFocus
-  readonly property bool keepOpen: cardHovered || Panels.barHoverScreen === screenId || popupOpen || (root.scrollDriver ? root.scrollDriver.dragActive : false) || ((root.exclusiveKeyboard || root.exclusiveFocus) && root.ownerFocused)
+  readonly property bool keepOpen: cardHovered || Panels.barHoverScreen === screenId || popupOpen || (root.scrollDriver ? root.scrollDriver.dragActive : false) || ((root.typingActive || root.exclusiveFocus) && root.ownerFocused)
 
   color: "transparent"
   visible: requested || closeDelay.running
@@ -125,7 +126,7 @@ PanelWindow {
   aboveWindows: true
   focusable: true
 
-  mask: root.popupOpen ? fullMask : cardMask
+  mask: root.popupOpen || root.typingActive ? fullMask : cardMask
 
   Region {
     id: cardMask

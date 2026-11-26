@@ -11,6 +11,7 @@ PanelBase {
   panelName: "battery"
   cardWidth: Theme.panelWidth * 2
   exclusiveKeyboard: true
+  typingActive: filterInput.activeFocus || root.procFiltered
   popupOpen: procMenu.opened
 
   property real cpuUsage: 0
