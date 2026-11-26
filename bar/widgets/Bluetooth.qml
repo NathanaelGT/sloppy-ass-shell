@@ -36,11 +36,9 @@ BarButton {
     return false
   }
 
-  visible: on
-
   Icon {
     anchors.centerIn: parent
-    name: root.connected ? "bluetooth-connected" : "bluetooth"
+    name: !root.on ? "bluetooth-off" : root.connected ? "bluetooth-connected" : "bluetooth"
     color: root.connected ? Theme.primary : Theme.text
     font.pixelSize: Theme.iconSizeLarge
   }
